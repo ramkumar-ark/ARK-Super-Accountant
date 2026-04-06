@@ -27,7 +27,7 @@ interface FooterColumnProps {
 function FooterColumn({ heading, links }: FooterColumnProps) {
   return (
     <div>
-      <p className="text-[#475569] text-xs font-semibold uppercase tracking-widest mb-4">
+      <p className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">
         {heading}
       </p>
       <ul className="flex flex-col gap-3">
@@ -62,7 +62,7 @@ export function LandingFooter() {
               Super Accountant
             </a>
             <p className="text-text-muted text-sm mb-2">Accounting on Autopilot.</p>
-            <p className="text-[#64748B] text-xs leading-relaxed">
+            <p className="text-text-muted text-xs leading-relaxed">
               Automate your books, reports, and filings — all in one platform.
             </p>
           </div>
@@ -74,14 +74,14 @@ export function LandingFooter() {
 
         {/* Bottom bar */}
         <div className="border-t border-sidebar-border pt-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-[#475569] text-[13px]">
+          <p className="text-text-secondary text-[13px]">
             © 2026 Super Accountant. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
-            <a href="#" className="text-[#475569] text-[13px] hover:text-white transition-colors duration-150">
+            <a href="#" className="text-text-secondary text-[13px] hover:text-white transition-colors duration-150">
               Privacy
             </a>
-            <a href="#" className="text-[#475569] text-[13px] hover:text-white transition-colors duration-150">
+            <a href="#" className="text-text-secondary text-[13px] hover:text-white transition-colors duration-150">
               Terms
             </a>
           </div>
