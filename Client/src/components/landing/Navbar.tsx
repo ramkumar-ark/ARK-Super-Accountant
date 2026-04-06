@@ -60,6 +60,7 @@ export function Navbar() {
           onClick={() => setMobileOpen((prev) => !prev)}
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           aria-expanded={mobileOpen}
+          aria-controls="mobile-menu"
         >
           {mobileOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
         </button>
@@ -67,7 +68,7 @@ export function Navbar() {
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-white px-6 py-4 flex flex-col gap-4">
+        <div id="mobile-menu" className="md:hidden border-t border-border bg-white px-6 py-4 flex flex-col gap-4">
           {navLinks.map((link) => (
             <a
               key={link.label}
