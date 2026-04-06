@@ -27,12 +27,12 @@ const problems: ProblemCard[] = [
 
 export function ProblemSection() {
   return (
-    <section className="bg-sidebar-bg py-24 px-6">
+    <section aria-labelledby="problem-heading" className="bg-sidebar-bg py-24 px-6">
       <div className="max-w-6xl mx-auto">
         <p className="text-xs font-semibold uppercase tracking-widest text-text-muted text-center mb-4">
           THE PROBLEM
         </p>
-        <h2 className="text-[32px] font-bold text-white text-center mb-12 max-w-2xl mx-auto leading-tight">
+        <h2 id="problem-heading" className="text-[32px] font-bold text-white text-center mb-12 max-w-2xl mx-auto leading-tight">
           Manual accounting is costing you more than you think.
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -42,7 +42,7 @@ export function ProblemSection() {
               className="border border-white/10 rounded-lg p-6"
             >
               <p.icon size={24} className="text-white mb-4" aria-hidden="true" />
-              <h3 className="text-[#F1F5F9] text-lg font-semibold mb-2">{p.title}</h3>
+              <h3 className="text-surface-raised text-lg font-semibold mb-2">{p.title}</h3>
               <p className="text-text-muted text-sm leading-relaxed">{p.body}</p>
             </div>
           ))}
