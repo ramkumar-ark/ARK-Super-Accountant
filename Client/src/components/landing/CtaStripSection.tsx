@@ -13,7 +13,7 @@ export function CtaStripSection() {
         <h2 id="cta-heading" className="text-[32px] font-bold text-white mb-4">
           Ready to put your accounting on autopilot?
         </h2>
-        <p className="text-xl text-white/80 mb-8 leading-relaxed">
+        <p className="text-lg text-white/80 mb-8 leading-relaxed">
           Join businesses and CA firms who've automated their compliance and reclaimed their time.
         </p>
         <a
