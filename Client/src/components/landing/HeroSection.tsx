@@ -8,7 +8,7 @@ const trustBadges = [
 
 export function HeroSection() {
   return (
-    <section className="bg-white pt-[120px] pb-24 px-6">
+    <section aria-labelledby="hero-heading" className="bg-white pt-[120px] pb-24 px-6">
       <div className="max-w-3xl mx-auto text-center">
         {/* Eyebrow pill */}
         <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary-light text-primary text-xs font-medium mb-6">
@@ -16,7 +16,7 @@ export function HeroSection() {
         </div>
 
         {/* Headline */}
-        <h1 className="text-[60px] font-bold leading-[1.15] tracking-[-0.02em] text-text-primary mb-6">
+        <h1 id="hero-heading" className="text-[60px] font-bold leading-[1.15] tracking-[-0.02em] text-text-primary mb-6">
           Accounting on{' '}
           <span className="text-primary">Autopilot</span>.{' '}
           Compliance Without the Chaos.
