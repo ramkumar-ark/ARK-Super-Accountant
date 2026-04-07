@@ -67,30 +67,33 @@ export function Navbar() {
       </div>
 
       {/* Mobile drawer */}
-      {mobileOpen && (
-        <div id="mobile-menu" className="md:hidden border-t border-border bg-white px-6 py-4 flex flex-col gap-4">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="text-text-secondary text-sm font-medium hover:text-text-primary transition-colors duration-150"
-              onClick={() => setMobileOpen(false)}
-            >
-              {link.label}
-            </a>
-          ))}
-          <hr className="border-border" />
-          <a href="/login" className="text-primary text-sm font-medium">
-            Log In
-          </a>
+      <div
+        id="mobile-menu"
+        hidden={!mobileOpen}
+        className="md:hidden border-t border-border bg-white px-6 py-4 flex flex-col gap-4"
+      >
+        {navLinks.map((link) => (
           <a
-            href="/signup"
-            className="bg-primary text-white text-sm font-medium px-4 py-2.5 rounded-lg text-center min-h-[44px] flex items-center justify-center cursor-pointer"
+            key={link.label}
+            href={link.href}
+            className="text-text-secondary text-sm font-medium hover:text-text-primary transition-colors duration-150"
+            onClick={() => setMobileOpen(false)}
           >
-            Get Started Free
+            {link.label}
           </a>
-        </div>
-      )}
+        ))}
+        <hr className="border-border" />
+        <a href="/login" className="text-primary text-sm font-medium" onClick={() => setMobileOpen(false)}>
+          Log In
+        </a>
+        <a
+          href="/signup"
+          className="bg-primary text-white text-sm font-medium px-4 py-2.5 rounded-lg text-center min-h-[44px] flex items-center justify-center cursor-pointer"
+          onClick={() => setMobileOpen(false)}
+        >
+          Get Started Free
+        </a>
+      </div>
     </nav>
   )
 }
