@@ -5,9 +5,14 @@ import {
   createRouter,
   createRoute,
   createRootRoute,
+  redirect,
 } from '@tanstack/react-router'
 import './index.css'
 import { LandingPage } from '@/pages/LandingPage'
+import { LoginPage } from '@/pages/LoginPage'
+import { SignupPage } from '@/pages/SignupPage'
+import { DashboardPage } from '@/pages/DashboardPage'
+import { useAuthStore } from '@/store/authStore'
 
 const rootRoute = createRootRoute()
 
@@ -20,16 +25,42 @@ const indexRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  component: () => <div className="p-8 text-text-secondary">Login — coming soon</div>,
+  beforeLoad: () => {
+    if (useAuthStore.getState().isAuthenticated) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: LoginPage,
 })
 
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/signup',
-  component: () => <div className="p-8 text-text-secondary">Sign Up — coming soon</div>,
+  beforeLoad: () => {
+    if (useAuthStore.getState().isAuthenticated) {
+      throw redirect({ to: '/dashboard' })
+    }
+  },
+  component: SignupPage,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, signupRoute])
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard',
+  beforeLoad: () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      throw redirect({ to: '/login' })
+    }
+  },
+  component: DashboardPage,
+})
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  loginRoute,
+  signupRoute,
+  dashboardRoute,
+])
 
 const router = createRouter({ routeTree })
 
