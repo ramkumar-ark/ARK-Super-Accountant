@@ -41,6 +41,7 @@ application-local.yml
 # Node / React / Vite (Client/)
 # ──────────────────────────────────────────
 node_modules/
+.vite/
 dist/
 dist-ssr/
 *.local
@@ -67,3 +68,4 @@ src/routeTree.gen.ts
 *.bak
 ~$*
 Design documents/~$*
+.planning/
