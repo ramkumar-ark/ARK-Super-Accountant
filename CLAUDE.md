@@ -66,3 +66,30 @@ cd Service/superaccountant
 ## Database
 
 PostgreSQL must be running locally on port 5432. Schema is auto-managed by Hibernate (`ddl-auto: update`). Credentials are in `application.properties`.
+
+## gstack
+
+Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools directly.
+
+Available gstack skills:
+- `/office-hours` - Office hours discussion
+- `/plan-ceo-review` - CEO review of plans
+- `/plan-eng-review` - Engineering review of plans
+- `/plan-design-review` - Design review of plans
+- `/design-consultation` - Design consultation
+- `/review` - Code review
+- `/ship` - Ship a feature
+- `/browse` - Web browsing (use this for all web browsing)
+- `/qa` - QA testing
+- `/qa-only` - QA testing only
+- `/design-review` - Design review
+- `/setup-browser-cookies` - Set up browser cookies
+- `/retro` - Retrospective
+- `/investigate` - Investigate an issue
+- `/document-release` - Document a release
+- `/codex` - Codex tasks
+- `/careful` - Careful mode
+- `/freeze` - Freeze changes
+- `/guard` - Guard mode
+- `/unfreeze` - Unfreeze changes
+- `/gstack-upgrade` - Upgrade gstack

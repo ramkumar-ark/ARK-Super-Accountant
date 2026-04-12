@@ -1,0 +1,69 @@
+# ──────────────────────────────────────────
+# OS & Editor
+# ──────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.idea/
+.claude/skills/ui-ux-pro-max
+*.iml
+*.iws
+*.ipr
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ──────────────────────────────────────────
+# Java / Maven (Service/)
+# ──────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Spring Boot
+*.log
+application-local.properties
+application-local.yml
+
+# ──────────────────────────────────────────
+# Node / React / Vite (Client/)
+# ──────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TanStack Router generated file
+src/routeTree.gen.ts
+
+# ──────────────────────────────────────────
+# Git Worktrees
+# ──────────────────────────────────────────
+.worktrees/
+
+# ──────────────────────────────────────────
+# Misc
+# ──────────────────────────────────────────
+*.tmp
+*.bak
+~$*
+Design documents/~$*

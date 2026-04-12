@@ -24,15 +24,19 @@ public class JwtUtils {
     private int jwtExpirationMs;
 
     public String generateJwtToken(Authentication authentication) {
-
         UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
 
-        return Jwts.builder()
-                .setSubject((userPrincipal.getUsername()))
+        var builder = Jwts.builder()
+                .setSubject(userPrincipal.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(key(), SignatureAlgorithm.HS256)
-                .compact();
+                .signWith(key(), SignatureAlgorithm.HS256);
+
+        if (userPrincipal.getOrganizationId() != null) {
+            builder.claim("organizationId", userPrincipal.getOrganizationId().toString());
+        }
+
+        return builder.compact();
     }
 
     private Key key() {
