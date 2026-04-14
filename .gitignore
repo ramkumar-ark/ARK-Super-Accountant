@@ -6,7 +6,7 @@ Thumbs.db
 desktop.ini
 
 .idea/
-.claude/skills/ui-ux-pro-max
+.claude/*
 *.iml
 *.iws
 *.ipr

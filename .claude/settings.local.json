@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C \"F:\\\\Software Projects\\\\Super Accountant\" log --oneline -20)",
-      "Bash(git -C \"F:\\\\Software Projects\\\\Super Accountant\" check-ignore Service/superaccountant/target)",
-      "Bash(test:*)"
-    ]
-  }
-}
