@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +28,7 @@ public class TallyImportController {
     @Autowired
     private TallyParserService tallyParserService;
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
     @PostMapping("/import")
     public ResponseEntity<?> importTallyData(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +32,7 @@ public class PreconfiguredMastersController {
     @Autowired
     private PreconfiguredMasterRepository masterRepository;
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<?> list(
             @RequestParam(required = false) LedgerCategory category,
@@ -53,6 +55,7 @@ public class PreconfiguredMastersController {
         return ResponseEntity.ok(results.map(this::toResponse));
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
     @PostMapping
     public ResponseEntity<?> create(
             @Valid @RequestBody CreatePreconfiguredMasterRequest request,
@@ -75,6 +78,7 @@ public class PreconfiguredMastersController {
         return ResponseEntity.status(201).body(toResponse(master));
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable UUID id,
@@ -100,6 +104,7 @@ public class PreconfiguredMastersController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @PathVariable UUID id,
@@ -121,6 +126,7 @@ public class PreconfiguredMastersController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
     @PostMapping("/bulk")
     public ResponseEntity<?> bulkImport(
             @Valid @RequestBody BulkImportRequest request,
@@ -151,6 +157,7 @@ public class PreconfiguredMastersController {
                 .build());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @PostMapping("/onboard")
     public ResponseEntity<?> onboard(
             @RequestBody OnboardRequest request,
@@ -192,6 +199,7 @@ public class PreconfiguredMastersController {
         }
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/validation-rules")
     public ResponseEntity<?> listValidationRules() {
         // Delegation to rule config repo not injected here to keep controller lean.

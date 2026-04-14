@@ -12,6 +12,7 @@ import { LandingPage } from '@/pages/LandingPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { SignupPage } from '@/pages/SignupPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { OrganizationSetupPage } from '@/pages/OrganizationSetupPage'
 import { useAuthStore } from '@/store/authStore'
 
 const rootRoute = createRootRoute()
@@ -55,11 +56,23 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 })
 
+const orgSetupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/organization/setup',
+  beforeLoad: () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      throw redirect({ to: '/login' })
+    }
+  },
+  component: OrganizationSetupPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   signupRoute,
   dashboardRoute,
+  orgSetupRoute,
 ])
 
 const router = createRouter({ routeTree })

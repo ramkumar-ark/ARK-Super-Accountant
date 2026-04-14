@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,6 +56,7 @@ public class UploadController {
     @Autowired
     private ValidationRuleConfigRepository ruleConfigRepository;
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
     @PostMapping("/uploads")
     public ResponseEntity<?> uploadMasters(
             @RequestParam("file") MultipartFile file,
@@ -113,6 +115,7 @@ public class UploadController {
         return ResponseEntity.status(201).body(toUploadResponse(job, findings));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/uploads")
     public ResponseEntity<?> listUploads(
             @RequestParam(required = false) UploadJobStatus status,
@@ -135,6 +138,7 @@ public class UploadController {
         return ResponseEntity.ok(jobs.map(j -> toUploadResponse(j, null)));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/uploads/{id}/mismatches")
     public ResponseEntity<?> listMismatches(
             @PathVariable UUID id,
@@ -158,6 +162,7 @@ public class UploadController {
         return ResponseEntity.ok(findings.map(this::toFindingResponse));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/uploads/{id}/mismatches/export")
     public ResponseEntity<?> exportMismatches(
             @PathVariable UUID id,
@@ -187,6 +192,7 @@ public class UploadController {
                 .body(csv.toString());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
     @PatchMapping("/uploads/{jobId}/mismatches/{findingId}/resolve")
     public ResponseEntity<?> resolveFinding(
             @PathVariable UUID jobId,
@@ -222,6 +228,7 @@ public class UploadController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/validation-rules")
     public ResponseEntity<?> listValidationRules() {
         return ResponseEntity.ok(ruleConfigRepository.findByActiveTrueOrderByExecutionOrderAsc());

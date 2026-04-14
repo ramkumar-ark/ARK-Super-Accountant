@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { api } from '@/lib/api'
+import { InviteSignupBanner } from '@/components/InviteSignupBanner'
 
 const ROLES = [
   { value: 'owner', label: 'Owner' },
@@ -19,6 +20,26 @@ export function SignupPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [inviteContext, setInviteContext] = useState<{ orgName: string; role: string } | null>(null)
+  const [inviteError, setInviteError] = useState('')
+
+  const search = new URLSearchParams(window.location.search)
+  const inviteToken = search.get('invite')
+
+  useEffect(() => {
+    if (!inviteToken) return
+    api.get(`/auth/invite/${inviteToken}`)
+      .then((res) => {
+        setInviteContext({ orgName: res.data.organizationName, role: res.data.role })
+      })
+      .catch((err: unknown) => {
+        const msg =
+          err instanceof Error && 'response' in err
+            ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+            : undefined
+        setInviteError(msg ?? 'This invite link is invalid or has expired.')
+      })
+  }, [inviteToken])
 
   function set(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -30,8 +51,13 @@ export function SignupPage() {
     setError('')
     setLoading(true)
     try {
-      await api.post('/auth/signup', form)
-      navigate({ to: '/login' })
+      const url = inviteToken ? `/auth/signup?invite=${inviteToken}` : '/auth/signup'
+      await api.post(url, form)
+      if (inviteToken) {
+        navigate({ to: '/dashboard' })
+      } else {
+        navigate({ to: '/login' })
+      }
     } catch (err: unknown) {
       const msg =
         err instanceof Error && 'response' in err
@@ -48,6 +74,8 @@ export function SignupPage() {
     form.email.includes('@') &&
     form.password.length >= 6
 
+  const formDisabled = loading || !!inviteError
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] px-4">
       <div className="w-full max-w-sm">
@@ -60,6 +88,14 @@ export function SignupPage() {
             Create your account
           </p>
         </div>
+
+        {inviteToken && (
+          <InviteSignupBanner
+            orgName={inviteContext?.orgName}
+            role={inviteContext?.role}
+            error={inviteError || undefined}
+          />
+        )}
 
         <div className="bg-[var(--color-surface)] rounded-[var(--radius-xl)] shadow-[var(--shadow-md)] p-8">
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -77,9 +113,10 @@ export function SignupPage() {
                 required
                 minLength={3}
                 maxLength={20}
+                disabled={formDisabled}
                 value={form.username}
                 onChange={set('username')}
-                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors"
+                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
                 placeholder="3–20 characters"
               />
             </div>
@@ -96,9 +133,10 @@ export function SignupPage() {
                 type="email"
                 autoComplete="email"
                 required
+                disabled={formDisabled}
                 value={form.email}
                 onChange={set('email')}
-                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors"
+                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
                 placeholder="you@company.com"
               />
             </div>
@@ -114,7 +152,8 @@ export function SignupPage() {
                 id="role"
                 value={form.role}
                 onChange={set('role')}
-                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors"
+                disabled={formDisabled || !!inviteContext}
+                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
               >
                 {ROLES.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -137,9 +176,10 @@ export function SignupPage() {
                 autoComplete="new-password"
                 required
                 minLength={6}
+                disabled={formDisabled}
                 value={form.password}
                 onChange={set('password')}
-                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors"
+                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
                 placeholder="Minimum 6 characters"
               />
             </div>
@@ -155,7 +195,7 @@ export function SignupPage() {
 
             <button
               type="submit"
-              disabled={loading || !isValid}
+              disabled={formDisabled || !isValid}
               className="w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account…' : 'Create account'}

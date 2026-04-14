@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.login.security.jwt;
 
+import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.login.security.services.UserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,12 +11,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 public class AuthTokenFilter extends OncePerRequestFilter {
     @Autowired
@@ -34,7 +35,14 @@ public class AuthTokenFilter extends OncePerRequestFilter {
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                UserDetailsImpl userDetails = (UserDetailsImpl) userDetailsService.loadUserByUsername(username);
+
+                // Extract active org from JWT claim and set on principal
+                String orgIdClaim = jwtUtils.getOrganizationIdFromJwtToken(jwt);
+                if (orgIdClaim != null) {
+                    userDetails.setOrganizationId(UUID.fromString(orgIdClaim));
+                }
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
