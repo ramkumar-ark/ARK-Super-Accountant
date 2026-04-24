@@ -50,12 +50,12 @@ Plans:
 4. An AUDITOR_CA user can view all data within a client organization but cannot create, edit, or approve anything.
 5. A CA user with the AUDITOR_CA role sees an organization selector; selecting a different organization switches all subsequent API calls to that organization's data scope without requiring re-authentication.
 
-**Plans:**
-1. Update `ERole` enum to OWNER, ACCOUNTANT, OPERATOR, AUDITOR_CA; migrate existing users; update `DataInitializer` seed data.
-2. Define and document permission matrix per role; apply `@PreAuthorize` guards to all existing endpoints using the new roles.
-3. Model CA ↔ multi-organization membership (junction table `user_organizations`); update JWT or session context to carry active organization ID.
-4. Build organization-switching API endpoint; update `UserDetailsImpl` and `AuthTokenFilter` to support active-org context switching.
-5. Build organization selector UI component; wire to switching endpoint; persist active org in client state (Zustand store).
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-PLAN-01.md — Backend role migration: V2 SQL, ERole target values, DataInitializer upsert, signup validation, GAP-1 permitAll fix
+- [ ] 02-PLAN-02.md — Permission matrix doc + @PreAuthorize rewrite across all controllers; role×endpoint integration tests
+- [ ] 02-PLAN-03.md — Frontend: signup ROLES, authStore.switchOrganization role propagation, AUDITOR_CA-gated OrganizationSelector, RoleBadge in DashboardPage
 
 **UI hint**: yes
 
@@ -192,7 +192,7 @@ Plans:
 ## Phases
 
 - [x] **Phase 1: Security Hardening & Foundation** - JWT secret is environment-driven, endpoints are role-guarded, CI tests run without local dependencies, org management is complete.
-- [ ] **Phase 2: Role Restructuring & CA Multi-Client Switching** - New role set is live, permission boundaries are enforced, CA users can switch organizations without re-login.
+- [x] **Phase 2: Role Restructuring & CA Multi-Client Switching** - New role set is live, permission boundaries are enforced, CA users can switch organizations without re-login.
 - [ ] **Phase 3: Masters TDS & GST Mapping Extension** - Every ledger has TDS section and GST applicability metadata; missing GSTIN and HSN/SAC codes are flagged as findings.
 - [ ] **Phase 4: Tally JSON Day Book Parser & Analysis Engine** - Users can upload Tally JSON, track job status, view voucher summaries, and are gated from compliance features until masters are clean.
 - [ ] **Phase 5: TDS Computation & Reports** - Full deductee-wise and section-wise TDS reports with interest calculations, PAN validation, and Excel/CSV export.
@@ -204,7 +204,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security Hardening & Foundation | 5/5 | Complete | 2026-04-12 |
-| 2. Role Restructuring & CA Multi-Client Switching | 0/5 | Not started | - |
+| 2. Role Restructuring & CA Multi-Client Switching | 3/3 | Complete | 2026-04-24 |
 | 3. Masters TDS & GST Mapping Extension | 0/5 | Not started | - |
 | 4. Tally JSON Day Book Parser & Analysis Engine | 0/5 | Not started | - |
 | 5. TDS Computation & Reports | 0/5 | Not started | - |

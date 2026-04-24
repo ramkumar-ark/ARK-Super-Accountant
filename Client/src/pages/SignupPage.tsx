@@ -6,8 +6,8 @@ import { InviteSignupBanner } from '@/components/InviteSignupBanner'
 const ROLES = [
   { value: 'owner', label: 'Owner' },
   { value: 'accountant', label: 'Accountant' },
-  { value: 'cashier', label: 'Cashier' },
-  { value: 'data_entry_operator', label: 'Data Entry Operator' },
+  { value: 'operator', label: 'Operator' },
+  { value: 'auditor_ca', label: 'CA Auditor' },
 ]
 
 export function SignupPage() {
@@ -16,7 +16,7 @@ export function SignupPage() {
     username: '',
     email: '',
     password: '',
-    role: 'cashier',
+    role: 'operator',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)

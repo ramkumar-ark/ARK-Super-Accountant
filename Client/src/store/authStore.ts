@@ -42,7 +42,12 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           token,
           user: state.user
-            ? { ...state.user, organizationId: org.organizationId, organizationName: org.organizationName }
+            ? {
+                ...state.user,
+                organizationId: org.organizationId,
+                organizationName: org.organizationName,
+                role: org.role,
+              }
             : state.user,
           organizations: state.organizations.map((o) => ({
             ...o,

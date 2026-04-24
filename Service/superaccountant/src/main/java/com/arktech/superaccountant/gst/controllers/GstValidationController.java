@@ -34,7 +34,7 @@ public class GstValidationController {
     @Autowired
     private TallyParserService tallyParserService;
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/validate")
     public ResponseEntity<?> validateGst(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {

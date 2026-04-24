@@ -32,12 +32,15 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedRoles() {
-        if (roleRepository.count() == 0) {
-            roleRepository.save(new Role(ERole.ROLE_CASHIER));
-            roleRepository.save(new Role(ERole.ROLE_ACCOUNTANT));
-            roleRepository.save(new Role(ERole.ROLE_DATA_ENTRY_OPERATOR));
-            roleRepository.save(new Role(ERole.ROLE_OWNER));
-            System.out.println("Roles initialized.");
+        int added = 0;
+        for (ERole eRole : ERole.values()) {
+            if (roleRepository.findByName(eRole).isEmpty()) {
+                roleRepository.save(new Role(eRole));
+                added++;
+            }
+        }
+        if (added > 0) {
+            System.out.println("Roles initialized/updated (" + added + " new).");
         }
     }
 

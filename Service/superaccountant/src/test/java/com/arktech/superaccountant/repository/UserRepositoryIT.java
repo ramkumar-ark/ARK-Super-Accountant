@@ -59,7 +59,7 @@ class UserRepositoryIT {
 
     @Test
     void existsByUsername_trueForExistingUser() {
-        Role role = new Role(ERole.ROLE_CASHIER);
+        Role role = new Role(ERole.ROLE_OPERATOR);
         roleRepository.save(role);
 
         User user = new User("existinguser", "existing@example.com", "hashedpassword");
@@ -72,7 +72,7 @@ class UserRepositoryIT {
 
     @Test
     void existsByEmail_trueForExistingEmail() {
-        Role role = new Role(ERole.ROLE_CASHIER);
+        Role role = new Role(ERole.ROLE_OPERATOR);
         roleRepository.save(role);
 
         User user = new User("emailuser", "unique@example.com", "hashedpassword");

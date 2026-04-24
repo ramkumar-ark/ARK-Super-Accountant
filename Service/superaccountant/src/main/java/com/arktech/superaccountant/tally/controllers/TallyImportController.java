@@ -28,7 +28,7 @@ public class TallyImportController {
     @Autowired
     private TallyParserService tallyParserService;
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/import")
     public ResponseEntity<?> importTallyData(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {

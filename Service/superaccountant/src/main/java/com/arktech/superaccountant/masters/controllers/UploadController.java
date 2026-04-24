@@ -56,7 +56,7 @@ public class UploadController {
     @Autowired
     private ValidationRuleConfigRepository ruleConfigRepository;
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/uploads")
     public ResponseEntity<?> uploadMasters(
             @RequestParam("file") MultipartFile file,
@@ -192,7 +192,7 @@ public class UploadController {
                 .body(csv.toString());
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('DATA_ENTRY_OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PatchMapping("/uploads/{jobId}/mismatches/{findingId}/resolve")
     public ResponseEntity<?> resolveFinding(
             @PathVariable UUID jobId,

@@ -1,5 +1,7 @@
 import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from '@tanstack/react-router'
+import { OrganizationSelector } from '@/components/OrganizationSelector'
+import { RoleBadge } from '@/components/RoleBadge'
 
 export function DashboardPage() {
   const { user, logout } = useAuthStore()
@@ -18,12 +20,9 @@ export function DashboardPage() {
           Super Accountant
         </span>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-[var(--color-text-secondary)]">
-            {user?.username}{' '}
-            <span className="text-xs text-[var(--color-text-muted)] font-mono">
-              ({user?.role})
-            </span>
-          </span>
+          <OrganizationSelector />
+          <RoleBadge role={user?.role} />
+          <span className="text-sm text-[var(--color-text-secondary)]">{user?.username}</span>
           <button
             onClick={handleLogout}
             className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-danger)] transition-colors"

@@ -9,7 +9,8 @@ export function OrganizationSelector() {
   const [switchingId, setSwitchingId] = useState<string | null>(null)
   const [rowError, setRowError] = useState<string | null>(null)
 
-  if (organizations.length < 2) return null
+  const isAuditorCA = user?.role === 'ROLE_AUDITOR_CA'
+  if (!isAuditorCA || organizations.length < 2) return null
 
   async function handleSwitch(orgId: string, orgName: string) {
     setSwitchingId(orgId)
@@ -30,9 +31,6 @@ export function OrganizationSelector() {
   }
 
   const activeOrg = organizations.find(o => o.isActive)
-
-  // suppress unused variable warning — user may be used for future display
-  void user
 
   return (
     <div className="relative">

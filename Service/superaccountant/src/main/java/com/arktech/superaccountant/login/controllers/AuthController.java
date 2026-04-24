@@ -117,27 +117,33 @@ public class AuthController {
         String strRole = signUpRequest.getRole();
         Role userRole;
 
-        if (strRole == null || strRole.isEmpty()) {
-            userRole = roleRepository.findByName(ERole.ROLE_CASHIER)
-                    .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-        } else {
-            switch (strRole) {
-                case "owner":
-                    userRole = roleRepository.findByName(ERole.ROLE_OWNER)
-                            .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                    break;
-                case "accountant":
-                    userRole = roleRepository.findByName(ERole.ROLE_ACCOUNTANT)
-                            .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                    break;
-                case "data_entry":
-                    userRole = roleRepository.findByName(ERole.ROLE_DATA_ENTRY_OPERATOR)
-                            .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-                    break;
-                default:
-                    userRole = roleRepository.findByName(ERole.ROLE_CASHIER)
-                            .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
-            }
+        if (strRole == null || strRole.isBlank()) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new MessageResponse("Invalid role. Valid roles: owner, accountant, operator, auditor_ca"));
+        }
+
+        switch (strRole) {
+            case "owner":
+                userRole = roleRepository.findByName(ERole.ROLE_OWNER)
+                        .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+                break;
+            case "accountant":
+                userRole = roleRepository.findByName(ERole.ROLE_ACCOUNTANT)
+                        .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+                break;
+            case "operator":
+                userRole = roleRepository.findByName(ERole.ROLE_OPERATOR)
+                        .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+                break;
+            case "auditor_ca":
+                userRole = roleRepository.findByName(ERole.ROLE_AUDITOR_CA)
+                        .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
+                break;
+            default:
+                return ResponseEntity
+                        .badRequest()
+                        .body(new MessageResponse("Invalid role. Valid roles: owner, accountant, operator, auditor_ca"));
         }
 
         // Validate invite token and override role if present
