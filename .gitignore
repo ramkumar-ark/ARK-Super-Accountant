@@ -6,7 +6,7 @@ Thumbs.db
 desktop.ini
 
 .idea/
-.claude/skills/ui-ux-pro-max
+.claude/*
 *.iml
 *.iws
 *.ipr
@@ -51,6 +51,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.vite/*
+.vscode/*
 
 # TanStack Router generated file
 src/routeTree.gen.ts
@@ -67,3 +69,11 @@ src/routeTree.gen.ts
 *.bak
 ~$*
 Design documents/~$*
+graphify-out/
+.planning/
+docs/
+.agent/
+.gstack/
+
+# SDD scratch files
+.superpowers/

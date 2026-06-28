@@ -197,4 +197,154 @@ class TallyMastersParserTest {
         List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
         assertTrue(ledgers.isEmpty());
     }
+
+    @Test
+    void tallyNativeFormat_metadataTypeDiscriminator_parsedCorrectly() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    {
+                      "metadata": { "type": "Group", "name": "Purchase Accounts", "reservedname": "" },
+                      "parent": "",
+                      "alterid": " 100"
+                    },
+                    {
+                      "metadata": { "type": "Ledger", "name": "Cement Purchases", "reservedname": "" },
+                      "guid": "f43efc2a-7ba1-40b0-989e-a5c4538741b7-000002ae",
+                      "parent": "Purchase Accounts",
+                      "taxtype": "Others",
+                      "istdsapplicable": false,
+                      "isgstapplicable": false
+                    }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals(1, ledgers.size());
+        assertEquals("Cement Purchases", ledgers.get(0).getName());
+        assertEquals("f43efc2a-7ba1-40b0-989e-a5c4538741b7-000002ae", ledgers.get(0).getGuid());
+        assertEquals(LedgerCategory.PURCHASE, ledgers.get(0).getCategory());
+    }
+
+    @Test
+    void tallyNativeFormat_gstApplicableLedger_classifiedAsGst() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    {
+                      "metadata": { "type": "Group", "name": "Duties & Taxes", "reservedname": "" },
+                      "parent": ""
+                    },
+                    {
+                      "metadata": { "type": "Ledger", "name": "Input CGST", "reservedname": "" },
+                      "guid": "guid-native-001",
+                      "parent": "Duties & Taxes",
+                      "taxtype": "GST",
+                      "isgstapplicable": true,
+                      "istdsapplicable": false
+                    }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals(1, ledgers.size());
+        assertEquals(LedgerCategory.GST, ledgers.get(0).getCategory());
+    }
+
+    @Test
+    void tallyNativeFormat_tdsApplicableLedger_classifiedAsTds() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    {
+                      "metadata": { "type": "Group", "name": "Duties & Taxes", "reservedname": "" },
+                      "parent": ""
+                    },
+                    {
+                      "metadata": { "type": "Ledger", "name": "TDS Payable 194C", "reservedname": "" },
+                      "guid": "guid-native-002",
+                      "parent": "Duties & Taxes",
+                      "taxtype": "Others",
+                      "isgstapplicable": false,
+                      "istdsapplicable": true
+                    }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals(1, ledgers.size());
+        assertEquals(LedgerCategory.TDS, ledgers.get(0).getCategory());
+    }
+
+    @Test
+    void tallyNativeFormat_currencyAndOtherTypes_skipped() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    {
+                      "metadata": { "type": "Currency", "name": "₹", "reservedname": "" },
+                      "guid": "guid-currency-001",
+                      "mailingname": "INR"
+                    },
+                    {
+                      "metadata": { "type": "Ledger", "name": "Cash", "reservedname": "" },
+                      "guid": "guid-ledger-001",
+                      "parent": "Cash-in-Hand"
+                    }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals(1, ledgers.size());
+        assertEquals("Cash", ledgers.get(0).getName());
+    }
+
+    @Test
+    void tallyNativeFormat_mixedBooleanAndStringFlags() throws Exception {
+        // Real Tally exports have boolean istdsapplicable and string taxtype
+        String json = """
+                {
+                  "tallymessage": [
+                    {
+                      "metadata": { "type": "Group", "name": "Duties & Taxes", "reservedname": "" },
+                      "parent": ""
+                    },
+                    {
+                      "metadata": { "type": "Ledger", "name": "CGST Input", "reservedname": "" },
+                      "guid": "guid-mixed-001",
+                      "parent": "Duties & Taxes",
+                      "taxtype": "GST",
+                      "isgstapplicable": false,
+                      "istdsapplicable": false
+                    }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals(1, ledgers.size());
+        assertEquals(LedgerCategory.GST, ledgers.get(0).getCategory());
+    }
+
+    @Test
+    void tallyNativeFormat_creditorSubgroupNotInHierarchy_classifiedAsCreditor() throws Exception {
+        // Tally exports may omit built-in groups; sub-groups like "Creditors - Material Purchase"
+        // should still classify as CREDITOR via keyword fallback
+        String json = """
+                {
+                  "tallymessage": [
+                    {
+                      "metadata": { "type": "Ledger", "name": "POOJA TRADERS", "reservedname": "" },
+                      "guid": "guid-creditor-001",
+                      "parent": "Creditors - Material Purchase",
+                      "taxtype": "Others",
+                      "istdsapplicable": false
+                    }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals(1, ledgers.size());
+        assertEquals("POOJA TRADERS", ledgers.get(0).getName());
+        assertEquals(LedgerCategory.CREDITOR, ledgers.get(0).getCategory());
+    }
 }

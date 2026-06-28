@@ -39,24 +39,13 @@ public class MismatchDetectionRule implements ValidationRule {
                         (existing, replacement) -> existing
                 ));
 
-        // 1. Configured masters missing from upload
-        for (Map.Entry<String, PreconfiguredMaster> entry : configuredMap.entrySet()) {
-            if (!uploadedMap.containsKey(entry.getKey())) {
-                findings.add(buildFinding(entry.getValue().getLedgerName(),
-                        entry.getValue().getCategory(),
-                        MismatchType.MISSING_IN_UPLOAD,
-                        FindingSeverity.WARNING,
-                        entry.getValue().getLedgerName(), null, null));
-            }
-        }
-
-        // 2. Uploaded ledgers not in configured masters
+        // Uploaded ledgers not in configured masters
         for (Map.Entry<String, ParsedLedger> entry : uploadedMap.entrySet()) {
             if (!configuredMap.containsKey(entry.getKey())) {
                 findings.add(buildFinding(entry.getValue().getName(),
                         entry.getValue().getCategory(),
                         MismatchType.MISSING_IN_CONFIGURATION,
-                        FindingSeverity.WARNING,
+                        FindingSeverity.MEDIUM,
                         null, entry.getValue().getName(), null));
             }
         }
@@ -77,7 +66,7 @@ public class MismatchDetectionRule implements ValidationRule {
                         "In TallyPrime: Gateway of Tally → Accounts Info → Ledgers → Alter → %s → rename to '%s' → Accept.",
                         uploaded.getName(), configured.getLedgerName());
                 findings.add(buildFindingWithFix(uploaded.getName(), uploaded.getCategory(),
-                        MismatchType.NAME_MISMATCH, FindingSeverity.INFO,
+                        MismatchType.NAME_MISMATCH, FindingSeverity.LOW,
                         configured.getLedgerName(), uploaded.getName(), suggestedFix));
             }
 
@@ -88,7 +77,7 @@ public class MismatchDetectionRule implements ValidationRule {
                         "In TallyPrime: Gateway of Tally → Accounts Info → Ledgers → Alter → %s → change 'Under' from '%s' to '%s' → Accept.",
                         uploaded.getName(), uploaded.getParentGroup(), configured.getExpectedParentGroup());
                 findings.add(buildFindingWithFix(uploaded.getName(), uploaded.getCategory(),
-                        MismatchType.PARENT_GROUP_MISMATCH, FindingSeverity.ERROR,
+                        MismatchType.PARENT_GROUP_MISMATCH, FindingSeverity.HIGH,
                         configured.getExpectedParentGroup(), uploaded.getParentGroup(), suggestedFix));
             }
 
@@ -96,7 +85,7 @@ public class MismatchDetectionRule implements ValidationRule {
             if (configured.getExpectedGstApplicable() != null
                     && !Objects.equals(uploaded.getGstApplicable(), configured.getExpectedGstApplicable())) {
                 findings.add(buildFinding(uploaded.getName(), uploaded.getCategory(),
-                        MismatchType.GST_APPLICABILITY_MISMATCH, FindingSeverity.ERROR,
+                        MismatchType.GST_APPLICABILITY_MISMATCH, FindingSeverity.HIGH,
                         String.valueOf(configured.getExpectedGstApplicable()),
                         String.valueOf(uploaded.getGstApplicable()), null));
             }
@@ -105,7 +94,7 @@ public class MismatchDetectionRule implements ValidationRule {
             if (configured.getExpectedTdsApplicable() != null
                     && !Objects.equals(uploaded.getTdsApplicable(), configured.getExpectedTdsApplicable())) {
                 findings.add(buildFinding(uploaded.getName(), uploaded.getCategory(),
-                        MismatchType.TDS_APPLICABILITY_MISMATCH, FindingSeverity.ERROR,
+                        MismatchType.TDS_APPLICABILITY_MISMATCH, FindingSeverity.HIGH,
                         String.valueOf(configured.getExpectedTdsApplicable()),
                         String.valueOf(uploaded.getTdsApplicable()), null));
             }

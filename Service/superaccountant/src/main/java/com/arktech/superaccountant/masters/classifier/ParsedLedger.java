@@ -13,4 +13,8 @@ public class ParsedLedger {
     private Boolean gstApplicable;
     private Boolean tdsApplicable;
     private LedgerCategory category;
+    private String tdsSection;
+    private String gstApplicabilityType;
+    private String hsnSacCode;
+    private String gstin;
 }

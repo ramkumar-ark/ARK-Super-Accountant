@@ -59,12 +59,10 @@ class MismatchDetectionRuleTest {
     }
 
     @Test
-    void configuredMasterMissingFromUpload_emitsMissingInUpload() {
+    void configuredMasterMissingFromUpload_noFinding() {
         PreconfiguredMaster m = configured("Cement", LedgerCategory.PURCHASE, "Purchase Accounts", null, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(MismatchType.MISSING_IN_UPLOAD, findings.get(0).getMismatchType());
-        assertEquals(FindingSeverity.WARNING, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test
@@ -73,7 +71,7 @@ class MismatchDetectionRuleTest {
         List<ValidationFinding> findings = rule.execute(ctx(List.of()), List.of(l));
         assertEquals(1, findings.size());
         assertEquals(MismatchType.MISSING_IN_CONFIGURATION, findings.get(0).getMismatchType());
-        assertEquals(FindingSeverity.WARNING, findings.get(0).getSeverity());
+        assertEquals(FindingSeverity.MEDIUM, findings.get(0).getSeverity());
     }
 
     @Test
@@ -83,7 +81,7 @@ class MismatchDetectionRuleTest {
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of(l));
         assertEquals(1, findings.size());
         assertEquals(MismatchType.NAME_MISMATCH, findings.get(0).getMismatchType());
-        assertEquals(FindingSeverity.INFO, findings.get(0).getSeverity());
+        assertEquals(FindingSeverity.LOW, findings.get(0).getSeverity());
         assertNotNull(findings.get(0).getSuggestedFix());
         assertTrue(findings.get(0).getSuggestedFix().contains("TallyPrime"));
     }
@@ -107,7 +105,7 @@ class MismatchDetectionRuleTest {
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of(l));
         assertEquals(1, findings.size());
         assertEquals(MismatchType.PARENT_GROUP_MISMATCH, findings.get(0).getMismatchType());
-        assertEquals(FindingSeverity.ERROR, findings.get(0).getSeverity());
+        assertEquals(FindingSeverity.HIGH, findings.get(0).getSeverity());
         assertNotNull(findings.get(0).getSuggestedFix());
     }
 
@@ -118,7 +116,7 @@ class MismatchDetectionRuleTest {
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of(l));
         assertEquals(1, findings.size());
         assertEquals(MismatchType.GST_APPLICABILITY_MISMATCH, findings.get(0).getMismatchType());
-        assertEquals(FindingSeverity.ERROR, findings.get(0).getSeverity());
+        assertEquals(FindingSeverity.HIGH, findings.get(0).getSeverity());
     }
 
     @Test
@@ -146,11 +144,8 @@ class MismatchDetectionRuleTest {
         PreconfiguredMaster m = configured("Some Ledger", LedgerCategory.PURCHASE, "Purchase Accounts", null, null);
         ParsedLedger l = uploaded("Some Ledger", LedgerCategory.OTHER, null, null, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of(l));
-        // OTHER ledger is excluded from uploaded map; configured ledger will emit MISSING_IN_UPLOAD
-        assertTrue(findings.stream().anyMatch(f -> f.getMismatchType() == MismatchType.MISSING_IN_UPLOAD));
-        // But no finding about the OTHER ledger itself
-        assertTrue(findings.stream().noneMatch(f -> "Some Ledger".equals(f.getLedgerName())
-                && f.getMismatchType() == MismatchType.MISSING_IN_CONFIGURATION));
+        // OTHER ledger is excluded from uploaded map — no findings since MISSING_IN_UPLOAD is not checked
+        assertTrue(findings.isEmpty());
     }
 
     @Test
@@ -174,8 +169,8 @@ class MismatchDetectionRuleTest {
 
     @Test
     void findingHasResolveStatusOpen_byDefault() {
-        PreconfiguredMaster m = configured("Cement", LedgerCategory.PURCHASE, "Purchase Accounts", null, null);
-        List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
+        ParsedLedger l = uploaded("New Ledger", LedgerCategory.PURCHASE, "Purchase Accounts", null, null);
+        List<ValidationFinding> findings = rule.execute(ctx(List.of()), List.of(l));
         assertEquals(ResolveStatus.OPEN, findings.get(0).getResolveStatus());
     }
 

@@ -1,0 +1,83 @@
+{
+  "tallymessage": [
+    {
+      "vouchertypename": "Purchase",
+      "vouchernumber": "PB/001",
+      "date": "20250401",
+      "partyledgername": "Cement Supplier",
+      "allledgerentries": [
+        { "ledgername": "Cement Purchases", "amount": "-50000" },
+        { "ledgername": "Input CGST @9%", "amount": "-4500" },
+        { "ledgername": "Input SGST @9%", "amount": "-4500" }
+      ],
+      "ledgerentries": []
+    },
+    {
+      "vouchertypename": "Purchase",
+      "vouchernumber": "PB/002",
+      "date": "20250501",
+      "partyledgername": "Steel Supplier",
+      "allledgerentries": [
+        { "ledgername": "Steel Purchases", "amount": "-30000" },
+        { "ledgername": "Input IGST @18%", "amount": "-5400" }
+      ],
+      "ledgerentries": []
+    },
+    {
+      "vouchertypename": "Sales",
+      "vouchernumber": "SB/001",
+      "date": "20250415",
+      "partyledgername": "Client ABC",
+      "allledgerentries": [
+        { "ledgername": "Sales Account", "amount": "100000" },
+        { "ledgername": "Output CGST @9%", "amount": "9000" },
+        { "ledgername": "Output SGST @9%", "amount": "9000" }
+      ],
+      "ledgerentries": []
+    },
+    {
+      "vouchertypename": "Journal",
+      "vouchernumber": "JV/001",
+      "date": "20250430",
+      "allledgerentries": [
+        { "ledgername": "Depreciation", "amount": "-5000" },
+        { "ledgername": "Plant & Machinery", "amount": "5000" }
+      ],
+      "ledgerentries": []
+    },
+    {
+      "vouchertypename": "Payment",
+      "vouchernumber": "PMT/001",
+      "date": "20250410",
+      "partyledgername": "Cement Supplier",
+      "allledgerentries": [
+        { "ledgername": "Cement Supplier", "amount": "54500" },
+        { "ledgername": "Bank Account", "amount": "-54500" }
+      ],
+      "ledgerentries": []
+    },
+    {
+      "vouchertypename": "Receipt",
+      "vouchernumber": "RCT/001",
+      "date": "20250420",
+      "partyledgername": "Client ABC",
+      "allledgerentries": [
+        { "ledgername": "Client ABC", "amount": "-118000" },
+        { "ledgername": "Bank Account", "amount": "118000" }
+      ],
+      "ledgerentries": []
+    },
+    {
+      "vouchertypename": "Credit Note",
+      "vouchernumber": "CN/001",
+      "date": "20250425",
+      "partyledgername": "Cement Supplier",
+      "allledgerentries": [
+        { "ledgername": "Cement Purchases", "amount": "5000" },
+        { "ledgername": "Input CGST @9%", "amount": "450" },
+        { "ledgername": "Input SGST @9%", "amount": "450" }
+      ],
+      "ledgerentries": []
+    }
+  ]
+}

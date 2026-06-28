@@ -78,30 +78,32 @@ public class TallyParserService {
                     "Invalid masters JSON: missing 'tallymessage' array envelope.");
         }
 
-        // Phase 1: Extract group hierarchy (groupName -> parentGroupName)
+        // Phase 1: Extract ALL groups first so hierarchy is complete before classifying ledgers
         Map<String, String> groupHierarchy = new HashMap<>();
         for (JsonNode element : tallymessage) {
-            JsonNode groupNode = element.get("group");
-            if (groupNode == null) continue;
-
-            String groupName = textOrNull(groupNode, "name");
-            String parentName = textOrNull(groupNode, "parent");
-            if (groupName != null && !groupName.isBlank()) {
-                groupHierarchy.put(groupName, parentName != null ? parentName : "");
+            String elementType = resolveElementType(element);
+            if ("Group".equalsIgnoreCase(elementType)) {
+                JsonNode groupNode = resolveDataNode(element, "group");
+                String groupName = resolveElementName(element, groupNode);
+                String parentName = textOrNull(groupNode, "parent");
+                if (groupName != null && !groupName.isBlank()) {
+                    groupHierarchy.put(groupName.toLowerCase(), parentName != null ? parentName.toLowerCase().trim() : "");
+                }
             }
         }
 
-        // Phase 2: Parse ledger objects and classify
+        // Phase 2: Parse ledger objects and classify with the complete hierarchy
         List<ParsedLedger> ledgers = new ArrayList<>();
         for (JsonNode element : tallymessage) {
-            JsonNode ledgerNode = element.get("ledger");
-            if (ledgerNode == null) continue;
+            String elementType = resolveElementType(element);
+            if (!"Ledger".equalsIgnoreCase(elementType)) continue;
 
-            String name = textOrNull(ledgerNode, "name");
+            JsonNode ledgerNode = resolveDataNode(element, "ledger");
+            String name = resolveElementName(element, ledgerNode);
             String guid = textOrNull(ledgerNode, "guid");
 
             if (name == null || name.isBlank()) {
-                continue; // skip ledgers without names
+                continue;
             }
             if (guid == null || guid.isBlank()) {
                 throw new IllegalArgumentException(
@@ -110,7 +112,9 @@ public class TallyParserService {
 
             String parentGroup = textOrNull(ledgerNode, "parent");
             Boolean gstApplicable = parseBooleanFlag(ledgerNode, "taxtype", "GST");
-            Boolean tdsApplicable = parseBooleanFlag(ledgerNode, "istdsapplicable", "yes");
+            Boolean tdsApplicable = resolveBooleanField(ledgerNode, "istdsapplicable", "yes",
+                    "istdsapplicable", null);
+            String gstApplicabilityType = resolveGstApplicabilityType(ledgerNode);
 
             com.arktech.superaccountant.masters.models.LedgerCategory category =
                     categoryClassifier.classify(parentGroup, gstApplicable, tdsApplicable, groupHierarchy);
@@ -121,6 +125,7 @@ public class TallyParserService {
                     .parentGroup(parentGroup)
                     .gstApplicable(gstApplicable)
                     .tdsApplicable(tdsApplicable)
+                    .gstApplicabilityType(gstApplicabilityType)
                     .category(category)
                     .build());
         }
@@ -193,6 +198,95 @@ public class TallyParserService {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Determines element type from either metadata.type (Tally native export)
+     * or by checking for "ledger"/"group" wrapper keys (simplified test format).
+     */
+    private String resolveElementType(JsonNode element) {
+        JsonNode metadata = element.get("metadata");
+        if (metadata != null && metadata.isObject()) {
+            String type = textOrNull(metadata, "type");
+            if (type != null) return type;
+        }
+        if (element.has("ledger")) return "Ledger";
+        if (element.has("group")) return "Group";
+        return null;
+    }
+
+    /**
+     * Returns the data node for a ledger/group element.
+     * For Tally native format (flat with metadata), the element itself is the data node.
+     * For simplified format (nested under "ledger"/"group" key), returns the nested node.
+     */
+    private JsonNode resolveDataNode(JsonNode element, String wrapperKey) {
+        JsonNode nested = element.get(wrapperKey);
+        if (nested != null && nested.isObject()) return nested;
+        return element;
+    }
+
+    /**
+     * Resolves the name from either metadata.name (Tally native) or the data node's "name" field.
+     */
+    private String resolveElementName(JsonNode element, JsonNode dataNode) {
+        JsonNode metadata = element.get("metadata");
+        if (metadata != null && metadata.isObject()) {
+            String name = textOrNull(metadata, "name");
+            if (name != null) return name;
+        }
+        return textOrNull(dataNode, "name");
+    }
+
+    /**
+     * Resolves a boolean classification field, handling both:
+     * - String comparison (e.g., taxtype == "GST")
+     * - Native boolean fields (e.g., istdsapplicable: true/false)
+     * - String fields with "Applicable" keyword (e.g., gstapplicable: "Applicable")
+     */
+    private Boolean resolveBooleanField(JsonNode node, String stringField, String trueValue,
+                                         String boolField, String applicableField) {
+        // Check native boolean field first (Tally native format)
+        if (boolField != null) {
+            JsonNode boolNode = node.get(boolField);
+            if (boolNode != null && boolNode.isBoolean()) {
+                return boolNode.asBoolean() ? Boolean.TRUE : Boolean.FALSE;
+            }
+        }
+
+        // Check "applicable" string field (e.g., "gstapplicable": "Applicable")
+        if (applicableField != null) {
+            String applicableVal = textOrNull(node, applicableField);
+            if (applicableVal != null && applicableVal.toLowerCase().contains("applicable")
+                    && !applicableVal.toLowerCase().contains("not applicable")) {
+                return Boolean.TRUE;
+            }
+        }
+
+        // Fall back to string comparison (e.g., taxtype == "GST")
+        JsonNode field = node.get(stringField);
+        if (field == null || field.isNull()) return null;
+        if (field.isBoolean()) {
+            return field.asBoolean() ? Boolean.TRUE : Boolean.FALSE;
+        }
+        String val = field.asText("").trim();
+        if (val.isEmpty()) return null;
+        return val.equalsIgnoreCase(trueValue) ? Boolean.TRUE : Boolean.FALSE;
+    }
+
+    /**
+     * Resolves GST applicability type from Tally fields.
+     * Maps "gstapplicable" string values to GstApplicabilityType enum names.
+     */
+    private String resolveGstApplicabilityType(JsonNode node) {
+        String gstApplicable = textOrNull(node, "gstapplicable");
+        if (gstApplicable == null) return null;
+
+        String cleaned = gstApplicable.replaceAll("[\\x00-\\x1F]", "").trim().toLowerCase();
+        if (cleaned.contains("not applicable")) return "NOT_APPLICABLE";
+        if (cleaned.contains("applicable")) return "TAXABLE";
+        if (cleaned.contains("exempt")) return "EXEMPT";
+        return null;
     }
 
     private String textOrNull(JsonNode node, String fieldName) {

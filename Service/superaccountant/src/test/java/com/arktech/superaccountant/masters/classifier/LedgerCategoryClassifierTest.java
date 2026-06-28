@@ -21,7 +21,7 @@ class LedgerCategoryClassifierTest {
     @Test
     void directPurchaseParent_classifiedAsPurchase() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Purchase Accounts", "");
+        hierarchy.put("purchase accounts", "");
         LedgerCategory result = classifier.classify("Purchase Accounts", null, null, hierarchy);
         assertEquals(LedgerCategory.PURCHASE, result);
     }
@@ -29,8 +29,8 @@ class LedgerCategoryClassifierTest {
     @Test
     void subgroupOfPurchaseAccounts_resolvedToPurchase() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("My Custom Sub-group", "Purchase Accounts");
-        hierarchy.put("Purchase Accounts", "");
+        hierarchy.put("my custom sub-group", "purchase accounts");
+        hierarchy.put("purchase accounts", "");
         LedgerCategory result = classifier.classify("My Custom Sub-group", null, null, hierarchy);
         assertEquals(LedgerCategory.PURCHASE, result);
     }
@@ -38,7 +38,7 @@ class LedgerCategoryClassifierTest {
     @Test
     void directExpenseParent_directExpenses_classifiedAsExpense() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Direct Expenses", "");
+        hierarchy.put("direct expenses", "");
         LedgerCategory result = classifier.classify("Direct Expenses", null, null, hierarchy);
         assertEquals(LedgerCategory.EXPENSE, result);
     }
@@ -46,7 +46,7 @@ class LedgerCategoryClassifierTest {
     @Test
     void indirectExpenseParent_classifiedAsExpense() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Indirect Expenses", "");
+        hierarchy.put("indirect expenses", "");
         LedgerCategory result = classifier.classify("Indirect Expenses", null, null, hierarchy);
         assertEquals(LedgerCategory.EXPENSE, result);
     }
@@ -54,7 +54,8 @@ class LedgerCategoryClassifierTest {
     @Test
     void dutiesAndTaxes_withGst_classifiedAsGst() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Duties & Taxes", "");
+        hierarchy.put("duties & taxes", "current liabilities");
+        hierarchy.put("current liabilities", "");
         LedgerCategory result = classifier.classify("Duties & Taxes", true, null, hierarchy);
         assertEquals(LedgerCategory.GST, result);
     }
@@ -62,7 +63,8 @@ class LedgerCategoryClassifierTest {
     @Test
     void dutiesAndTaxes_withTds_classifiedAsTds() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Duties & Taxes", "");
+        hierarchy.put("duties & taxes", "current liabilities");
+        hierarchy.put("current liabilities", "");
         LedgerCategory result = classifier.classify("Duties & Taxes", null, true, hierarchy);
         assertEquals(LedgerCategory.TDS, result);
     }
@@ -84,8 +86,8 @@ class LedgerCategoryClassifierTest {
     @Test
     void circularGroupReference_classifiedAsOther_noInfiniteLoop() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("GroupA", "GroupB");
-        hierarchy.put("GroupB", "GroupA"); // cycle
+        hierarchy.put("groupa", "groupb");
+        hierarchy.put("groupb", "groupa");
         LedgerCategory result = classifier.classify("GroupA", null, null, hierarchy);
         assertEquals(LedgerCategory.OTHER, result);
     }
@@ -93,9 +95,9 @@ class LedgerCategoryClassifierTest {
     @Test
     void deepHierarchy_resolvedToPurchase() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Sub-sub-group", "Sub-group");
-        hierarchy.put("Sub-group", "Purchase Accounts");
-        hierarchy.put("Purchase Accounts", "");
+        hierarchy.put("sub-sub-group", "sub-group");
+        hierarchy.put("sub-group", "purchase accounts");
+        hierarchy.put("purchase accounts", "");
         LedgerCategory result = classifier.classify("Sub-sub-group", null, null, hierarchy);
         assertEquals(LedgerCategory.PURCHASE, result);
     }
@@ -103,7 +105,7 @@ class LedgerCategoryClassifierTest {
     @Test
     void salesAccounts_classifiedAsIncome() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Sales Accounts", "");
+        hierarchy.put("sales accounts", "");
         LedgerCategory result = classifier.classify("Sales Accounts", null, null, hierarchy);
         assertEquals(LedgerCategory.INCOME, result);
     }
@@ -111,18 +113,59 @@ class LedgerCategoryClassifierTest {
     @Test
     void dutiesAndTaxes_neitherGstNorTds_classifiedAsOther() {
         Map<String, String> hierarchy = new HashMap<>();
-        hierarchy.put("Duties & Taxes", "");
+        hierarchy.put("duties & taxes", "");
         LedgerCategory result = classifier.classify("Duties & Taxes", null, null, hierarchy);
         assertEquals(LedgerCategory.OTHER, result);
     }
 
     @Test
-    void caseInsensitiveGroupName_purchaseAccounts_lowercase_classifiedAsPurchase() {
+    void caseInsensitiveGroupName_mixedCaseInput_classifiedCorrectly() {
         Map<String, String> hierarchy = new HashMap<>();
-        // The group exists in hierarchy but hierarchy walk returns the node name as-is;
-        // classification checks lowercase comparison
         hierarchy.put("purchase accounts", "");
-        LedgerCategory result = classifier.classify("purchase accounts", null, null, hierarchy);
+        LedgerCategory result = classifier.classify("PURCHASE ACCOUNTS", null, null, hierarchy);
         assertEquals(LedgerCategory.PURCHASE, result);
+    }
+
+    @Test
+    void sundryCreditors_underCurrentLiabilities_classifiedAsCreditor() {
+        Map<String, String> hierarchy = new HashMap<>();
+        hierarchy.put("sundry creditors", "current liabilities");
+        hierarchy.put("current liabilities", "");
+        LedgerCategory result = classifier.classify("Sundry Creditors", null, null, hierarchy);
+        assertEquals(LedgerCategory.CREDITOR, result);
+    }
+
+    @Test
+    void creditorSubgroup_underSundryCreditors_underCurrentLiabilities_classifiedAsCreditor() {
+        Map<String, String> hierarchy = new HashMap<>();
+        hierarchy.put("trade payables", "sundry creditors");
+        hierarchy.put("sundry creditors", "current liabilities");
+        hierarchy.put("current liabilities", "");
+        LedgerCategory result = classifier.classify("Trade Payables", null, null, hierarchy);
+        assertEquals(LedgerCategory.CREDITOR, result);
+    }
+
+    @Test
+    void labourContractors_underSundryCreditors_classifiedAsCreditor() {
+        Map<String, String> hierarchy = new HashMap<>();
+        hierarchy.put("labour contractors", "sundry creditors");
+        hierarchy.put("sundry creditors", "current liabilities");
+        hierarchy.put("current liabilities", "");
+        LedgerCategory result = classifier.classify("Labour Contractors", null, null, hierarchy);
+        assertEquals(LedgerCategory.CREDITOR, result);
+    }
+
+    @Test
+    void sundryCreditors_notInHierarchy_classifiedViaKeyword() {
+        Map<String, String> hierarchy = new HashMap<>();
+        LedgerCategory result = classifier.classify("Sundry Creditors", null, null, hierarchy);
+        assertEquals(LedgerCategory.CREDITOR, result);
+    }
+
+    @Test
+    void creditorSubgroup_parentNotInHierarchy_classifiedViaKeyword() {
+        Map<String, String> hierarchy = new HashMap<>();
+        LedgerCategory result = classifier.classify("Creditors - Material Purchase", null, null, hierarchy);
+        assertEquals(LedgerCategory.CREDITOR, result);
     }
 }

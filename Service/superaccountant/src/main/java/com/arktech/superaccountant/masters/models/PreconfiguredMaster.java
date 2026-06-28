@@ -45,6 +45,22 @@ public class PreconfiguredMaster {
     @Column(name = "is_template", nullable = false)
     private boolean template = false;
 
+    @Column(name = "template_slug")
+    private String templateSlug;
+
+    @Column(name = "tds_section")
+    private String tdsSection;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gst_applicability_type")
+    private GstApplicabilityType gstApplicabilityType;
+
+    @Column(name = "hsn_sac_code")
+    private String hsnSacCode;
+
+    @Column(name = "gstin")
+    private String gstin;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 

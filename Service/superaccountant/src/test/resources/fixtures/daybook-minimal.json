@@ -1,0 +1,18 @@
+{
+  "tallymessage": [
+    {
+      "vouchertypename": "Purchase",
+      "vouchernumber": "PB/001",
+      "date": "20250401",
+      "partyledgername": "Test Supplier",
+      "partygstin": "27AAAAA0000A1Z5",
+      "narration": "Test purchase",
+      "allledgerentries": [
+        { "ledgername": "Test Cement Purchases", "amount": "-10000" },
+        { "ledgername": "Input CGST @9%", "amount": "-900" },
+        { "ledgername": "Input SGST @9%", "amount": "-900" }
+      ],
+      "ledgerentries": []
+    }
+  ]
+}

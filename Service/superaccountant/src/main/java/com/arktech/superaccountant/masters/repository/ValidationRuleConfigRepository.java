@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface ValidationRuleConfigRepository extends JpaRepository<ValidationRuleConfig, UUID> {
     List<ValidationRuleConfig> findByActiveTrueOrderByExecutionOrderAsc();
+    boolean existsByRuleCode(String ruleCode);
 }

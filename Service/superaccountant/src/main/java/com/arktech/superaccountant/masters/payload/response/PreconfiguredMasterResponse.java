@@ -19,4 +19,8 @@ public class PreconfiguredMasterResponse {
     private boolean active;
     private Instant createdAt;
     private Instant updatedAt;
+    private String tdsSection;
+    private String gstApplicabilityType;
+    private String hsnSacCode;
+    private String gstin;
 }

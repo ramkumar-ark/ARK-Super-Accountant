@@ -6,5 +6,6 @@ public enum LedgerCategory {
     INCOME,
     GST,
     TDS,
+    CREDITOR,
     OTHER
 }

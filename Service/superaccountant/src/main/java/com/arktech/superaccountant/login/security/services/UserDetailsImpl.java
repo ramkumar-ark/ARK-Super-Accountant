@@ -34,7 +34,7 @@ public class UserDetailsImpl implements UserDetails {
         this.authorities = authorities;
     }
 
-    public static UserDetailsImpl build(User user) {
+    public static UserDetailsImpl build(User user, UUID activeOrganizationId) {
         List<GrantedAuthority> authorities = List.of(
                 new SimpleGrantedAuthority(user.getRole().getName().name()));
 
@@ -43,7 +43,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getUsername(),
                 user.getEmail(),
                 user.getPassword(),
-                user.getOrganizationId(),
+                activeOrganizationId,
                 authorities);
     }
 
@@ -62,6 +62,10 @@ public class UserDetailsImpl implements UserDetails {
 
     public UUID getOrganizationId() {
         return organizationId;
+    }
+
+    public void setOrganizationId(UUID organizationId) {
+        this.organizationId = organizationId;
     }
 
     @Override

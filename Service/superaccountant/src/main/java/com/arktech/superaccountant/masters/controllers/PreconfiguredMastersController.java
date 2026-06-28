@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.masters.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.models.GstApplicabilityType;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.PreconfiguredMaster;
 import com.arktech.superaccountant.masters.payload.request.BulkImportRequest;
@@ -15,12 +16,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @CrossOrigin(origins = "*")
@@ -31,6 +34,7 @@ public class PreconfiguredMastersController {
     @Autowired
     private PreconfiguredMasterRepository masterRepository;
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping
     public ResponseEntity<?> list(
             @RequestParam(required = false) LedgerCategory category,
@@ -53,6 +57,7 @@ public class PreconfiguredMastersController {
         return ResponseEntity.ok(results.map(this::toResponse));
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping
     public ResponseEntity<?> create(
             @Valid @RequestBody CreatePreconfiguredMasterRequest request,
@@ -70,15 +75,28 @@ public class PreconfiguredMastersController {
         master.setExpectedParentGroup(request.getExpectedParentGroup());
         master.setExpectedGstApplicable(request.getExpectedGstApplicable());
         master.setExpectedTdsApplicable(request.getExpectedTdsApplicable());
+        master.setTdsSection(request.getTdsSection());
+        if (request.getGstApplicabilityType() != null) {
+            try {
+                master.setGstApplicabilityType(
+                    GstApplicabilityType.valueOf(request.getGstApplicabilityType()));
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest()
+                    .body("Invalid gstApplicabilityType: " + request.getGstApplicabilityType());
+            }
+        }
+        master.setHsnSacCode(request.getHsnSacCode());
+        master.setGstin(request.getGstin());
         master = masterRepository.save(master);
 
         return ResponseEntity.status(201).body(toResponse(master));
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable UUID id,
-            @RequestBody UpdatePreconfiguredMasterRequest request,
+            @Valid @RequestBody UpdatePreconfiguredMasterRequest request,
             @AuthenticationPrincipal UserDetailsImpl principal) {
 
         UUID orgId = requireOrgId(principal);
@@ -94,12 +112,35 @@ public class PreconfiguredMastersController {
                     if (request.getExpectedParentGroup() != null) master.setExpectedParentGroup(request.getExpectedParentGroup());
                     if (request.getExpectedGstApplicable() != null) master.setExpectedGstApplicable(request.getExpectedGstApplicable());
                     if (request.getExpectedTdsApplicable() != null) master.setExpectedTdsApplicable(request.getExpectedTdsApplicable());
+                    if (request.getTdsSection() != null) {
+                        master.setTdsSection(request.getTdsSection());
+                        if (request.getExpectedTdsApplicable() == null) {
+                            master.setExpectedTdsApplicable(!"NOT_SUBJECT".equals(request.getTdsSection()));
+                        }
+                    }
+                    if (request.getGstApplicabilityType() != null) {
+                        try {
+                            master.setGstApplicabilityType(
+                                GstApplicabilityType.valueOf(request.getGstApplicabilityType()));
+                        } catch (IllegalArgumentException e) {
+                            return ResponseEntity.badRequest()
+                                .body("Invalid gstApplicabilityType: " + request.getGstApplicabilityType());
+                        }
+                        if (request.getExpectedGstApplicable() == null) {
+                            master.setExpectedGstApplicable(
+                                !"NOT_APPLICABLE".equals(request.getGstApplicabilityType()));
+                        }
+                    }
+                    if (request.getHsnSacCode() != null) master.setHsnSacCode(request.getHsnSacCode());
+                    if (request.getGstin() != null) master.setGstin(request.getGstin());
                     master.setUpdatedAt(Instant.now());
-                    return ResponseEntity.ok(toResponse(masterRepository.save(master)));
+                    PreconfiguredMaster saved = masterRepository.save(master);
+                    return ResponseEntity.ok(toResponse(saved));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @PathVariable UUID id,
@@ -121,6 +162,7 @@ public class PreconfiguredMastersController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/bulk")
     public ResponseEntity<?> bulkImport(
             @Valid @RequestBody BulkImportRequest request,
@@ -140,6 +182,18 @@ public class PreconfiguredMastersController {
             m.setExpectedParentGroup(r.getExpectedParentGroup());
             m.setExpectedGstApplicable(r.getExpectedGstApplicable());
             m.setExpectedTdsApplicable(r.getExpectedTdsApplicable());
+            m.setTdsSection(r.getTdsSection());
+            if (r.getGstApplicabilityType() != null) {
+                try {
+                    m.setGstApplicabilityType(
+                        GstApplicabilityType.valueOf(r.getGstApplicabilityType()));
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest()
+                        .body("Invalid gstApplicabilityType for ledger '" + r.getLedgerName() + "': " + r.getGstApplicabilityType());
+                }
+            }
+            m.setHsnSacCode(r.getHsnSacCode());
+            m.setGstin(r.getGstin());
             masters.add(m);
         }
 
@@ -151,6 +205,7 @@ public class PreconfiguredMastersController {
                 .build());
     }
 
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @PostMapping("/onboard")
     public ResponseEntity<?> onboard(
             @RequestBody OnboardRequest request,
@@ -163,6 +218,37 @@ public class PreconfiguredMastersController {
 
         if (masterRepository.existsByOrganizationId(orgId)) {
             return ResponseEntity.badRequest().body("Organization already has pre-configured masters. Onboarding can only be done once.");
+        }
+
+        if (request.getTemplateSlug() != null && !request.getTemplateSlug().isBlank()) {
+            String slug = request.getTemplateSlug();
+            List<String> validSlugs = List.of("standard", "simplified", "manufacturing");
+            if (!validSlugs.contains(slug)) {
+                return ResponseEntity.badRequest().body("Unknown templateSlug: " + slug);
+            }
+            List<PreconfiguredMaster> templates = masterRepository.findByTemplateTrueAndTemplateSlug(slug);
+            List<PreconfiguredMaster> copies = new ArrayList<>();
+            for (PreconfiguredMaster t : templates) {
+                PreconfiguredMaster copy = new PreconfiguredMaster();
+                copy.setOrganizationId(orgId);
+                copy.setLedgerName(t.getLedgerName());
+                copy.setCategory(t.getCategory());
+                copy.setExpectedParentGroup(t.getExpectedParentGroup());
+                copy.setExpectedGstApplicable(t.getExpectedGstApplicable());
+                copy.setExpectedTdsApplicable(t.getExpectedTdsApplicable());
+                copy.setTdsSection(t.getTdsSection());
+                copy.setGstApplicabilityType(t.getGstApplicabilityType());
+                copy.setHsnSacCode(t.getHsnSacCode());
+                copy.setGstin(t.getGstin());
+                copy.setTemplate(false);
+                copy.setActive(true);
+                copies.add(copy);
+            }
+            masterRepository.saveAll(copies);
+            return ResponseEntity.ok(Map.of(
+                "message", slug + " template applied. " + copies.size() + " masters configured.",
+                "count", copies.size()
+            ));
         }
 
         if (request.isUseTemplate()) {
@@ -192,6 +278,7 @@ public class PreconfiguredMastersController {
         }
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/validation-rules")
     public ResponseEntity<?> listValidationRules() {
         // Delegation to rule config repo not injected here to keep controller lean.
@@ -214,6 +301,10 @@ public class PreconfiguredMastersController {
                 .active(m.isActive())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
+                .tdsSection(m.getTdsSection())
+                .gstApplicabilityType(m.getGstApplicabilityType() != null ? m.getGstApplicabilityType().name() : null)
+                .hsnSacCode(m.getHsnSacCode())
+                .gstin(m.getGstin())
                 .build();
     }
 }

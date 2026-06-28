@@ -11,6 +11,7 @@ import java.util.UUID;
 @Builder
 public class FindingResponse {
     private UUID id;
+    private UUID uploadJobId;
     private String ruleCode;
     private LedgerCategory category;
     private MismatchType mismatchType;

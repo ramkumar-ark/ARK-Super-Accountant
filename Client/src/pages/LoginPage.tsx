@@ -1,15 +1,31 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
+import { InviteSignupBanner } from '@/components/InviteSignupBanner'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
+  const setOrganizations = useAuthStore((s) => s.setOrganizations)
+  const switchOrganization = useAuthStore((s) => s.switchOrganization)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const search = new URLSearchParams(window.location.search)
+  const inviteToken = search.get('invite')
+  const [inviteContext, setInviteContext] = useState<{ orgName: string; role: string } | null>(null)
+
+  useEffect(() => {
+    if (!inviteToken) return
+    api.get(`/auth/invite/${inviteToken}`)
+      .then((res) => {
+        setInviteContext({ orgName: res.data.organizationName, role: res.data.role })
+      })
+      .catch(() => {})
+  }, [inviteToken])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -23,13 +39,40 @@ export function LoginPage() {
         email: data.email,
         role: data.role,
       })
+
+      if (inviteToken) {
+        navigate({ to: '/signup', search: { invite: inviteToken } })
+        return
+      }
+
+      const { data: orgs } = await api.get<Array<{
+        organizationId: string
+        organizationName: string
+        role: string
+        isActive: boolean
+      }>>('/organizations/me/list')
+      setOrganizations(orgs)
+
+      if (orgs.length === 0) {
+        navigate({ to: '/organization/setup' })
+        return
+      }
+
+      const target = orgs.find((o) => o.isActive) ?? orgs[0]
+      const { data: selected } = await api.post(`/organizations/${target.organizationId}/select`)
+      switchOrganization(selected.token, {
+        organizationId: String(selected.organizationId),
+        organizationName: selected.organizationName,
+        role: selected.role,
+      })
+
       navigate({ to: '/dashboard' })
     } catch (err: unknown) {
       const msg =
         err instanceof Error && 'response' in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined
-      setError(msg ?? 'Invalid username or password')
+      setError(msg ?? 'Sign in failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -44,9 +87,13 @@ export function LoginPage() {
             Super Accountant
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-            Sign in to your account
+            {inviteToken ? 'Sign in to join the organization' : 'Sign in to your account'}
           </p>
         </div>
+
+        {inviteToken && inviteContext && (
+          <InviteSignupBanner orgName={inviteContext.orgName} role={inviteContext.role} />
+        )}
 
         <div className="bg-[var(--color-surface)] rounded-[var(--radius-xl)] shadow-[var(--shadow-md)] p-8">
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -109,7 +156,11 @@ export function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-[var(--color-text-muted)]">
           Don't have an account?{' '}
-          <Link to="/signup" className="text-[var(--color-primary)] font-medium hover:underline">
+          <Link
+            to="/signup"
+            search={inviteToken ? { invite: inviteToken } : {}}
+            className="text-[var(--color-primary)] font-medium hover:underline"
+          >
             Sign up
           </Link>
         </p>

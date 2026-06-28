@@ -17,4 +17,5 @@ public interface PreconfiguredMasterRepository extends JpaRepository<Preconfigur
     Page<PreconfiguredMaster> findByOrganizationIdAndActiveTrueAndCategory(UUID organizationId, LedgerCategory category, Pageable pageable);
     boolean existsByOrganizationId(UUID organizationId);
     List<PreconfiguredMaster> findByTemplateTrue();
+    List<PreconfiguredMaster> findByTemplateTrueAndTemplateSlug(String templateSlug);
 }

@@ -1,0 +1,8 @@
+{
+  "tallymessage": [
+    { "group": { "name": "Purchase Accounts", "parent": "" } },
+    { "ledger": { "name": "Test Cement Purchases", "guid": "guid-test-001", "parent": "Purchase Accounts" } },
+    { "group": { "name": "Sales Accounts", "parent": "" } },
+    { "ledger": { "name": "Test Sales Revenue", "guid": "guid-test-002", "parent": "Sales Accounts" } }
+  ]
+}

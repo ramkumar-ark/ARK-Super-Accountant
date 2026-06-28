@@ -1,0 +1,14 @@
+{
+  "tallymessage": [
+    { "group": { "name": "Current Liabilities", "parent": "" } },
+    { "group": { "name": "Sundry Creditors", "parent": "Current Liabilities" } },
+    { "ledger": { "name": "Test Vendor A", "guid": "guid-vendor-a", "parent": "Sundry Creditors" } },
+    { "ledger": { "name": "Test Vendor B", "guid": "guid-vendor-b", "parent": "Sundry Creditors" } },
+    { "group": { "name": "Indirect Expenses", "parent": "" } },
+    { "ledger": { "name": "Test Expense B", "guid": "guid-expense-b", "parent": "Indirect Expenses" } },
+    { "group": { "name": "Sales Accounts", "parent": "" } },
+    { "ledger": { "name": "Test Income C", "guid": "guid-income-c", "parent": "Sales Accounts" } },
+    { "group": { "name": "Capital Account", "parent": "" } },
+    { "ledger": { "name": "Test Capital D", "guid": "guid-capital-d", "parent": "Capital Account" } }
+  ]
+}
