@@ -8,6 +8,27 @@ import { Header } from '@/components/Header'
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/
 
+/**
+ * Extracts a human-readable message from an unknown axios error.
+ * The backend is inconsistent: some endpoints return `{ message: string }`,
+ * others (e.g. preconfigured-masters onboard) return a plain-text string body.
+ */
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const data = (err as { response?: { data?: unknown } }).response?.data
+    if (typeof data === 'string' && data.trim().length > 0) {
+      return data
+    }
+    if (data && typeof data === 'object' && 'message' in data) {
+      const message = (data as { message?: unknown }).message
+      if (typeof message === 'string' && message.trim().length > 0) {
+        return message
+      }
+    }
+  }
+  return fallback
+}
+
 export function OrganizationSetupPage() {
   const navigate = useNavigate()
   const switchOrganization = useAuthStore((s) => s.switchOrganization)
@@ -30,6 +51,7 @@ export function OrganizationSetupPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('standard')
   const [applyingTemplate, setApplyingTemplate] = useState(false)
   const [templateError, setTemplateError] = useState('')
+  const [orgActivated, setOrgActivated] = useState(false)
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -88,19 +110,18 @@ export function OrganizationSetupPage() {
       setCreatedOrgId(response.data.id)
       setStep(2)
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined
       setError(
-        msg ?? 'Organization could not be created. Try again, or contact support if the problem continues.'
+        extractErrorMessage(
+          err,
+          'Organization could not be created. Try again, or contact support if the problem continues.'
+        )
       )
     } finally {
       setLoading(false)
     }
   }
 
-  async function selectAndNavigate() {
+  async function activateOrganization() {
     const res = await api.post(`/organizations/${createdOrgId}/select`)
     try {
       const { data: orgs } = await api.get<Array<{
@@ -118,18 +139,27 @@ export function OrganizationSetupPage() {
       organizationName: res.data.organizationName,
       role: res.data.role,
     })
-    navigate({ to: '/dashboard' })
+    setOrgActivated(true)
   }
 
   async function handleApplyTemplate() {
     setApplyingTemplate(true)
     setTemplateError('')
     try {
-      await api.post('/v1/preconfigured-masters/onboard', { templateSlug: selectedTemplate })
-      await selectAndNavigate()
+      await activateOrganization()
     } catch {
-      setTemplateError('Could not apply the template. You can skip for now and apply later.')
-    } finally {
+      setTemplateError('Could not activate the organization. Please try again.')
+      setApplyingTemplate(false)
+      return
+    }
+    try {
+      await api.post('/v1/preconfigured-masters/onboard', { templateSlug: selectedTemplate })
+      navigate({ to: '/dashboard' })
+    } catch (err: unknown) {
+      const backendMessage = extractErrorMessage(err, 'Could not apply the template.')
+      setTemplateError(
+        `${backendMessage} Your organization is active — you can continue and configure ledgers from the Masters page.`
+      )
       setApplyingTemplate(false)
     }
   }
@@ -137,7 +167,8 @@ export function OrganizationSetupPage() {
   async function handleSkip() {
     setApplyingTemplate(true)
     try {
-      await selectAndNavigate()
+      await activateOrganization()
+      navigate({ to: '/dashboard' })
     } catch {
       setTemplateError('Could not activate the organization. Please try again.')
       setApplyingTemplate(false)
@@ -215,26 +246,38 @@ export function OrganizationSetupPage() {
           )}
 
           <div className="flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={handleApplyTemplate}
-              disabled={applyingTemplate}
-              className="w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {applyingTemplate ? (
-                <><Loader2 size={16} className="animate-spin" /> Applying…</>
-              ) : (
-                'Apply Template'
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={applyingTemplate}
-              className="w-full h-11 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Skip for now
-            </button>
+            {orgActivated && templateError ? (
+              <button
+                type="button"
+                onClick={() => navigate({ to: '/dashboard' })}
+                className="w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors"
+              >
+                Continue to Dashboard
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleApplyTemplate}
+                  disabled={applyingTemplate}
+                  className="w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {applyingTemplate ? (
+                    <><Loader2 size={16} className="animate-spin" /> Applying…</>
+                  ) : (
+                    'Apply Template'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  disabled={applyingTemplate}
+                  className="w-full h-11 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Skip for now
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
