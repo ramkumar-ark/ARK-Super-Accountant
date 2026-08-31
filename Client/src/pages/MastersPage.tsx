@@ -29,7 +29,7 @@ interface ValidationFinding {
   severity: 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | 'WARNING' | 'ERROR'
   message: string
   suggestedFix: string | null
-  resolveStatus: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ACCEPTED' | 'OVERRIDDEN'
+  resolveStatus: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'APPROVED' | 'DISCARDED'
   resolveNote: string | null
   resolvedBy: string | null
 }
@@ -532,9 +532,7 @@ function FindingsTab({
   }
 
   const isResolved = (f: ValidationFinding) =>
-    f.resolveStatus === 'RESOLVED' ||
-    f.resolveStatus === 'ACCEPTED' ||
-    f.resolveStatus === 'OVERRIDDEN'
+    f.resolveStatus === 'RESOLVED' || f.resolveStatus === 'APPROVED'
 
   async function handleAccept(finding: ValidationFinding) {
     setAcceptingId(finding.id)
@@ -542,7 +540,7 @@ function FindingsTab({
     try {
       await api.patch(
         `/v1/uploads/${finding.uploadJobId}/mismatches/${finding.id}/resolve`,
-        { status: 'ACCEPTED' },
+        { status: 'APPROVED' },
       )
       onFindingResolved()
     } catch {
@@ -560,7 +558,7 @@ function FindingsTab({
     try {
       await api.patch(
         `/v1/uploads/${finding.uploadJobId}/mismatches/${finding.id}/resolve`,
-        { status: 'OVERRIDDEN', note: overrideNote },
+        { status: 'APPROVED', note: overrideNote },
       )
       setOverridingId(null)
       setOverrideNote('')
@@ -706,7 +704,7 @@ function FindingsTab({
                   <div className="flex items-center gap-1 mt-1">
                     <CheckCircle2 size={14} className="text-[var(--color-success)]" />
                     <span className="text-xs text-[var(--color-text-muted)]">
-                      {finding.resolveStatus === 'OVERRIDDEN' ? 'Overridden' : 'Resolved'}
+                      Resolved
                       {finding.resolveNote && ` — ${finding.resolveNote}`}
                     </span>
                   </div>
