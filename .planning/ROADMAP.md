@@ -1,3 +1,9 @@
+> **ARCHIVED (2026-09-07):** This roadmap is design-only history, not
+> current status. Its phase statuses and commit references are known to
+> be wrong (28 cited commit SHAs don't exist in this repo; contradicts
+> STATE.md on Phases 2 and 4). Current status lives in `docs/superpowers/`
+> (gitignored — captain has accepted that risk). See `.planning/README.md`.
+
 # Roadmap: Super Accountant v1
 
 **Created:** 2026-04-09

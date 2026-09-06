@@ -34,6 +34,7 @@ A CA or business owner uploads Tally JSON and immediately gets actionable GST an
 - [ ] Extended role set: Manager, Auditor/CA — with appropriate permission boundaries
 - [ ] Multi-tenant CA mode: CA account can manage and switch between multiple isolated client organizations
 - [ ] AI audit trail: log what each AI invoice extraction captured and the reasoning behind each entry
+- [ ] GSTR-1 / GSTR-3B filing automation — brought into scope by the 2026-07-13 filing-automation spec as Phases 7-10
 
 ### Out of Scope
 
@@ -44,7 +45,6 @@ A CA or business owner uploads Tally JSON and immediately gets actionable GST an
 - Full data-change audit trail (all edits) — AI decisions only for v1; full audit trail is v2 compliance scope
 - Login/access audit log — deferred to v2
 - P&L and Balance Sheet reports — not the primary compliance pain point; deferred after GST/TDS workflow is validated
-- GSTR-1 / GSTR-3B filing automation — reconciliation comes before filing automation
 - Tally XML re-import (XML format) — JSON round-trip only; XML export is a separate Tally integration concern
 
 ## Context
@@ -87,6 +87,7 @@ A CA or business owner uploads Tally JSON and immediately gets actionable GST an
 | Masters upload pattern reused for GSTR-2B and invoice workflows | Upload → parse → validate → findings is proven in the masters pipeline | — Pending |
 | TDS and GSTR-2B reports before AI invoice processing | Primary v1 success criterion is compliance workflow; AI invoice is valuable but secondary | — Pending |
 | CA multi-client via Organization switching | CAs need isolated client data; Organization model already exists as the tenant boundary | — Pending |
+| GSTR-1 / GSTR-3B filing automation moved from Out of Scope to Active (Phases 7-10) | The 2026-07-13 filing-automation spec brought filing automation into scope and explicitly required this edit, which was never made until this 2026-09-07 record-canon correction | — Pending |
 
 ## Evolution
 
