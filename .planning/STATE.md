@@ -1,3 +1,9 @@
+> **ARCHIVED (2026-09-07):** This state file is design-only history, not
+> current status. Its progress table and commit references are known to
+> be wrong (28 cited commit SHAs don't exist in this repo; contradicts
+> ROADMAP.md on Phases 2 and 4). Current status lives in `docs/superpowers/`
+> (gitignored — captain has accepted that risk). See `.planning/README.md`.
+
 # Project State
 
 **Last updated:** 2026-05-07
