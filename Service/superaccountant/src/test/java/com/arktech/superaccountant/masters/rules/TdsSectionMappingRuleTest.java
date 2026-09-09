@@ -34,11 +34,10 @@ class TdsSectionMappingRuleTest {
     }
 
     @Test
-    void tdsCategoryNullSection_emitsHighFinding() {
+    void tdsCategoryNullSection_skipped_noFinding() {
         PreconfiguredMaster m = configured("TDS Payable 194C", LedgerCategory.TDS, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.HIGH, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test
@@ -66,19 +65,17 @@ class TdsSectionMappingRuleTest {
     }
 
     @Test
-    void gstCategoryNullSection_emitsLowFinding() {
+    void gstCategoryNullSection_skipped_noFinding() {
         PreconfiguredMaster m = configured("Output CGST @18%", LedgerCategory.GST, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.LOW, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test
-    void otherCategoryNullSection_emitsLowFinding() {
+    void otherCategoryNullSection_skipped_noFinding() {
         PreconfiguredMaster m = configured("Miscellaneous Expenses", LedgerCategory.OTHER, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.LOW, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test

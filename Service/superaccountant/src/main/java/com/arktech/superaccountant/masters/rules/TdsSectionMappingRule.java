@@ -33,7 +33,6 @@ public class TdsSectionMappingRule implements ValidationRule {
             }
             if (master.getTdsSection() == null) {
                 FindingSeverity severity = switch (master.getCategory()) {
-                    case TDS -> FindingSeverity.HIGH;
                     case PURCHASE, EXPENSE, INCOME -> FindingSeverity.MEDIUM;
                     default -> FindingSeverity.LOW;
                 };

@@ -47,13 +47,13 @@ class MastersGateServiceTest {
     }
 
     @Test
-    void checkGate_whenHighOpenFindingsExist_returnsGated() {
+    void checkGate_whenUnresolvedFindingsExist_returnsGated() {
         UploadJob job = new UploadJob();
         job.setId(UUID.randomUUID());
         job.setTotalLedgersParsed(5);
         when(uploadJobRepository.findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(
                 any(UUID.class), eq(COMPLETED_STATUSES))).thenReturn(Optional.of(job));
-        when(findingRepository.countHighSeverityUnresolved(job.getId())).thenReturn(3L);
+        when(findingRepository.countUnresolvedForGate(job.getId())).thenReturn(3L);
 
         GateResult result = gateService.checkGate(UUID.randomUUID());
 
@@ -68,7 +68,7 @@ class MastersGateServiceTest {
         job.setTotalLedgersParsed(5);
         when(uploadJobRepository.findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(
                 any(UUID.class), eq(COMPLETED_STATUSES))).thenReturn(Optional.of(job));
-        when(findingRepository.countHighSeverityUnresolved(job.getId())).thenReturn(0L);
+        when(findingRepository.countUnresolvedForGate(job.getId())).thenReturn(0L);
 
         GateResult result = gateService.checkGate(UUID.randomUUID());
 
