@@ -13,10 +13,10 @@ import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class MastersGateServiceIT {
 
-    @SpringBootConfiguration
+    @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
     @EntityScan(basePackages = "com.arktech.superaccountant")
     @EnableJpaRepositories(basePackageClasses = ValidationFindingRepository.class)
