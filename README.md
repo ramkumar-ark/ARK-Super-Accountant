@@ -30,8 +30,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed breakdown.
 # 1. Create the database
 psql -U postgres -c "CREATE DATABASE superaccountant;"
 
-# 2. Set required environment variable
-export JWT_SECRET="<your-base64-encoded-secret-min-32-chars>"
+# 2. Set required environment variable (backend refuses to start without it)
+export JWT_SECRET="<random-secret-at-least-32-characters>"
 
 # 3. Start the backend
 cd Service/superaccountant

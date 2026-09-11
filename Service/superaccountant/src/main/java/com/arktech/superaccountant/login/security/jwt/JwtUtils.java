@@ -20,7 +20,9 @@ import java.util.UUID;
 public class JwtUtils {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
 
-    @Value("${JWT_SECRET}")
+    // No usable default: an absent JWT_SECRET resolves to empty and is rejected by
+    // validateJwtSecret() below, so the application refuses to start.
+    @Value("${JWT_SECRET:}")
     private String jwtSecret;
 
     @Value("${arktech.app.jwtExpirationMs}")

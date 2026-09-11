@@ -97,6 +97,7 @@ Public endpoints: `/api/auth/**`, `/api/test/**`, `/error`. All others require a
 
 ```bash
 cd Service/superaccountant
+export JWT_SECRET=...         # Required, min 32 chars; boot fails without it (see README)
 ./mvnw spring-boot:run        # Run the application
 ./mvnw test                   # Run tests
 ./mvnw clean package          # Build JAR
