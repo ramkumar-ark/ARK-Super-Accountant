@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * Reusable gate service that checks whether an organization's masters have
- * unresolved HIGH-severity findings that must block downstream compliance endpoints.
+ * unresolved findings of any severity that must block downstream compliance endpoints.
  *
  * Called by Phase 5 TdsReportController and Phase 6 GstValidationController.
  *

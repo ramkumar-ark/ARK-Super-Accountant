@@ -13,14 +13,28 @@ import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(classes = MastersGateServiceIT.GateSliceConfig.class,
+        webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Transactional
 class MastersGateServiceIT {
+
+    @SpringBootConfiguration
+    @EnableAutoConfiguration
+    @EntityScan(basePackages = "com.arktech.superaccountant")
+    @EnableJpaRepositories(basePackageClasses = ValidationFindingRepository.class)
+    @Import(MastersGateService.class)
+    static class GateSliceConfig {
+    }
 
     @Autowired
     private OrganizationRepository organizationRepository;
