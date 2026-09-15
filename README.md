@@ -30,7 +30,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed breakdown.
 # 1. Create the database
 psql -U postgres -c "CREATE DATABASE superaccountant;"
 
-# 2. Set required environment variable
+# 2. Set required environment variables
+export DB_PASSWORD="<your-postgres-password>"
 export JWT_SECRET="<your-base64-encoded-secret-min-32-chars>"
 
 # 3. Start the backend
@@ -42,6 +43,9 @@ cd Client
 npm install
 npm run dev
 ```
+
+The backend requires `DB_PASSWORD` and refuses to start without it. `DB_URL` and `DB_USERNAME` default to
+`jdbc:postgresql://localhost:5432/superaccountant` and `postgres`; override them for a non-local database.
 
 Open [http://localhost:5173](http://localhost:5173). See [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) for a full walkthrough.
 
