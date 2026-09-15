@@ -13,7 +13,8 @@ import org.springframework.stereotype.Component;
  * The datasource password is sourced from the DB_PASSWORD environment variable with no
  * usable default (see application.properties), mirroring how JWT_SECRET is handled.
  * This runs as a {@link BeanFactoryPostProcessor} so the check happens before the
- * datasource is created and its missing password surfaces as a connection error.
+ * datasource is created, making a missing password fail with a clear error instead of
+ * surfacing later as a connection error.
  */
 @Component
 public class DatabasePasswordValidator implements BeanFactoryPostProcessor, EnvironmentAware {

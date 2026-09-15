@@ -19,14 +19,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = MastersGateServiceIT.GateSliceConfig.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@TestPropertySource(properties = "spring.datasource.password=${DB_PASSWORD:test-db-password}")
 @Transactional
 class MastersGateServiceIT {
 

@@ -5,10 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
-@TestPropertySource(properties = {
-		"JWT_SECRET=test-jwt-secret-must-be-at-least-32-characters-long",
-		"spring.datasource.password=${DB_PASSWORD:test-db-password}"
-})
+@TestPropertySource(properties = "JWT_SECRET=test-jwt-secret-must-be-at-least-32-characters-long")
 class SuperaccountantApplicationTests {
 
 	@Test
