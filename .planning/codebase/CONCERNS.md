@@ -8,7 +8,7 @@
 
 ### HIGH — Database credentials committed to source control
 
-- Issue: `application.properties` contains hardcoded PostgreSQL credentials (`postgres` / `Arkpostgres@2020`) and a plaintext JWT secret key committed directly to the repository.
+- Issue: `application.properties` contains hardcoded PostgreSQL credentials (`postgres` / `<redacted>`) and a plaintext JWT secret key committed directly to the repository.
 - Files: `Service/superaccountant/src/main/resources/application.properties`
 - Impact: Any developer, CI system, or attacker with repository access has the production database password and can forge JWT tokens by knowing the secret. The JWT secret `superAccountantSecretKeyForJwtTokenGenerationPurposeOnly` is short, human-readable, and weak for HS256.
 - Fix approach: Move all secrets to environment variables or a secrets manager. In Spring Boot, use `${DB_PASSWORD}` syntax in properties and inject at runtime. Rotate the exposed credentials immediately. Use a cryptographically random 256-bit secret for JWT.
