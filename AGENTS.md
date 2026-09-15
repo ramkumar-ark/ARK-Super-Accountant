@@ -142,7 +142,7 @@ npm run test:run              # Vitest (single run)
 
 PostgreSQL must be running locally on port 5432. Schema is auto-managed by Hibernate (`ddl-auto: update`).
 
-The datasource password comes from the `DB_PASSWORD` environment variable and the app refuses to start without it (`config/DatabasePasswordValidator`). `DB_URL` and `DB_USERNAME` default to `jdbc:postgresql://localhost:5432/superaccountant` and `postgres`. See the README Quick start and `application.properties`.
+The datasource password comes from the `DB_PASSWORD` environment variable and the app refuses to start without it (`config/DatabasePasswordValidator`). For `DB_URL`/`DB_USERNAME` defaults see `application.properties` and the README Quick start.
 
 ## .gitignore Rules
 
