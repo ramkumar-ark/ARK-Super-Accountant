@@ -2,7 +2,6 @@ package com.arktech.superaccountant.masters.repository;
 
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
-import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.models.ValidationFinding;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -40,20 +39,6 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
     List<ValidationFinding> findOpenByUploadJobIdAndLedgerName(
             @Param("jobId") UUID jobId,
             @Param("ledgerName") String ledgerName);
-
-    /**
-     * Counts HIGH-severity findings for a given upload job that are still unresolved
-     * (status OPEN or ACKNOWLEDGED). Used by {@code MastersGateService} to determine
-     * whether a compliance endpoint should be gated.
-     *
-     * @param jobId the upload job to scope the count to
-     * @return count of HIGH + (OPEN | ACKNOWLEDGED) findings for the job
-     */
-    @Query("SELECT COUNT(f) FROM ValidationFinding f WHERE f.uploadJobId = :jobId " +
-           "AND f.severity = com.arktech.superaccountant.masters.models.FindingSeverity.HIGH " +
-           "AND (f.resolveStatus = com.arktech.superaccountant.masters.models.ResolveStatus.OPEN " +
-           "OR f.resolveStatus = com.arktech.superaccountant.masters.models.ResolveStatus.ACKNOWLEDGED)")
-    long countHighSeverityUnresolved(@Param("jobId") UUID jobId);
 
     @Query("SELECT COUNT(f) FROM ValidationFinding f WHERE f.uploadJobId = :jobId " +
            "AND f.resolveStatus IN " +

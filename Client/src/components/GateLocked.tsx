@@ -20,7 +20,7 @@ export function GateLockedBanner({ reason, unresolvedCount }: GateLockedBannerPr
       <AlertTriangle size={18} className="text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-          {hasFindings ? 'Masters have unresolved HIGH findings' : 'Masters validation required'}
+          {hasFindings ? 'Masters have unresolved findings' : 'Masters validation required'}
         </p>
         <p className="text-sm text-[var(--color-text-secondary)]">
           {reason}. TDS and GSTR-2B reports will be locked until resolved.
@@ -61,7 +61,7 @@ export function GateLockedFull({ reason, unresolvedCount }: GateLockedFullProps)
       <p className="text-sm text-[var(--color-text-secondary)] max-w-sm text-center">{reason}</p>
       {hasFindings && (
         <p className="text-sm text-[var(--color-text-muted)]">
-          {unresolvedCount} unresolved HIGH finding{unresolvedCount !== 1 ? 's' : ''} must be resolved
+          {unresolvedCount} unresolved finding{unresolvedCount !== 1 ? 's' : ''} must be resolved
           to unlock this feature.
         </p>
       )}

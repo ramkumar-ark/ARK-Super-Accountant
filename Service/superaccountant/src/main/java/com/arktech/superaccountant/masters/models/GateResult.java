@@ -4,7 +4,7 @@ package com.arktech.superaccountant.masters.models;
  * Value object returned by {@link com.arktech.superaccountant.masters.services.MastersGateService#checkGate(java.util.UUID)}.
  *
  * Reused by Phase 5 TdsReportController and Phase 6 GstValidationController
- * to determine whether the org's masters have unresolved HIGH-severity findings
+ * to determine whether the org's masters have unresolved findings of any severity
  * that block access to compliance reports.
  */
 public record GateResult(boolean gated, int unresolvedCount) {
@@ -17,9 +17,9 @@ public record GateResult(boolean gated, int unresolvedCount) {
     }
 
     /**
-     * Returns a closed gate with the given unresolved HIGH finding count.
+     * Returns a closed gate with the given unresolved finding count.
      *
-     * @param count number of unresolved HIGH-severity findings (may be 0 if no masters upload exists)
+     * @param count number of unresolved findings of any severity (may be 0 if no masters upload exists)
      */
     public static GateResult gated(int count) {
         return new GateResult(true, count);

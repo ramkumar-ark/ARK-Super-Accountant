@@ -225,7 +225,7 @@ public class DayBookController {
     /**
      * GET /api/v1/masters/gate-status
      *
-     * Returns gate status: { gated: false } if org has no unresolved HIGH-severity masters findings;
+     * Returns gate status: { gated: false } if org has no unresolved masters findings;
      * { gated: true, reason, unresolvedCount } otherwise.
      *
      * Always returns HTTP 200 — gated state is business logic, not an auth error (D-11, T-4-06).
@@ -248,7 +248,7 @@ public class DayBookController {
         if (gate.gated()) {
             String reason = gate.unresolvedCount() == 0
                     ? "Masters validation has not been run. Upload and validate masters to unlock compliance features."
-                    : "Unresolved HIGH severity masters findings must be resolved before accessing compliance features.";
+                    : "Unresolved masters findings must be resolved before accessing compliance features.";
             return ResponseEntity.ok(Map.of(
                     "gated", true,
                     "reason", reason,
