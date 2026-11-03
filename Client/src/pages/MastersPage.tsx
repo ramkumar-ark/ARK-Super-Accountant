@@ -3,6 +3,7 @@ import { api } from '@/lib/api'
 import { Database, Upload, SearchX, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
 import { LedgerMappingPanel } from '@/components/LedgerMappingPanel'
 import { AppShell } from '@/components/AppShell'
+import { useAuthStore } from '@/store/authStore'
 
 interface PreconfiguredMaster {
   id: string
@@ -24,14 +25,35 @@ interface ValidationFinding {
   id: string
   uploadJobId: string
   ruleCode: string
+  mismatchType: string | null
   ledgerName: string
   category: string
+  actualValue: string | null
   severity: 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | 'WARNING' | 'ERROR'
   message: string
   suggestedFix: string | null
   resolveStatus: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'APPROVED' | 'DISCARDED'
   resolveNote: string | null
   resolvedBy: string | null
+  proposedValue: string | null
+  submittedBy: string | null
+  reviewedBy: string | null
+  reviewNote: string | null
+}
+
+// Rule codes whose corrected value is typed in by the user; everything else is derived server-side.
+const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
+const GST_APPLICABILITY_TYPES = ['TAXABLE', 'EXEMPT', 'ZERO_RATED', 'NON_GST', 'RCM', 'NOT_APPLICABLE']
+const VALUE_LABELS: Record<string, string> = {
+  GSTIN_PRESENCE: 'GSTIN',
+  HSN_SAC_CODE: 'HSN/SAC code',
+  TDS_SECTION_MAPPING: 'TDS section',
+  GST_APPLICABILITY: 'GST applicability',
+}
+
+function apiErrorMessage(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { error?: string } } })?.response?.data
+  return data?.error || fallback
 }
 
 export function MastersPage() {
@@ -510,7 +532,14 @@ function FindingsTab({
 }) {
   const [overridingId, setOverridingId] = useState<string | null>(null)
   const [overrideNote, setOverrideNote] = useState('')
-  const [acceptingId, setAcceptingId] = useState<string | null>(null)
+  const [overrideValue, setOverrideValue] = useState('')
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const role = useAuthStore((st) => st.user?.role)
+  // Server is the authority; these only decide which buttons to show.
+  const isAccountant = role === 'ROLE_ACCOUNTANT'
+  const canSubmit = isAccountant || role === 'ROLE_OPERATOR'
   const [findingErrors, setFindingErrors] = useState<Record<string, string>>({})
   const [ruleFilter, setRuleFilter] = useState('')
 
@@ -534,42 +563,69 @@ function FindingsTab({
   const isResolved = (f: ValidationFinding) =>
     f.resolveStatus === 'RESOLVED' || f.resolveStatus === 'APPROVED'
 
-  async function handleAccept(finding: ValidationFinding) {
-    setAcceptingId(finding.id)
+  const actionUrl = (f: ValidationFinding) => `/v1/uploads/${f.uploadJobId}/findings/${f.id}/action`
+
+  function openOverride(finding: ValidationFinding) {
+    if (overridingId === finding.id) {
+      setOverridingId(null)
+      return
+    }
+    // A rejected proposal comes back pre-filled so it can be corrected and resubmitted.
+    setOverrideValue(finding.proposedValue ?? '')
+    setOverrideNote(finding.resolveNote ?? '')
+    setRejectingId(null)
+    setOverridingId(finding.id)
+  }
+
+  async function runAction(
+    finding: ValidationFinding,
+    body: Record<string, string>,
+    fallbackError: string,
+  ): Promise<boolean> {
+    setBusyId(finding.id)
     setFindingErrors((prev) => ({ ...prev, [finding.id]: '' }))
     try {
-      await api.patch(
-        `/v1/uploads/${finding.uploadJobId}/mismatches/${finding.id}/resolve`,
-        { status: 'APPROVED' },
-      )
+      await api.post(actionUrl(finding), body)
       onFindingResolved()
-    } catch {
-      setFindingErrors((prev) => ({
-        ...prev,
-        [finding.id]: 'Could not accept this finding. Try again.',
-      }))
+      return true
+    } catch (err) {
+      setFindingErrors((prev) => ({ ...prev, [finding.id]: apiErrorMessage(err, fallbackError) }))
+      return false
     } finally {
-      setAcceptingId(null)
+      setBusyId(null)
     }
   }
 
   async function handleOverride(finding: ValidationFinding) {
-    setFindingErrors((prev) => ({ ...prev, [finding.id]: '' }))
-    try {
-      await api.patch(
-        `/v1/uploads/${finding.uploadJobId}/mismatches/${finding.id}/resolve`,
-        { status: 'APPROVED', note: overrideNote },
-      )
+    const body: Record<string, string> = { action: 'ACKNOWLEDGE', note: overrideNote }
+    if (TYPED_INPUT_RULES.includes(finding.ruleCode)) body.value = overrideValue.trim()
+    const ok = await runAction(finding, body, 'Could not resolve this finding. Try again.')
+    if (ok) {
       setOverridingId(null)
       setOverrideNote('')
-      onFindingResolved()
-    } catch {
-      setFindingErrors((prev) => ({
-        ...prev,
-        [finding.id]: 'Could not resolve this finding. Try again.',
-      }))
+      setOverrideValue('')
     }
   }
+
+  async function handleApprove(finding: ValidationFinding) {
+    await runAction(finding, { action: 'APPROVE' }, 'Could not approve this finding. Try again.')
+  }
+
+  async function handleReject(finding: ValidationFinding) {
+    const ok = await runAction(
+      finding,
+      { action: 'REJECT', note: rejectNote.trim() },
+      'Could not reject this finding. Try again.',
+    )
+    if (ok) {
+      setRejectingId(null)
+      setRejectNote('')
+    }
+  }
+
+  // What the master will take if this finding is approved.
+  const proposedDisplay = (f: ValidationFinding) =>
+    TYPED_INPUT_RULES.includes(f.ruleCode) ? f.proposedValue : f.actualValue
 
   const filteredFindings = ruleFilter
     ? findings.filter((f) => f.ruleCode === ruleFilter)
@@ -709,26 +765,33 @@ function FindingsTab({
                     </span>
                   </div>
                 )}
+                {finding.resolveStatus === 'ACKNOWLEDGED' && (
+                  <div className="mt-2 text-xs text-[var(--color-text-secondary)]">
+                    <span className="inline-block px-2 py-0.5 rounded-full bg-[var(--color-warning-bg)] text-[var(--color-warning)]">
+                      Pending accountant review
+                    </span>
+                    <p className="mt-1">
+                      Proposed value: <span className="font-mono">{proposedDisplay(finding) ?? '—'}</span>
+                      {finding.submittedBy && ` · submitted by ${finding.submittedBy}`}
+                    </p>
+                    {finding.resolveNote && <p>Note: {finding.resolveNote}</p>}
+                  </div>
+                )}
+                {finding.resolveStatus === 'OPEN' && finding.reviewNote && (
+                  <p className="mt-2 text-xs text-[var(--color-danger)]">
+                    Rejected{finding.reviewedBy ? ` by ${finding.reviewedBy}` : ''}: {finding.reviewNote}
+                  </p>
+                )}
                 {findingErrors[finding.id] && (
                   <p className="text-xs text-[var(--color-danger)] mt-1">
                     {findingErrors[finding.id]}
                   </p>
                 )}
               </div>
-              {!isResolved(finding) && (
+              {finding.resolveStatus === 'OPEN' && canSubmit && (
                 <div className="flex gap-2 flex-shrink-0">
                   <button
-                    onClick={() => handleAccept(finding)}
-                    disabled={acceptingId === finding.id}
-                    aria-label={`Accept Fix for ${finding.ledgerName}`}
-                    className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)] disabled:opacity-50"
-                  >
-                    {acceptingId === finding.id ? 'Accepting…' : 'Accept Fix'}
-                  </button>
-                  <button
-                    onClick={() =>
-                      setOverridingId(overridingId === finding.id ? null : finding.id)
-                    }
+                    onClick={() => openOverride(finding)}
                     aria-expanded={overridingId === finding.id}
                     aria-label={`Override Value for ${finding.ledgerName}`}
                     className="h-9 px-3 rounded-[var(--radius-md)] text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)]"
@@ -737,9 +800,65 @@ function FindingsTab({
                   </button>
                 </div>
               )}
+              {finding.resolveStatus === 'ACKNOWLEDGED' && isAccountant && (
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleApprove(finding)}
+                    disabled={busyId === finding.id}
+                    aria-label={`Approve ${finding.ledgerName}`}
+                    className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRejectingId(rejectingId === finding.id ? null : finding.id)
+                      setRejectNote('')
+                    }}
+                    aria-expanded={rejectingId === finding.id}
+                    aria-label={`Reject ${finding.ledgerName}`}
+                    className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)]"
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
             </div>
-            {overridingId === finding.id && (
+            {overridingId === finding.id && finding.resolveStatus === 'OPEN' && (
               <div className="mt-3 bg-[var(--color-surface-raised)] rounded-[var(--radius-md)] p-4">
+                {TYPED_INPUT_RULES.includes(finding.ruleCode) ? (
+                  <div className="mb-2">
+                    <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+                      {VALUE_LABELS[finding.ruleCode]} (required)
+                      {finding.ruleCode === 'GST_APPLICABILITY' ? (
+                        <select
+                          value={overrideValue}
+                          onChange={(e) => setOverrideValue(e.target.value)}
+                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
+                        >
+                          <option value="">Select…</option>
+                          {GST_APPLICABILITY_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={overrideValue}
+                          onChange={(e) => setOverrideValue(e.target.value)}
+                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
+                        />
+                      )}
+                    </label>
+                  </div>
+                ) : (
+                  <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+                    The master will be updated to:{' '}
+                    <span className="font-mono">{finding.actualValue ?? '—'}</span>
+                  </p>
+                )}
                 <textarea
                   rows={2}
                   value={overrideNote}
@@ -750,18 +869,52 @@ function FindingsTab({
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => handleOverride(finding)}
-                    className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm"
+                    disabled={
+                      busyId === finding.id ||
+                      (TYPED_INPUT_RULES.includes(finding.ruleCode) && overrideValue.trim() === '')
+                    }
+                    className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
                   >
-                    Confirm Override
+                    {isAccountant ? 'Confirm Override' : 'Submit for Review'}
                   </button>
                   <button
                     onClick={() => {
                       setOverridingId(null)
                       setOverrideNote('')
+                      setOverrideValue('')
                     }}
                     className="h-9 px-3 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] rounded-[var(--radius-md)]"
                   >
                     Cancel Changes
+                  </button>
+                </div>
+              </div>
+            )}
+            {rejectingId === finding.id && finding.resolveStatus === 'ACKNOWLEDGED' && isAccountant && (
+              <div className="mt-3 bg-[var(--color-surface-raised)] rounded-[var(--radius-md)] p-4">
+                <textarea
+                  rows={2}
+                  value={rejectNote}
+                  onChange={(e) => setRejectNote(e.target.value)}
+                  placeholder="Explain why this is rejected (required)…"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] resize-none focus:outline-none focus:border-[var(--color-primary)]"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => handleReject(finding)}
+                    disabled={busyId === finding.id || rejectNote.trim() === ''}
+                    className="h-9 px-3 bg-[var(--color-danger)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
+                  >
+                    Confirm Reject
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRejectingId(null)
+                      setRejectNote('')
+                    }}
+                    className="h-9 px-3 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] rounded-[var(--radius-md)]"
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
