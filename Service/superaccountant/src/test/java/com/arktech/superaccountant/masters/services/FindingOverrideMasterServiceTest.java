@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -323,10 +324,57 @@ class FindingOverrideMasterServiceTest {
 
     @Test
     void validate_autoDerivedMismatch_needsNoValue() {
-        for (MismatchType t : List.of(MismatchType.NAME_MISMATCH, MismatchType.PARENT_GROUP_MISMATCH,
-                MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH)) {
+        for (MismatchType t : List.of(MismatchType.NAME_MISMATCH, MismatchType.PARENT_GROUP_MISMATCH)) {
             service.validate(finding("MISMATCH_DETECTION", t, "Office Rent", "a", "b"), null, orgId);
         }
+        for (MismatchType t : List.of(MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH)) {
+            service.validate(finding("MISMATCH_DETECTION", t, "Office Rent", "true", "false"), null, orgId);
+        }
+    }
+
+    @Test
+    void applicabilityMismatch_withAbsentTallyFlag_throws400AndWritesNothing() {
+        for (MismatchType t : List.of(MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH)) {
+            ValidationFinding f = finding("MISMATCH_DETECTION", t, "Office Rent", "true", "null");
+            assertThatThrownBy(() -> service.validate(f, null, orgId))
+                    .as(t.name())
+                    .isInstanceOfSatisfying(FindingOverrideException.class,
+                            e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+            assertThatThrownBy(() -> service.apply(f, orgId, "acct1"))
+                    .as(t.name())
+                    .isInstanceOfSatisfying(FindingOverrideException.class,
+                            e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        }
+        verify(masterRepository, never()).save(any());
+        verifyNoInteractions(editLogRepository);
+    }
+
+    @Test
+    void validate_typedRuleWithMalformedValue_throws400() {
+        Map<String, String> malformed = Map.of(
+                "GSTIN_PRESENCE", "abc",
+                "HSN_SAC_CODE", "12",
+                "TDS_SECTION_MAPPING", "195X");
+        malformed.forEach((rule, value) -> {
+            ValidationFinding f = finding(rule, null, "Office Rent", null, null);
+            assertThatThrownBy(() -> service.validate(f, value, orgId))
+                    .as(rule)
+                    .isInstanceOfSatisfying(FindingOverrideException.class,
+                            e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        });
+    }
+
+    @Test
+    void apply_malformedGstin_throws400AndWritesNothing() {
+        ValidationFinding f = finding("GSTIN_PRESENCE", null, "Office Rent", null, null);
+        f.setProposedValue("abc");
+
+        assertThatThrownBy(() -> service.apply(f, orgId, "acct1"))
+                .isInstanceOfSatisfying(FindingOverrideException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        assertThat(master.getGstin()).isNull();
+        verify(masterRepository, never()).save(any());
+        verifyNoInteractions(editLogRepository);
     }
 
     @Test

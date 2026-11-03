@@ -504,7 +504,7 @@ public class UploadController {
         }
 
         // 2. Find finding
-        Optional<ValidationFinding> findingOpt = findingRepository.findById(findingId);
+        Optional<ValidationFinding> findingOpt = findingRepository.findByIdForUpdate(findingId);
         if (findingOpt.isEmpty() || !findingOpt.get().getUploadJobId().equals(jobId)) {
             return ResponseEntity.notFound().build();
         }

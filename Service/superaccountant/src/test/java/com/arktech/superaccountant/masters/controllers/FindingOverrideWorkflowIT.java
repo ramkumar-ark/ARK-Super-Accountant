@@ -314,7 +314,7 @@ class FindingOverrideWorkflowIT {
     @Test
     void reject_requiresNote_returns400() throws Exception {
         ValidationFinding f = gstinFinding();
-        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"BAD\"}").andExpect(status().isOk());
+        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"27ABCDE1234F1Z5\"}").andExpect(status().isOk());
 
         act(accountantJwt, f, "{\"action\":\"REJECT\"}").andExpect(status().isBadRequest());
     }
@@ -322,12 +322,12 @@ class FindingOverrideWorkflowIT {
     @Test
     void reject_returnsToOpen_keepsProposalAndNote_writesNothing_thenResubmitClearsReview() throws Exception {
         ValidationFinding f = gstinFinding();
-        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"note\":\"n1\",\"value\":\"BAD\"}").andExpect(status().isOk());
+        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"note\":\"n1\",\"value\":\"27ABCDE1234F1Z5\"}").andExpect(status().isOk());
 
         act(accountantJwt, f, "{\"action\":\"REJECT\",\"note\":\"not a valid GSTIN\"}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resolveStatus").value("OPEN"))
-                .andExpect(jsonPath("$.proposedValue").value("BAD"))
+                .andExpect(jsonPath("$.proposedValue").value("27ABCDE1234F1Z5"))
                 .andExpect(jsonPath("$.resolveNote").value("n1"))
                 .andExpect(jsonPath("$.reviewNote").value("not a valid GSTIN"))
                 .andExpect(jsonPath("$.reviewedBy").value("wf_accountant"))
@@ -360,7 +360,7 @@ class FindingOverrideWorkflowIT {
     @Test
     void operatorCannotReject() throws Exception {
         ValidationFinding f = gstinFinding();
-        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"V\"}").andExpect(status().isOk());
+        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isOk());
 
         act(operatorJwt, f, "{\"action\":\"REJECT\",\"note\":\"x\"}").andExpect(status().isForbidden());
     }
@@ -368,11 +368,11 @@ class FindingOverrideWorkflowIT {
     @Test
     void auditorCa_cannotApproveRejectOrSubmit() throws Exception {
         ValidationFinding f = gstinFinding();
-        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"V\"}").andExpect(status().isOk());
+        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isOk());
 
         act(auditorJwt, f, "{\"action\":\"APPROVE\"}").andExpect(status().isForbidden());
         act(auditorJwt, f, "{\"action\":\"REJECT\",\"note\":\"x\"}").andExpect(status().isForbidden());
-        act(auditorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"V\"}").andExpect(status().isForbidden());
+        act(auditorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isForbidden());
         assertThat(reloadMaster().getGstin()).isNull();
     }
 
@@ -380,7 +380,7 @@ class FindingOverrideWorkflowIT {
     void owner_cannotApproveRejectOrSubmit() throws Exception {
         ValidationFinding f = gstinFinding();
 
-        act(ownerJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"V\"}").andExpect(status().isForbidden());
+        act(ownerJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isForbidden());
         act(ownerJwt, f, "{\"action\":\"APPROVE\"}").andExpect(status().isForbidden());
         act(ownerJwt, f, "{\"action\":\"REJECT\",\"note\":\"x\"}").andExpect(status().isForbidden());
     }

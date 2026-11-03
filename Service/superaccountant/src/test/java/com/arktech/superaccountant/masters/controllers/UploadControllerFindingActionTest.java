@@ -61,7 +61,7 @@ class UploadControllerFindingActionTest {
         finding.setId(UUID.randomUUID());
         finding.setUploadJobId(jobId);
         finding.setRuleCode("GSTIN_PRESENCE");
-        lenient().when(findingRepository.findById(finding.getId())).thenReturn(Optional.of(finding));
+        lenient().when(findingRepository.findByIdForUpdate(finding.getId())).thenReturn(Optional.of(finding));
     }
 
     private UserDetailsImpl user(String name, String role) {

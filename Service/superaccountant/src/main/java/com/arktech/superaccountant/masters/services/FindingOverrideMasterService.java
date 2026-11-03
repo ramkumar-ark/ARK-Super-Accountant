@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Writes an approved finding override back to {@code preconfigured_masters} and audits it.
@@ -24,6 +25,12 @@ import java.util.UUID;
  */
 @Service
 public class FindingOverrideMasterService {
+
+    private static final Pattern GSTIN_PATTERN =
+            Pattern.compile("[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}");
+    private static final Pattern HSN_SAC_PATTERN = Pattern.compile("\\d{4,8}");
+    private static final Pattern TDS_SECTION_PATTERN =
+            Pattern.compile("NOT_SUBJECT|194C|194J_A|194J_B|194H|194I|194Q|194A|194B|194D|194M|OTHER");
 
     static final Set<String> TYPED_INPUT_RULES =
             Set.of("GSTIN_PRESENCE", "HSN_SAC_CODE", "TDS_SECTION_MAPPING", "GST_APPLICABILITY");
@@ -50,7 +57,8 @@ public class FindingOverrideMasterService {
             throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
         switch (f.getMismatchType()) {
-            case NAME_MISMATCH, PARENT_GROUP_MISMATCH, GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH -> { }
+            case NAME_MISMATCH, PARENT_GROUP_MISMATCH -> { }
+            case GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH -> parseFlag(f.getActualValue());
             case MISSING_IN_CONFIGURATION -> findSnapshot(f);
             default -> throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
@@ -104,14 +112,14 @@ public class FindingOverrideMasterService {
                         approver, submitter, () -> master.setExpectedParentGroup(v));
             }
             case GST_APPLICABILITY_MISMATCH -> {
+                Boolean v = parseFlag(f.getActualValue());
                 PreconfiguredMaster master = findMaster(orgId, f.getLedgerName());
-                Boolean v = Boolean.parseBoolean(f.getActualValue());
                 change(master, f, "expected_gst_applicable", str(master.getExpectedGstApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedGstApplicable(v));
             }
             case TDS_APPLICABILITY_MISMATCH -> {
+                Boolean v = parseFlag(f.getActualValue());
                 PreconfiguredMaster master = findMaster(orgId, f.getLedgerName());
-                Boolean v = Boolean.parseBoolean(f.getActualValue());
                 change(master, f, "expected_tds_applicable", str(master.getExpectedTdsApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedTdsApplicable(v));
             }
@@ -213,9 +221,30 @@ public class FindingOverrideMasterService {
         if (value == null || value.isBlank()) {
             throw badRequest("A value is required to resolve this finding.");
         }
-        if ("GST_APPLICABILITY".equals(ruleCode)) {
-            parseGstType(value);
+        String v = value.trim();
+        switch (ruleCode) {
+            case "GSTIN_PRESENCE" -> requireMatch(GSTIN_PATTERN, v,
+                    "GSTIN must be 15 characters in format: 22AAAAA0000A1Z5");
+            case "HSN_SAC_CODE" -> requireMatch(HSN_SAC_PATTERN, v, "HSN/SAC code must be 4-8 digits");
+            case "TDS_SECTION_MAPPING" -> requireMatch(TDS_SECTION_PATTERN, v, "Invalid TDS section code");
+            default -> parseGstType(v);
         }
+    }
+
+    private static void requireMatch(Pattern pattern, String value, String message) {
+        if (!pattern.matcher(value).matches()) {
+            throw badRequest(message);
+        }
+    }
+
+    private static Boolean parseFlag(String value) {
+        if ("true".equals(value)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(value)) {
+            return Boolean.FALSE;
+        }
+        throw badRequest("The uploaded ledger has no value for this flag; it cannot be applied to the master.");
     }
 
     private GstApplicabilityType parseGstType(String value) {
