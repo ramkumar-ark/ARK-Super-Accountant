@@ -2,6 +2,7 @@ package com.arktech.superaccountant.masters.rules;
 
 import com.arktech.superaccountant.masters.classifier.ParsedLedger;
 import com.arktech.superaccountant.masters.models.*;
+import com.arktech.superaccountant.masters.util.LedgerNames;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -104,7 +105,7 @@ public class MismatchDetectionRule implements ValidationRule {
     }
 
     private String normalize(String name) {
-        return name == null ? "" : name.trim().toLowerCase();
+        return LedgerNames.normalize(name);
     }
 
     private ValidationFinding buildFinding(String ledgerName, LedgerCategory category,

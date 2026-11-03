@@ -10,5 +10,7 @@ public class FindingActionRequest {
     @NotNull
     private String action; // "ACKNOWLEDGE", "APPROVE", "REJECT"
 
-    private String note; // optional reason/rejection note
+    private String note; // optional reason; required for REJECT
+
+    private String value; // proposed master value; required for typed-input rule codes on ACKNOWLEDGE
 }
