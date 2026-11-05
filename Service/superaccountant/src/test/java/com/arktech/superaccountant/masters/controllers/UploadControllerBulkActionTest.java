@@ -106,10 +106,13 @@ class UploadControllerBulkActionTest {
         typed.setMismatchType(null);
         ValidationFinding missingInUpload = finding("Gone", ResolveStatus.OPEN);
         missingInUpload.setMismatchType(MismatchType.MISSING_IN_UPLOAD);
+        ValidationFinding absentFlag = finding("NoFlag", ResolveStatus.OPEN);
+        absentFlag.setMismatchType(MismatchType.GST_APPLICABILITY_MISMATCH);
+        absentFlag.setActualValue("null");
         BulkFindingActionRequest r = new BulkFindingActionRequest();
         r.setSeverity(FindingSeverity.MEDIUM);
         when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, FindingSeverity.MEDIUM, null, null))
-                .thenReturn(List.of(derivable, typed, missingInUpload));
+                .thenReturn(List.of(derivable, typed, missingInUpload, absentFlag));
 
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR"));
 
@@ -120,6 +123,7 @@ class UploadControllerBulkActionTest {
         assertThat(missingInUpload.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
         verify(overrideService, never()).validate(eq(typed), any(), any());
         verify(overrideService, never()).validate(eq(missingInUpload), any(), any());
+        verify(overrideService, never()).validate(eq(absentFlag), any(), any());
     }
 
     @Test

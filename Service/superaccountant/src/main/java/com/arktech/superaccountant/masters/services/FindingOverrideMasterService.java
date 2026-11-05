@@ -45,6 +45,17 @@ public class FindingOverrideMasterService {
 
     /** True when the corrected master value comes from the finding itself, so no typed value is needed. */
     public static boolean isDerivable(ValidationFinding f) {
+        if (!isOverridableMismatch(f)) {
+            return false;
+        }
+        return switch (f.getMismatchType()) {
+            case GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH ->
+                    "true".equals(f.getActualValue()) || "false".equals(f.getActualValue());
+            default -> true;
+        };
+    }
+
+    private static boolean isOverridableMismatch(ValidationFinding f) {
         return "MISMATCH_DETECTION".equals(f.getRuleCode()) && DERIVABLE_MISMATCH_TYPES.contains(f.getMismatchType());
     }
 
@@ -66,7 +77,7 @@ public class FindingOverrideMasterService {
             requireTypedValue(f.getRuleCode(), value);
             return;
         }
-        if (!isDerivable(f)) {
+        if (!isOverridableMismatch(f)) {
             throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
         switch (f.getMismatchType()) {
@@ -119,7 +130,7 @@ public class FindingOverrideMasterService {
             }
             return;
         }
-        if (!isDerivable(f)) {
+        if (!isOverridableMismatch(f)) {
             throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
         switch (f.getMismatchType()) {

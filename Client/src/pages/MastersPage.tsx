@@ -43,6 +43,7 @@ interface ValidationFinding {
 
 // Rule codes whose corrected value is typed in by the user; everything else is derived server-side.
 const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
+const APPLICABILITY_MISMATCH_TYPES = ['GST_APPLICABILITY_MISMATCH', 'TDS_APPLICABILITY_MISMATCH']
 const DERIVABLE_MISMATCH_TYPES = [
   'MISSING_IN_CONFIGURATION',
   'NAME_MISMATCH',
@@ -674,7 +675,10 @@ function FindingsTab({
     f.resolveStatus === 'OPEN' &&
     f.ruleCode === 'MISMATCH_DETECTION' &&
     f.mismatchType != null &&
-    DERIVABLE_MISMATCH_TYPES.includes(f.mismatchType)
+    DERIVABLE_MISMATCH_TYPES.includes(f.mismatchType) &&
+    (!APPLICABILITY_MISMATCH_TYPES.includes(f.mismatchType) ||
+      f.actualValue === 'true' ||
+      f.actualValue === 'false')
   const canBulkApprove = (f: ValidationFinding) => isAccountant && f.resolveStatus === 'ACKNOWLEDGED'
 
   async function runBulk(action: 'ACKNOWLEDGE' | 'APPROVE', ids: string[] | null) {

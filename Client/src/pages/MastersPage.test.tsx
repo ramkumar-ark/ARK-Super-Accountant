@@ -333,11 +333,15 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
     rows.push(
       mk('gstin', { ruleCode: 'GSTIN_PRESENCE', mismatchType: null }),
       mk('gone', { mismatchType: 'MISSING_IN_UPLOAD' }),
+      mk('noflag', { mismatchType: 'GST_APPLICABILITY_MISMATCH', actualValue: 'null' }),
+      mk('flag', { mismatchType: 'GST_APPLICABILITY_MISMATCH', actualValue: 'true' }),
     )
     await openTab()
     await screen.findByText('Ledger gone')
     expect(screen.queryByLabelText('Select Ledger gstin')).toBeNull()
     expect(screen.queryByLabelText('Select Ledger gone')).toBeNull()
+    expect(screen.queryByLabelText('Select Ledger noflag')).toBeNull()
+    expect(screen.getByLabelText('Select Ledger flag')).toBeInTheDocument()
     expect(screen.getByLabelText('Select Ledger a')).toBeInTheDocument()
   })
 
