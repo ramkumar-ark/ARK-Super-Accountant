@@ -95,7 +95,45 @@ class UploadControllerBulkActionTest {
         assertThat(a.getResolveStatus()).isEqualTo(ResolveStatus.ACKNOWLEDGED);
         assertThat(b.getResolveStatus()).isEqualTo(ResolveStatus.ACKNOWLEDGED);
         assertThat(a.getSubmittedBy()).isEqualTo("op");
-        verify(overrideService, never()).apply(any(), any(), anyString());
+        verify(overrideService, never()).apply(any(), any(), anyString(), any());
+    }
+
+    @Test
+    void bulkOverride_byFilter_skipsFindingsThatNeedATypedValueOrCannotBeOverridden() {
+        ValidationFinding derivable = finding("A", ResolveStatus.OPEN);
+        ValidationFinding typed = finding("Typed", ResolveStatus.OPEN);
+        typed.setRuleCode("GSTIN_PRESENCE");
+        typed.setMismatchType(null);
+        ValidationFinding missingInUpload = finding("Gone", ResolveStatus.OPEN);
+        missingInUpload.setMismatchType(MismatchType.MISSING_IN_UPLOAD);
+        BulkFindingActionRequest r = new BulkFindingActionRequest();
+        r.setSeverity(FindingSeverity.MEDIUM);
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, FindingSeverity.MEDIUM, null, null))
+                .thenReturn(List.of(derivable, typed, missingInUpload));
+
+        ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        assertThat(((Map<?, ?>) res.getBody()).get("processed")).isEqualTo(1);
+        assertThat(derivable.getResolveStatus()).isEqualTo(ResolveStatus.ACKNOWLEDGED);
+        assertThat(typed.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
+        assertThat(missingInUpload.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
+        verify(overrideService, never()).validate(eq(typed), any(), any());
+        verify(overrideService, never()).validate(eq(missingInUpload), any(), any());
+    }
+
+    @Test
+    void bulkOverride_byFilter_onlyNonDerivableFindingsMatch_returns400() {
+        ValidationFinding typed = finding("Typed", ResolveStatus.OPEN);
+        typed.setRuleCode("HSN_SAC_CODE");
+        typed.setMismatchType(null);
+        BulkFindingActionRequest r = new BulkFindingActionRequest();
+        r.setRuleCode("HSN_SAC_CODE");
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, null, "HSN_SAC_CODE", null))
+                .thenReturn(List.of(typed));
+
+        assertThat(controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR")).getStatusCode().value())
+                .isEqualTo(400);
     }
 
     @Test
@@ -110,8 +148,9 @@ class UploadControllerBulkActionTest {
         assertThat(res.getStatusCode().value()).isEqualTo(200);
         assertThat(a.getResolveStatus()).isEqualTo(ResolveStatus.APPROVED);
         assertThat(b.getResolvedBy()).isEqualTo("acct");
-        verify(overrideService).apply(a, orgId, "acct");
-        verify(overrideService).apply(b, orgId, "acct");
+        verify(overrideService).apply(eq(a), eq(orgId), eq("acct"), any());
+        verify(overrideService).apply(eq(b), eq(orgId), eq("acct"), any());
+        verify(overrideService, times(1)).activeMastersByName(orgId);
     }
 
     @Test
@@ -178,7 +217,8 @@ class UploadControllerBulkActionTest {
         assertThat(a.getResolveStatus()).isEqualTo(ResolveStatus.APPROVED);
         assertThat(a.getSubmittedBy()).isEqualTo("op");
         assertThat(a.getResolvedBy()).isEqualTo("acct");
-        verify(overrideService, times(2)).apply(any(), eq(orgId), eq("acct"));
+        verify(overrideService, times(2)).apply(any(), eq(orgId), eq("acct"), any());
+        verify(overrideService, times(1)).activeMastersByName(orgId);
     }
 
     @Test
@@ -188,7 +228,7 @@ class UploadControllerBulkActionTest {
         when(findingRepository.findMatchingForUpdate(any(), eq(ResolveStatus.ACKNOWLEDGED), any(), any(), any(), any()))
                 .thenReturn(List.of(a, b));
         lenient().doThrow(new FindingOverrideException(HttpStatus.CONFLICT, "Master changed since submission; reject and resubmit."))
-                .when(overrideService).apply(eq(b), any(), anyString());
+                .when(overrideService).apply(eq(b), any(), anyString(), any());
 
         assertThatThrownBy(() -> controller.bulkFindingAction(jobId, filterReq("APPROVE"), user("acct", "ROLE_ACCOUNTANT")))
                 .isInstanceOfSatisfying(BulkFindingActionException.class, e -> {
@@ -217,7 +257,7 @@ class UploadControllerBulkActionTest {
 
         assertThatThrownBy(() -> controller.bulkFindingAction(jobId, r, user("acct", "ROLE_ACCOUNTANT")))
                 .isInstanceOf(BulkFindingActionException.class);
-        verify(overrideService, never()).apply(any(), any(), anyString());
+        verify(overrideService, never()).apply(any(), any(), anyString(), any());
     }
 
     @Test

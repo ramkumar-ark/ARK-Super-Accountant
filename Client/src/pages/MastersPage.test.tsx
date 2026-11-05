@@ -329,6 +329,18 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
     )
   })
 
+  it('typed-value and missing-in-upload findings are not offered for bulk override', async () => {
+    rows.push(
+      mk('gstin', { ruleCode: 'GSTIN_PRESENCE', mismatchType: null }),
+      mk('gone', { mismatchType: 'MISSING_IN_UPLOAD' }),
+    )
+    await openTab()
+    await screen.findByText('Ledger gone')
+    expect(screen.queryByLabelText('Select Ledger gstin')).toBeNull()
+    expect(screen.queryByLabelText('Select Ledger gone')).toBeNull()
+    expect(screen.getByLabelText('Select Ledger a')).toBeInTheDocument()
+  })
+
   it('accountant can bulk resolve and bulk approve pending', async () => {
     setRole('ROLE_ACCOUNTANT')
     await openTab()

@@ -43,6 +43,13 @@ interface ValidationFinding {
 
 // Rule codes whose corrected value is typed in by the user; everything else is derived server-side.
 const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
+const DERIVABLE_MISMATCH_TYPES = [
+  'MISSING_IN_CONFIGURATION',
+  'NAME_MISMATCH',
+  'PARENT_GROUP_MISMATCH',
+  'GST_APPLICABILITY_MISMATCH',
+  'TDS_APPLICABILITY_MISMATCH',
+]
 const GST_APPLICABILITY_TYPES = ['TAXABLE', 'EXEMPT', 'ZERO_RATED', 'NON_GST', 'RCM', 'NOT_APPLICABLE']
 // Detection reasons a mismatch finding can have (MismatchType on the server).
 const MISMATCH_REASONS: Record<string, string> = {
@@ -663,7 +670,11 @@ function FindingsTab({
 
   // Bulk actions only cover findings whose corrected value the server derives itself.
   const canBulkOverride = (f: ValidationFinding) =>
-    canSubmit && f.resolveStatus === 'OPEN' && !TYPED_INPUT_RULES.includes(f.ruleCode)
+    canSubmit &&
+    f.resolveStatus === 'OPEN' &&
+    f.ruleCode === 'MISMATCH_DETECTION' &&
+    f.mismatchType != null &&
+    DERIVABLE_MISMATCH_TYPES.includes(f.mismatchType)
   const canBulkApprove = (f: ValidationFinding) => isAccountant && f.resolveStatus === 'ACKNOWLEDGED'
 
   async function runBulk(action: 'ACKNOWLEDGE' | 'APPROVE', ids: string[] | null) {

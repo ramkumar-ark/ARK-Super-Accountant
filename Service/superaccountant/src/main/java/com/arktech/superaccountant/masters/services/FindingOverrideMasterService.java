@@ -12,7 +12,10 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +38,16 @@ public class FindingOverrideMasterService {
     static final Set<String> TYPED_INPUT_RULES =
             Set.of("GSTIN_PRESENCE", "HSN_SAC_CODE", "TDS_SECTION_MAPPING", "GST_APPLICABILITY");
 
+    private static final Set<MismatchType> DERIVABLE_MISMATCH_TYPES = EnumSet.of(
+            MismatchType.NAME_MISMATCH, MismatchType.PARENT_GROUP_MISMATCH,
+            MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH,
+            MismatchType.MISSING_IN_CONFIGURATION);
+
+    /** True when the corrected master value comes from the finding itself, so no typed value is needed. */
+    public static boolean isDerivable(ValidationFinding f) {
+        return "MISMATCH_DETECTION".equals(f.getRuleCode()) && DERIVABLE_MISMATCH_TYPES.contains(f.getMismatchType());
+    }
+
     @Autowired
     private PreconfiguredMasterRepository masterRepository;
 
@@ -53,7 +66,7 @@ public class FindingOverrideMasterService {
             requireTypedValue(f.getRuleCode(), value);
             return;
         }
-        if (!"MISMATCH_DETECTION".equals(f.getRuleCode()) || f.getMismatchType() == null) {
+        if (!isDerivable(f)) {
             throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
         switch (f.getMismatchType()) {
@@ -69,11 +82,27 @@ public class FindingOverrideMasterService {
      * problem; the caller's transaction must roll back.
      */
     public void apply(ValidationFinding f, UUID orgId, String approver) {
+        apply(f, orgId, approver, activeMastersByName(orgId));
+    }
+
+    /**
+     * The organization's active masters keyed by normalized ledger name, loaded once for a batch of approvals.
+     * {@link #apply(ValidationFinding, UUID, String, Map)} keeps it current as masters are renamed or created.
+     */
+    public Map<String, PreconfiguredMaster> activeMastersByName(UUID orgId) {
+        Map<String, PreconfiguredMaster> masters = new HashMap<>();
+        for (PreconfiguredMaster m : masterRepository.findByOrganizationIdAndActiveTrue(orgId)) {
+            masters.putIfAbsent(LedgerNames.normalize(m.getLedgerName()), m);
+        }
+        return masters;
+    }
+
+    public void apply(ValidationFinding f, UUID orgId, String approver, Map<String, PreconfiguredMaster> masters) {
         String submitter = f.getSubmittedBy();
         if (TYPED_INPUT_RULES.contains(f.getRuleCode())) {
             String value = f.getProposedValue();
             requireTypedValue(f.getRuleCode(), value);
-            PreconfiguredMaster master = findMaster(orgId, f.getLedgerName());
+            PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
             switch (f.getRuleCode()) {
                 case "GSTIN_PRESENCE" -> change(master, f, "gstin", master.getGstin(), value.trim(),
                         approver, submitter, () -> master.setGstin(value.trim()));
@@ -90,51 +119,53 @@ public class FindingOverrideMasterService {
             }
             return;
         }
-        if (!"MISMATCH_DETECTION".equals(f.getRuleCode()) || f.getMismatchType() == null) {
+        if (!isDerivable(f)) {
             throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
         switch (f.getMismatchType()) {
             case NAME_MISMATCH -> {
                 // ledgerName holds the Tally (new) name; the master is located by its current name (expectedValue).
-                PreconfiguredMaster master = masterRepository.findByOrganizationIdAndActiveTrue(orgId).stream()
-                        .filter(m -> Objects.equals(m.getLedgerName(), f.getExpectedValue()))
-                        .findFirst()
-                        .orElseThrow(() -> new FindingOverrideException(HttpStatus.CONFLICT,
-                                "Master changed since submission; reject and resubmit."));
+                PreconfiguredMaster master = masters.get(LedgerNames.normalize(f.getExpectedValue()));
+                if (master == null || !Objects.equals(master.getLedgerName(), f.getExpectedValue())) {
+                    throw new FindingOverrideException(HttpStatus.CONFLICT,
+                            "Master changed since submission; reject and resubmit.");
+                }
+                String oldKey = LedgerNames.normalize(master.getLedgerName());
                 String newName = f.getActualValue();
                 change(master, f, "ledger_name", master.getLedgerName(), newName,
                         approver, submitter, () -> master.setLedgerName(newName));
+                masters.remove(oldKey, master);
+                masters.putIfAbsent(LedgerNames.normalize(newName), master);
             }
             case PARENT_GROUP_MISMATCH -> {
-                PreconfiguredMaster master = findMaster(orgId, f.getLedgerName());
+                PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
                 String v = f.getActualValue();
                 change(master, f, "expected_parent_group", master.getExpectedParentGroup(), v,
                         approver, submitter, () -> master.setExpectedParentGroup(v));
             }
             case GST_APPLICABILITY_MISMATCH -> {
                 Boolean v = parseFlag(f.getActualValue());
-                PreconfiguredMaster master = findMaster(orgId, f.getLedgerName());
+                PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
                 change(master, f, "expected_gst_applicable", str(master.getExpectedGstApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedGstApplicable(v));
             }
             case TDS_APPLICABILITY_MISMATCH -> {
                 Boolean v = parseFlag(f.getActualValue());
-                PreconfiguredMaster master = findMaster(orgId, f.getLedgerName());
+                PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
                 change(master, f, "expected_tds_applicable", str(master.getExpectedTdsApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedTdsApplicable(v));
             }
-            case MISSING_IN_CONFIGURATION -> createFromSnapshot(f, orgId, approver, submitter);
+            case MISSING_IN_CONFIGURATION -> createFromSnapshot(f, orgId, approver, submitter, masters);
             default -> throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
     }
 
     // --- helpers ---
 
-    private void createFromSnapshot(ValidationFinding f, UUID orgId, String approver, String submitter) {
+    private void createFromSnapshot(ValidationFinding f, UUID orgId, String approver, String submitter,
+                                    Map<String, PreconfiguredMaster> masters) {
         UploadLedgerSnapshot s = findSnapshot(f);
-        boolean exists = masterRepository.findByOrganizationIdAndActiveTrue(orgId).stream()
-                .anyMatch(m -> LedgerNames.normalize(m.getLedgerName()).equals(LedgerNames.normalize(f.getLedgerName())));
-        if (exists) {
+        if (masters.containsKey(LedgerNames.normalize(f.getLedgerName()))) {
             throw new FindingOverrideException(HttpStatus.CONFLICT,
                     "Master changed since submission; reject and resubmit.");
         }
@@ -151,6 +182,7 @@ public class FindingOverrideMasterService {
         m.setGstApplicabilityType(s.getGstApplicabilityType());
         m.setUpdatedAt(Instant.now());
         PreconfiguredMaster saved = masterRepository.save(m);
+        masters.put(LedgerNames.normalize(f.getLedgerName()), saved);
 
         List<MasterEditLog> logs = new ArrayList<>();
         addCreateLog(logs, saved, f, "ledger_name", saved.getLedgerName(), approver, submitter);
@@ -198,13 +230,13 @@ public class FindingOverrideMasterService {
         return l;
     }
 
-    private PreconfiguredMaster findMaster(UUID orgId, String ledgerName) {
-        String key = LedgerNames.normalize(ledgerName);
-        return masterRepository.findByOrganizationIdAndActiveTrue(orgId).stream()
-                .filter(m -> LedgerNames.normalize(m.getLedgerName()).equals(key))
-                .findFirst()
-                .orElseThrow(() -> new FindingOverrideException(HttpStatus.CONFLICT,
-                        "Master changed since submission; reject and resubmit."));
+    private PreconfiguredMaster findMaster(Map<String, PreconfiguredMaster> masters, String ledgerName) {
+        PreconfiguredMaster master = masters.get(LedgerNames.normalize(ledgerName));
+        if (master == null) {
+            throw new FindingOverrideException(HttpStatus.CONFLICT,
+                    "Master changed since submission; reject and resubmit.");
+        }
+        return master;
     }
 
     private UploadLedgerSnapshot findSnapshot(ValidationFinding f) {

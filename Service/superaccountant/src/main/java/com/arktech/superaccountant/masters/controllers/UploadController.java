@@ -536,7 +536,7 @@ public class UploadController {
                 if (finding.getResolveStatus() != ResolveStatus.OPEN) {
                     return ResponseEntity.badRequest().body(Map.of("error", "Only OPEN findings can be resolved."));
                 }
-                submit(finding, request.getValue(), request.getNote(), orgId, username, isAccountant, now);
+                submit(finding, request.getValue(), request.getNote(), orgId, username, isAccountant, now, null);
             }
             case "APPROVE" -> {
                 if (!isAccountant) {
@@ -545,7 +545,7 @@ public class UploadController {
                 if (finding.getResolveStatus() != ResolveStatus.ACKNOWLEDGED) {
                     return ResponseEntity.badRequest().body(Map.of("error", "Only findings pending review can be approved."));
                 }
-                approve(finding, orgId, username, now);
+                approve(finding, orgId, username, now, null);
             }
             case "REJECT" -> {
                 if (!isAccountant) {
@@ -588,7 +588,7 @@ public class UploadController {
      * own submission is approved in the same step (D4). Must run inside the caller's transaction.
      */
     private void submit(ValidationFinding finding, String value, String note, UUID orgId, String username,
-                        boolean isAccountant, Instant now) {
+                        boolean isAccountant, Instant now, Map<String, PreconfiguredMaster> masters) {
         findingOverrideMasterService.validate(finding, value, orgId);
         finding.setResolveStatus(ResolveStatus.ACKNOWLEDGED);
         finding.setResolveNote(note);
@@ -601,7 +601,7 @@ public class UploadController {
         finding.setResolvedBy(null);
         finding.setResolvedAt(null);
         if (isAccountant) {
-            approve(finding, orgId, username, now);
+            approve(finding, orgId, username, now, masters);
         }
     }
 
@@ -646,6 +646,9 @@ public class UploadController {
                 ? findingRepository.findByIdsForUpdate(jobId, new java.util.LinkedHashSet<>(request.getFindingIds()))
                 : findingRepository.findMatchingForUpdate(jobId, requiredStatus, request.getCategory(), request.getSeverity(),
                         blankToNull(request.getRuleCode()), request.getMismatchType());
+        if (!byIds && !approving) {
+            targets = targets.stream().filter(FindingOverrideMasterService::isDerivable).toList();
+        }
         if (targets.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", approving ? "No findings pending review match." : "No open findings match."));
         }
@@ -653,6 +656,8 @@ public class UploadController {
         String username = principal.getUsername();
         Instant now = Instant.now();
 
+        Map<String, PreconfiguredMaster> masters = approving || isAccountant
+                ? findingOverrideMasterService.activeMastersByName(orgId) : Map.of();
         List<BulkFindingActionException.Failure> failures = new java.util.ArrayList<>();
         if (byIds) {
             java.util.Set<UUID> found = targets.stream().map(ValidationFinding::getId).collect(Collectors.toSet());
@@ -670,9 +675,9 @@ public class UploadController {
             }
             try {
                 if (approving) {
-                    approve(f, orgId, username, now);
+                    approve(f, orgId, username, now, masters);
                 } else {
-                    submit(f, null, request.getNote(), orgId, username, isAccountant, now);
+                    submit(f, null, request.getNote(), orgId, username, isAccountant, now, masters);
                 }
             } catch (FindingOverrideException e) {
                 failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(), e.getMessage()));
@@ -700,8 +705,13 @@ public class UploadController {
     }
 
     /** Writes the proposal to the master and marks the finding APPROVED. Must run inside the caller's transaction. */
-    private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now) {
-        findingOverrideMasterService.apply(finding, orgId, approver);
+    private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now,
+                         Map<String, PreconfiguredMaster> masters) {
+        if (masters == null) {
+            findingOverrideMasterService.apply(finding, orgId, approver);
+        } else {
+            findingOverrideMasterService.apply(finding, orgId, approver, masters);
+        }
         finding.setResolveStatus(ResolveStatus.APPROVED);
         finding.setReviewedBy(approver);
         finding.setReviewedAt(now);

@@ -201,6 +201,48 @@ class FindingOverrideMasterServiceTest {
     }
 
     @Test
+    void apply_withSharedMasterIndex_seesMastersCreatedEarlierInTheBatch_withoutReloading() {
+        when(masterRepository.findByOrganizationIdAndActiveTrue(orgId)).thenReturn(List.of(master));
+        UploadLedgerSnapshot s = new UploadLedgerSnapshot();
+        s.setLedgerName("New Vendor");
+        when(snapshotRepository.findByUploadJobIdAndNormalizedName(any(), anyString())).thenReturn(List.of(s));
+        when(masterRepository.save(any(PreconfiguredMaster.class))).thenAnswer(i -> i.getArgument(0));
+        ValidationFinding first = finding("MISMATCH_DETECTION", MismatchType.MISSING_IN_CONFIGURATION,
+                "new vendor", null, "new vendor");
+        ValidationFinding duplicate = finding("MISMATCH_DETECTION", MismatchType.MISSING_IN_CONFIGURATION,
+                "New Vendor ", null, "New Vendor ");
+        ValidationFinding parent = finding("MISMATCH_DETECTION", MismatchType.PARENT_GROUP_MISMATCH,
+                "office rent", "Indirect Expenses", "Direct Expenses");
+
+        Map<String, PreconfiguredMaster> index = service.activeMastersByName(orgId);
+        service.apply(first, orgId, "acct1", index);
+        service.apply(parent, orgId, "acct1", index);
+
+        assertThat(master.getExpectedParentGroup()).isEqualTo("Direct Expenses");
+        assertThatThrownBy(() -> service.apply(duplicate, orgId, "acct1", index))
+                .isInstanceOfSatisfying(FindingOverrideException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
+        verify(masterRepository, org.mockito.Mockito.times(1)).findByOrganizationIdAndActiveTrue(orgId);
+    }
+
+    @Test
+    void apply_withSharedMasterIndex_renamedMasterIsFoundByItsNewName() {
+        when(masterRepository.findByOrganizationIdAndActiveTrue(orgId)).thenReturn(List.of(master));
+        ValidationFinding rename = finding("MISMATCH_DETECTION", MismatchType.NAME_MISMATCH,
+                "Office Rent Paid", "Office Rent", "Office Rent Paid");
+        ValidationFinding parent = finding("MISMATCH_DETECTION", MismatchType.PARENT_GROUP_MISMATCH,
+                "office rent paid", "Indirect Expenses", "Direct Expenses");
+
+        Map<String, PreconfiguredMaster> index = service.activeMastersByName(orgId);
+        service.apply(rename, orgId, "acct1", index);
+        service.apply(parent, orgId, "acct1", index);
+
+        assertThat(master.getLedgerName()).isEqualTo("Office Rent Paid");
+        assertThat(master.getExpectedParentGroup()).isEqualTo("Direct Expenses");
+        assertThat(index).containsOnlyKeys("office rent paid");
+    }
+
+    @Test
     void apply_missingInConfiguration_noSnapshot_throws409() {
         ValidationFinding f = finding("MISMATCH_DETECTION", MismatchType.MISSING_IN_CONFIGURATION,
                 "new vendor", null, "new vendor");
