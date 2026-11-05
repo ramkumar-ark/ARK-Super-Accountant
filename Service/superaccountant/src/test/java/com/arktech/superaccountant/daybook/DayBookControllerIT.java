@@ -42,7 +42,7 @@ class DayBookControllerIT {
     }
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ── Test 1: TALLY-01, TALLY-06 ───────────────────────────────────────────
 

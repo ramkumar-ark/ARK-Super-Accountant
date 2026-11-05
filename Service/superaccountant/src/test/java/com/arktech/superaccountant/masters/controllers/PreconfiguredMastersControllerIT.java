@@ -40,8 +40,7 @@ class PreconfiguredMastersControllerIT {
     @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void onboard_standardTemplate_copies60PlusMasters() throws Exception {
