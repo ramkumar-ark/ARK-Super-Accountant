@@ -89,6 +89,24 @@ public class FindingOverrideMasterService {
     }
 
     /**
+     * Records an override proposal: validates it, then moves the finding to pending review (ACKNOWLEDGED),
+     * clearing any earlier review. Writes nothing to the master.
+     */
+    public void submit(ValidationFinding f, String value, String note, UUID orgId, String submitter, Instant now) {
+        validate(f, value, orgId);
+        f.setResolveStatus(ResolveStatus.ACKNOWLEDGED);
+        f.setResolveNote(note);
+        f.setProposedValue(value);
+        f.setSubmittedBy(submitter);
+        f.setSubmittedAt(now);
+        f.setReviewedBy(null);
+        f.setReviewedAt(null);
+        f.setReviewNote(null);
+        f.setResolvedBy(null);
+        f.setResolvedAt(null);
+    }
+
+    /**
      * Applies the finding's proposal to the master. Throws {@link FindingOverrideException} on any
      * problem; the caller's transaction must roll back.
      */

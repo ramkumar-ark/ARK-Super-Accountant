@@ -307,6 +307,72 @@ class FindingOverrideWorkflowIT {
         assertThat(gateService.checkGate(orgId).gated()).isTrue();
     }
 
+    private UploadLedgerSnapshot acmeSnapshot() {
+        UploadLedgerSnapshot s = new UploadLedgerSnapshot();
+        s.setUploadJobId(job.getId());
+        s.setOrganizationId(orgId);
+        s.setLedgerName("Acme Traders");
+        return snapshotRepository.saveAndFlush(s);
+    }
+
+    private ResultActions inlineGstin(String jwt, UploadLedgerSnapshot s, String gstin) throws Exception {
+        return mockMvc.perform(patch("/api/v1/uploads/" + job.getId() + "/ledgers/" + s.getId())
+                .contentType("application/json").content("{\"gstin\":\"" + gstin + "\"}")
+                .header("Authorization", "Bearer " + jwt));
+    }
+
+    @Test
+    void operatorInlineEdit_afterRejection_submitsForReview_cannotUnlockGate() throws Exception {
+        UploadLedgerSnapshot s = acmeSnapshot();
+        ValidationFinding f = gstinFinding();
+        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isOk());
+        act(accountantJwt, f, "{\"action\":\"REJECT\",\"note\":\"wrong GSTIN\"}").andExpect(status().isOk());
+
+        inlineGstin(operatorJwt, s, "29ABCDE1234F1Z5").andExpect(status().isOk());
+
+        findingRepository.flush();
+        ValidationFinding after = findingRepository.findById(f.getId()).orElseThrow();
+        assertThat(after.getResolveStatus()).isEqualTo(ResolveStatus.ACKNOWLEDGED);
+        assertThat(after.getSubmittedBy()).isEqualTo("wf_operator");
+        assertThat(after.getProposedValue()).isEqualTo("29ABCDE1234F1Z5");
+        assertThat(after.getReviewNote()).isNull();
+        assertThat(after.getResolvedBy()).isNull();
+        assertThat(reloadMaster().getGstin()).isNull();
+        assertThat(gateService.checkGate(orgId).gated()).isTrue();
+
+        act(accountantJwt, f, "{\"action\":\"APPROVE\"}").andExpect(status().isOk());
+        findingRepository.flush();
+        assertThat(reloadMaster().getGstin()).isEqualTo("29ABCDE1234F1Z5");
+        assertThat(gateService.checkGate(orgId).gated()).isFalse();
+    }
+
+    @Test
+    void operatorInlineEdit_invalidValue_leavesFindingOpen() throws Exception {
+        UploadLedgerSnapshot s = acmeSnapshot();
+        ValidationFinding f = gstinFinding();
+
+        inlineGstin(operatorJwt, s, "abc").andExpect(status().isOk());
+
+        findingRepository.flush();
+        assertThat(findingRepository.findById(f.getId()).orElseThrow().getResolveStatus())
+                .isEqualTo(ResolveStatus.OPEN);
+        assertThat(gateService.checkGate(orgId).gated()).isTrue();
+    }
+
+    @Test
+    void accountantInlineEdit_resolvesFindingInOneStep() throws Exception {
+        UploadLedgerSnapshot s = acmeSnapshot();
+        ValidationFinding f = gstinFinding();
+
+        inlineGstin(accountantJwt, s, "29ABCDE1234F1Z5").andExpect(status().isOk());
+
+        findingRepository.flush();
+        ValidationFinding after = findingRepository.findById(f.getId()).orElseThrow();
+        assertThat(after.getResolveStatus()).isEqualTo(ResolveStatus.RESOLVED);
+        assertThat(after.getResolvedBy()).isEqualTo("wf_accountant");
+        assertThat(gateService.checkGate(orgId).gated()).isFalse();
+    }
+
     // ── validation at submission ─────────────────────────────────────────────
 
     @Test

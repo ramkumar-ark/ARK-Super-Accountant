@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
@@ -54,6 +55,7 @@ class UploadControllerFindingActionTest {
 
     @BeforeEach
     void setUp() {
+        lenient().doCallRealMethod().when(overrideService).submit(any(), any(), any(), any(), any(), any());
         UploadJob job = new UploadJob();
         job.setOrganizationId(orgId);
         lenient().when(uploadJobRepository.findById(jobId)).thenReturn(Optional.of(job));

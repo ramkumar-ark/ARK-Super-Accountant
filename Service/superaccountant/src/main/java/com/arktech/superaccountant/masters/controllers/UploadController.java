@@ -481,7 +481,10 @@ public class UploadController {
         // Only trigger auto-resolve if any fields actually changed
         List<ValidationFinding> resolvedFindings = List.of();
         if (!logs.isEmpty()) {
-            resolvedFindings = findingAutoResolveService.autoResolveForUpdatedSnapshot(jobId, snapshot, username);
+            boolean isAccountant = principal.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"));
+            resolvedFindings = findingAutoResolveService.autoResolveForUpdatedSnapshot(
+                    jobId, snapshot, username, isAccountant, orgId);
         }
 
         return ResponseEntity.ok(Map.of(
@@ -589,17 +592,7 @@ public class UploadController {
      */
     private void submit(ValidationFinding finding, String value, String note, UUID orgId, String username,
                         boolean isAccountant, Instant now, Map<String, PreconfiguredMaster> masters) {
-        findingOverrideMasterService.validate(finding, value, orgId);
-        finding.setResolveStatus(ResolveStatus.ACKNOWLEDGED);
-        finding.setResolveNote(note);
-        finding.setProposedValue(value);
-        finding.setSubmittedBy(username);
-        finding.setSubmittedAt(now);
-        finding.setReviewedBy(null);
-        finding.setReviewedAt(null);
-        finding.setReviewNote(null);
-        finding.setResolvedBy(null);
-        finding.setResolvedAt(null);
+        findingOverrideMasterService.submit(finding, value, note, orgId, username, now);
         if (isAccountant) {
             approve(finding, orgId, username, now, masters);
         }
