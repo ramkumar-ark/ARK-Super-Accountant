@@ -177,7 +177,7 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     current = { ...current, resolveStatus: 'ACKNOWLEDGED', proposedValue: '29ABCDE1234F1Z5', submittedBy: 'op1' }
     await openFindingsTab()
 
-    await userEvent.click(screen.getByRole('button', { name: /Approve/ }))
+    await userEvent.click(screen.getByRole('button', { name: /^Approve Acme/ }))
 
     await waitFor(() => expect(mockPost).toHaveBeenCalledWith(ACTION_URL, { action: 'APPROVE' }))
   })
@@ -231,5 +231,142 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     await openFindingsTab()
 
     expect(screen.queryByRole('button', { name: /Override Value/ })).toBeNull()
+  })
+})
+
+describe('MastersPage — show resolved, reason filter and bulk actions', () => {
+  const BULK_URL = '/v1/uploads/job-1/findings/bulk-action'
+  const mk = (id: string, over: Record<string, unknown> = {}) => ({
+    ...baseFinding,
+    id,
+    ledgerName: `Ledger ${id}`,
+    ruleCode: 'MISMATCH_DETECTION',
+    mismatchType: 'MISSING_IN_CONFIGURATION',
+    ...over,
+  })
+  let rows: Array<ReturnType<typeof mk>>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setRole('ROLE_OPERATOR')
+    rows = [
+      mk('a'),
+      mk('b'),
+      mk('done', { resolveStatus: 'APPROVED' }),
+      mk('pend', { resolveStatus: 'ACKNOWLEDGED', proposedValue: 'V', submittedBy: 'op1' }),
+    ]
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) return Promise.resolve({ data: { totalElements: 3 } })
+      if (url.startsWith('/v1/uploads/latest/mismatches')) {
+        const q = new URLSearchParams(url.split('?')[1])
+        const closed = (s: string) => ['APPROVED', 'RESOLVED', 'DISCARDED'].includes(s)
+        let out = rows.filter((r) => (q.get('resolvedOnly') === 'true' ? closed(r.resolveStatus) : q.get('showResolved') === 'true' || !closed(r.resolveStatus)))
+        if (q.get('mismatchType')) out = out.filter((r) => r.mismatchType === q.get('mismatchType'))
+        return Promise.resolve({ data: { content: out, totalElements: out.length } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    mockPost.mockResolvedValue({ data: {} })
+  })
+
+  async function openTab() {
+    render(<MastersPage />)
+    const tab = await screen.findByRole('tab', { name: /Findings/ })
+    await waitFor(() => expect(tab).not.toBeDisabled())
+    await userEvent.click(tab)
+    await screen.findByText('Ledger a')
+  }
+
+  it('show resolved unchecked hides resolved findings; checked lists only resolved', async () => {
+    await openTab()
+    expect(screen.queryByText('Ledger done')).toBeNull()
+    expect(screen.getByText('Ledger pend')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByLabelText(/Show resolved/i))
+
+    await screen.findByText('Ledger done')
+    expect(screen.queryByText('Ledger a')).toBeNull()
+    expect(screen.queryByText('Ledger pend')).toBeNull()
+
+    await userEvent.click(screen.getByLabelText(/Show resolved/i))
+    await screen.findByText('Ledger a')
+    expect(screen.queryByText('Ledger done')).toBeNull()
+  })
+
+  it('reason filter is sent as the mismatchType param', async () => {
+    await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
+    await waitFor(() =>
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('mismatchType=MISSING_IN_CONFIGURATION')),
+    )
+  })
+
+  it('operator bulk-submits selected findings for review', async () => {
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger a'))
+    await userEvent.click(screen.getByLabelText('Select Ledger b'))
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(2\)/ }))
+
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, { action: 'ACKNOWLEDGE', findingIds: ['a', 'b'] }),
+    )
+    expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull()
+  })
+
+  it('operator bulk-submits all matching the current filter', async () => {
+    await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
+    await userEvent.click(await screen.findByRole('button', { name: /Submit for review all matching \(2\)/ }))
+
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, {
+        action: 'ACKNOWLEDGE',
+        mismatchType: 'MISSING_IN_CONFIGURATION',
+      }),
+    )
+  })
+
+  it('accountant can bulk resolve and bulk approve pending', async () => {
+    setRole('ROLE_ACCOUNTANT')
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger a'))
+    await userEvent.click(screen.getByRole('button', { name: /Resolve selected \(1\)/ }))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, { action: 'ACKNOWLEDGE', findingIds: ['a'] }),
+    )
+
+    await userEvent.click(screen.getByLabelText('Select Ledger pend'))
+    await userEvent.click(screen.getByRole('button', { name: /Approve selected \(1\)/ }))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, { action: 'APPROVE', findingIds: ['pend'] }),
+    )
+  })
+
+  it('shows every failure when a bulk action is rejected', async () => {
+    mockPost.mockRejectedValueOnce({
+      response: {
+        data: {
+          error: '1 finding(s) cannot be resolved; nothing was changed.',
+          failures: [{ findingId: 'a', ledgerName: 'Ledger a', error: 'needs a value' }],
+        },
+      },
+    })
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger a'))
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected/ }))
+
+    expect(await screen.findByText(/nothing was changed/)).toBeInTheDocument()
+    expect(screen.getByText(/Ledger a: needs a value/)).toBeInTheDocument()
+  })
+
+  it.each(['ROLE_AUDITOR_CA', 'ROLE_OWNER'])('%s sees no bulk controls', async (role) => {
+    setRole(role)
+    await openTab()
+    expect(screen.queryByLabelText(/Select all/)).toBeNull()
+    expect(screen.queryByLabelText('Select Ledger a')).toBeNull()
+    expect(screen.queryByRole('button', { name: /selected|all matching|all pending/ })).toBeNull()
   })
 })
