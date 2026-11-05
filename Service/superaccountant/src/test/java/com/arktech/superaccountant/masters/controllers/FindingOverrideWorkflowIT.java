@@ -285,6 +285,28 @@ class FindingOverrideWorkflowIT {
         assertThat(editLogRepository.findByFindingId(f.getId())).isEmpty();
     }
 
+    @Test
+    void inlineLedgerEdit_doesNotCloseFindingPendingAccountantReview_gateStaysLocked() throws Exception {
+        UploadLedgerSnapshot s = new UploadLedgerSnapshot();
+        s.setUploadJobId(job.getId());
+        s.setOrganizationId(orgId);
+        s.setLedgerName("Acme Traders");
+        s = snapshotRepository.saveAndFlush(s);
+        ValidationFinding f = gstinFinding();
+        act(operatorJwt, f, "{\"action\":\"ACKNOWLEDGE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/uploads/" + job.getId() + "/ledgers/" + s.getId())
+                        .contentType("application/json").content("{\"gstin\":\"29ABCDE1234F1Z5\"}")
+                        .header("Authorization", "Bearer " + operatorJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resolvedFindings").isEmpty());
+
+        findingRepository.flush();
+        assertThat(findingRepository.findById(f.getId()).orElseThrow().getResolveStatus())
+                .isEqualTo(ResolveStatus.ACKNOWLEDGED);
+        assertThat(gateService.checkGate(orgId).gated()).isTrue();
+    }
+
     // ── validation at submission ─────────────────────────────────────────────
 
     @Test

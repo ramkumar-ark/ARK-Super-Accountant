@@ -75,8 +75,7 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
 
     @Query("SELECT f FROM ValidationFinding f WHERE f.uploadJobId = :jobId " +
            "AND LOWER(f.ledgerName) = LOWER(:ledgerName) " +
-           "AND (f.resolveStatus = com.arktech.superaccountant.masters.models.ResolveStatus.OPEN " +
-           "OR f.resolveStatus = com.arktech.superaccountant.masters.models.ResolveStatus.ACKNOWLEDGED)")
+           "AND f.resolveStatus = com.arktech.superaccountant.masters.models.ResolveStatus.OPEN")
     List<ValidationFinding> findOpenByUploadJobIdAndLedgerName(
             @Param("jobId") UUID jobId,
             @Param("ledgerName") String ledgerName);
