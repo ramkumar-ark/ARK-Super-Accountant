@@ -98,7 +98,8 @@ Public endpoints: `/api/auth/**`, `/api/test/**`, `/error`. All others require a
 ```bash
 cd Service/superaccountant
 ./mvnw spring-boot:run        # Run the application
-./mvnw test                   # Run tests
+./mvnw test                   # Unit tests only (Surefire)
+./mvnw verify                 # Unit + *IT integration tests (Failsafe/Testcontainers, needs Docker) — what CI runs
 ./mvnw clean package          # Build JAR
 ```
 

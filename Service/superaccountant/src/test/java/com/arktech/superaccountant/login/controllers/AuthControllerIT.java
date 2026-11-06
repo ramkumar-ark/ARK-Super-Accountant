@@ -45,7 +45,7 @@ class AuthControllerIT {
     void signup_withOperatorRole_returns200() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u1\",\"email\":\"u1@x.com\",\"password\":\"pass123\",\"role\":\"operator\"}"))
+                        .content("{\"username\":\"usr1\",\"email\":\"u1@x.com\",\"password\":\"pass123\",\"role\":\"operator\"}"))
                 .andExpect(status().isOk());
     }
 
@@ -53,7 +53,7 @@ class AuthControllerIT {
     void signup_withAuditorCaRole_returns200() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u2\",\"email\":\"u2@x.com\",\"password\":\"pass123\",\"role\":\"auditor_ca\"}"))
+                        .content("{\"username\":\"usr2\",\"email\":\"u2@x.com\",\"password\":\"pass123\",\"role\":\"auditor_ca\"}"))
                 .andExpect(status().isOk());
     }
 
@@ -61,7 +61,7 @@ class AuthControllerIT {
     void signup_withOwnerRole_returns200() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u3\",\"email\":\"u3@x.com\",\"password\":\"pass123\",\"role\":\"owner\"}"))
+                        .content("{\"username\":\"usr3\",\"email\":\"u3@x.com\",\"password\":\"pass123\",\"role\":\"owner\"}"))
                 .andExpect(status().isOk());
     }
 
@@ -69,7 +69,7 @@ class AuthControllerIT {
     void signup_withAccountantRole_returns200() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u4\",\"email\":\"u4@x.com\",\"password\":\"pass123\",\"role\":\"accountant\"}"))
+                        .content("{\"username\":\"usr4\",\"email\":\"u4@x.com\",\"password\":\"pass123\",\"role\":\"accountant\"}"))
                 .andExpect(status().isOk());
     }
 
@@ -79,7 +79,7 @@ class AuthControllerIT {
     void signup_withCashierRole_returns400WithInvalidRoleMessage() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u5\",\"email\":\"u5@x.com\",\"password\":\"pass123\",\"role\":\"cashier\"}"))
+                        .content("{\"username\":\"usr5\",\"email\":\"u5@x.com\",\"password\":\"pass123\",\"role\":\"cashier\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(containsStringIgnoringCase("Invalid role")));
     }
@@ -88,7 +88,7 @@ class AuthControllerIT {
     void signup_withDataEntryOperatorRole_returns400() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u6\",\"email\":\"u6@x.com\",\"password\":\"pass123\",\"role\":\"data_entry_operator\"}"))
+                        .content("{\"username\":\"usr6\",\"email\":\"u6@x.com\",\"password\":\"pass123\",\"role\":\"data_entry_operator\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -96,7 +96,7 @@ class AuthControllerIT {
     void signup_withEmptyRole_returns400() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"u7\",\"email\":\"u7@x.com\",\"password\":\"pass123\",\"role\":\"\"}"))
+                        .content("{\"username\":\"usr7\",\"email\":\"u7@x.com\",\"password\":\"pass123\",\"role\":\"\"}"))
                 .andExpect(status().isBadRequest());
     }
 
