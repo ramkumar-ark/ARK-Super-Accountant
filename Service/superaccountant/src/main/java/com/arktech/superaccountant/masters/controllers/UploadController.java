@@ -539,7 +539,7 @@ public class UploadController {
                 if (finding.getResolveStatus() != ResolveStatus.OPEN) {
                     return ResponseEntity.badRequest().body(Map.of("error", "Only OPEN findings can be resolved."));
                 }
-                submit(finding, request.getValue(), request.getNote(), orgId, username, isAccountant, now, null);
+                submit(finding, request.getValue(), request.getNote(), orgId, username, isAccountant, now, null, null);
             }
             case "APPROVE" -> {
                 if (!isAccountant) {
@@ -591,10 +591,11 @@ public class UploadController {
      * own submission is approved in the same step (D4). Must run inside the caller's transaction.
      */
     private void submit(ValidationFinding finding, String value, String note, UUID orgId, String username,
-                        boolean isAccountant, Instant now, Map<String, PreconfiguredMaster> masters) {
-        findingOverrideMasterService.submit(finding, value, note, orgId, username, now);
+                        boolean isAccountant, Instant now, Map<String, PreconfiguredMaster> masters,
+                        Map<String, UploadLedgerSnapshot> snapshots) {
+        findingOverrideMasterService.submit(finding, value, note, orgId, username, now, snapshots);
         if (isAccountant) {
-            approve(finding, orgId, username, now, masters);
+            approve(finding, orgId, username, now, masters, snapshots);
         }
     }
 
@@ -657,6 +658,10 @@ public class UploadController {
 
         Map<String, PreconfiguredMaster> masters = approving || isAccountant
                 ? findingOverrideMasterService.activeMastersByName(orgId) : Map.of();
+        // Loaded once: each missing-in-configuration finding would otherwise look its uploaded ledger up itself.
+        Map<String, UploadLedgerSnapshot> snapshots = targets.stream()
+                .anyMatch(f -> f.getMismatchType() == MismatchType.MISSING_IN_CONFIGURATION)
+                ? findingOverrideMasterService.snapshotsByName(jobId) : Map.of();
         List<BulkFindingActionException.Failure> failures = new java.util.ArrayList<>();
         if (byIds) {
             java.util.Set<UUID> found = targets.stream().map(ValidationFinding::getId).collect(Collectors.toSet());
@@ -674,9 +679,9 @@ public class UploadController {
             }
             try {
                 if (approving) {
-                    approve(f, orgId, username, now, masters);
+                    approve(f, orgId, username, now, masters, snapshots);
                 } else {
-                    submit(f, null, request.getNote(), orgId, username, isAccountant, now, masters);
+                    submit(f, null, request.getNote(), orgId, username, isAccountant, now, masters, snapshots);
                 }
             } catch (FindingOverrideException e) {
                 failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(), e.getMessage()));
@@ -713,10 +718,15 @@ public class UploadController {
     /** Writes the proposal to the master and marks the finding APPROVED. Must run inside the caller's transaction. */
     private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now,
                          Map<String, PreconfiguredMaster> masters) {
+        approve(finding, orgId, approver, now, masters, null);
+    }
+
+    private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now,
+                         Map<String, PreconfiguredMaster> masters, Map<String, UploadLedgerSnapshot> snapshots) {
         if (masters == null) {
             findingOverrideMasterService.apply(finding, orgId, approver);
         } else {
-            findingOverrideMasterService.apply(finding, orgId, approver, masters);
+            findingOverrideMasterService.apply(finding, orgId, approver, masters, snapshots);
         }
         finding.setResolveStatus(ResolveStatus.APPROVED);
         finding.setReviewedBy(approver);

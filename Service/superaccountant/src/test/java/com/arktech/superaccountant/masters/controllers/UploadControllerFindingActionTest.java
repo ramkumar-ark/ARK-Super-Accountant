@@ -55,7 +55,7 @@ class UploadControllerFindingActionTest {
 
     @BeforeEach
     void setUp() {
-        lenient().doCallRealMethod().when(overrideService).submit(any(), any(), any(), any(), any(), any());
+        lenient().doCallRealMethod().when(overrideService).submit(any(), any(), any(), any(), any(), any(), any());
         UploadJob job = new UploadJob();
         job.setOrganizationId(orgId);
         lenient().when(uploadJobRepository.findById(jobId)).thenReturn(Optional.of(job));
@@ -92,7 +92,7 @@ class UploadControllerFindingActionTest {
         assertThat(finding.getSubmittedBy()).isEqualTo("op");
         assertThat(finding.getResolveNote()).isEqualTo("typo");
         assertThat(finding.getResolvedBy()).isNull();
-        verify(overrideService).validate(any(), any(), any());
+        verify(overrideService).validate(any(), any(), any(), any());
         verify(overrideService, never()).apply(any(), any(), anyString());
     }
 

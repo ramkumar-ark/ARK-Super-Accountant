@@ -446,13 +446,14 @@ describe('MastersPage — findings paging and select-all-matching', () => {
 
   const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
 
-  async function openTab() {
+  async function openTab(first = 'Ledger 000') {
     render(<MastersPage />)
     const tab = await screen.findByRole('tab', { name: /Findings/ })
     await waitFor(() => expect(tab).not.toBeDisabled())
     await userEvent.click(tab)
-    await screen.findByText('Ledger 000')
+    await screen.findByText(first)
   }
+  const openTab2 = () => openTab('Ledger 2000')
 
   it('lists numbered pages of 100 driven by the server total and fetches the clicked page', async () => {
     await openTab()
@@ -546,4 +547,47 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     expect(screen.queryByLabelText('Select all')).toBeNull()
     expect(screen.queryByRole('button', { name: /Select all \d+ matching/ })).toBeNull()
   })
+
+  it('shows a busy state while a bulk action runs, locks the controls, then reports the result', async () => {
+    stubConfirm(true)
+    let finish!: (v: unknown) => void
+    const dry = mockPost.getMockImplementation()!
+    mockPost.mockImplementation(((url: string, body: Record<string, unknown>) =>
+      body?.dryRun ? dry(url, body) : new Promise((r) => (finish = r))) as never)
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select all'))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
+
+    expect(await screen.findByText(/Submitting 250 findings/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Filter by reason')).toBeDisabled()
+    expect(screen.getByLabelText('Select all')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Page 2' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Submit for review selected/ })).toBeDisabled()
+
+    finish({ data: { processed: 250, status: 'ACKNOWLEDGED' } })
+
+    expect(await screen.findByText('Submitted 250 findings for review.')).toBeInTheDocument()
+    expect(screen.queryByText(/Submitting 250 findings/)).toBeNull()
+    expect(screen.getByLabelText('Filter by reason')).not.toBeDisabled()
+  })
+
+  it('explains why bulk is unavailable when only typed-value findings are left', async () => {
+    all = Array.from({ length: 6 }, (_, i) => mk(2000 + i, { ruleCode: 'HSN_SAC_CODE', mismatchType: null }))
+    mockPost.mockImplementation((() => Promise.resolve({ data: { matched: 0 } })) as never)
+    await openTab2()
+
+    expect(screen.getByRole('note')).toHaveTextContent(/6 findings on this page need a typed value/)
+    expect(screen.getByRole('note')).toHaveTextContent(/bulk actions are not available/)
+    expect(screen.queryByLabelText('Select all')).toBeNull()
+  })
+
+  it('does not show the typed-value note to read-only roles', async () => {
+    setRole('ROLE_AUDITOR_CA')
+    all = Array.from({ length: 6 }, (_, i) => mk(2000 + i, { ruleCode: 'HSN_SAC_CODE', mismatchType: null }))
+    await openTab2()
+
+    expect(screen.queryByRole('note')).toBeNull()
+  })
 })
+

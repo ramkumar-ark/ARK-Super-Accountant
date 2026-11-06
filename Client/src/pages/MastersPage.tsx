@@ -621,6 +621,8 @@ function FindingsTab({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkError, setBulkError] = useState('')
+  const [bulkWorking, setBulkWorking] = useState('')
+  const [bulkResult, setBulkResult] = useState('')
   const [bulkFailures, setBulkFailures] = useState<BulkFailure[]>([])
   // "Select all N matching": the action then targets every finding matching the filters, not just this page.
   const [allMatching, setAllMatching] = useState(false)
@@ -736,14 +738,24 @@ function FindingsTab({
       // Reaches beyond the rows on this page: say exactly how many findings it covers.
       if (!window.confirm(`${verb} all ${count} matching findings, not just the ${visibleFindings.length} on this page?`)) return
     }
+    const count = ids ? ids.length : action === 'APPROVE' ? matchedApprove : matchedOverride
     setBulkBusy(true)
     setBulkError('')
+    setBulkResult('')
     setBulkFailures([])
+    setBulkWorking(
+      `${action === 'APPROVE' ? 'Approving' : isAccountant ? 'Resolving' : 'Submitting'} ${count} finding${count === 1 ? '' : 's'}… this can take a little while for large selections.`,
+    )
     const body: Record<string, unknown> = ids ? { findingIds: ids } : filterBody()
     body.action = action
     try {
       const jobId = findings[0]?.uploadJobId
-      await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, body)
+      const res = await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, body)
+      const done = Number(res.data?.processed ?? count)
+      const noun = `${done} finding${done === 1 ? '' : 's'}`
+      setBulkResult(
+        action === 'APPROVE' ? `Approved ${noun}.` : isAccountant ? `Resolved ${noun}.` : `Submitted ${noun} for review.`,
+      )
       setSelectedIds(new Set())
       setAllMatching(false)
       onFindingResolved()
@@ -753,6 +765,7 @@ function FindingsTab({
       setBulkFailures(failures ?? [])
     } finally {
       setBulkBusy(false)
+      setBulkWorking('')
     }
   }
 
@@ -815,6 +828,7 @@ function FindingsTab({
     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-4 shadow-[var(--shadow-sm)] mb-4 flex flex-wrap gap-3 items-center">
       <select
         value={severityFilter}
+        disabled={bulkBusy}
         onChange={(e) => onSeverityFilterChange(e.target.value)}
         className="h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
       >
@@ -826,6 +840,7 @@ function FindingsTab({
       <select
         value={ruleFilter}
         aria-label="Filter by rule type"
+        disabled={bulkBusy}
         onChange={(e) => {
           setSelectedIds(new Set())
           setAllMatching(false)
@@ -847,6 +862,7 @@ function FindingsTab({
           onMismatchFilterChange(e.target.value)
         }}
         aria-label="Filter by reason"
+        disabled={bulkBusy}
         className="h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
       >
         <option value="">All reasons</option>
@@ -860,11 +876,23 @@ function FindingsTab({
         <input
           type="checkbox"
           checked={showResolved}
+          disabled={bulkBusy}
           onChange={(e) => onShowResolvedChange(e.target.checked)}
           className="rounded"
         />
         Show resolved
       </label>
+      {bulkWorking && (
+        <div className="basis-full flex items-center gap-2 text-sm text-[var(--color-text-secondary)]" role="status">
+          <Loader2 className="animate-spin" size={16} />
+          {bulkWorking}
+        </div>
+      )}
+      {!bulkWorking && bulkResult && (
+        <div className="basis-full text-sm text-[var(--color-success)]" role="status">
+          {bulkResult}
+        </div>
+      )}
     </div>
   )
 
@@ -938,6 +966,20 @@ function FindingsTab({
   const overrideCount = allMatching ? matchedOverride : selectedOverridable.length
   const approveCount = allMatching ? matchedApprove : selectedApprovable.length
 
+  // Open findings that need a typed value (GSTIN, HSN/SAC, TDS section, ...): bulk leaves them out by design.
+  const typedOnly = canSubmit && !showResolved
+    ? visibleFindings.filter((f) => f.resolveStatus === 'OPEN' && !canBulkOverride(f))
+    : []
+  const typedNote =
+    typedOnly.length > 0 ? (
+      <p className="text-xs text-[var(--color-text-muted)] mb-3" role="note">
+        {typedOnly.length} finding{typedOnly.length === 1 ? '' : 's'} on this page need
+        {typedOnly.length === 1 ? 's' : ''} a typed value (such as a GSTIN, HSN/SAC code or TDS section), so
+        bulk actions are not available for {typedOnly.length === 1 ? 'it' : 'them'}. Resolve
+        {typedOnly.length === 1 ? ' it' : ' them'} one at a time.
+      </p>
+    ) : null
+
   const bulkBar =
     !showResolved && (pageEligible > 0 || matchedTotal > 0) ? (
       <div
@@ -949,6 +991,7 @@ function FindingsTab({
             type="checkbox"
             aria-label="Select all"
             checked={allOnPageSelected}
+            disabled={bulkBusy}
             onChange={(e) => {
               setAllMatching(false)
               setSelectedIds(
@@ -985,6 +1028,7 @@ function FindingsTab({
             {pageSelected} on this page selected.{' '}
             <button
               className="underline text-[var(--color-primary)]"
+              disabled={bulkBusy}
               onClick={() => setAllMatching(true)}
             >
               Select all {matchedTotal} matching
@@ -996,6 +1040,7 @@ function FindingsTab({
             All {matchedTotal} matching findings selected.{' '}
             <button
               className="underline text-[var(--color-primary)]"
+              disabled={bulkBusy}
               onClick={() => {
                 setAllMatching(false)
                 setSelectedIds(new Set())
@@ -1037,7 +1082,7 @@ function FindingsTab({
         <span className="text-[var(--color-text-muted)] mr-2">
           {page * FINDINGS_PAGE_SIZE + 1}–{Math.min((page + 1) * FINDINGS_PAGE_SIZE, total)} of {total}
         </span>
-        <button className={btn} disabled={page === 0} onClick={() => goToPage(page - 1)}>
+        <button className={btn} disabled={bulkBusy || page === 0} onClick={() => goToPage(page - 1)}>
           Previous
         </button>
         {pageWindow.map((p, i) => (
@@ -1047,14 +1092,14 @@ function FindingsTab({
               className={btn}
               aria-label={`Page ${p + 1}`}
               aria-current={p === page ? 'page' : undefined}
-              disabled={p === page}
+              disabled={bulkBusy || p === page}
               onClick={() => goToPage(p)}
             >
               {p + 1}
             </button>
           </span>
         ))}
-        <button className={btn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}>
+        <button className={btn} disabled={bulkBusy || page >= totalPages - 1} onClick={() => goToPage(page + 1)}>
           Next
         </button>
       </nav>
@@ -1064,6 +1109,7 @@ function FindingsTab({
     <div id="findings-panel" role="tabpanel">
       {filterBar}
       {bulkBar}
+      {typedNote}
       <div className="flex flex-col gap-3">
         {visibleFindings.map((finding) => (
           <div
@@ -1076,6 +1122,7 @@ function FindingsTab({
                   type="checkbox"
                   aria-label={`Select ${finding.ledgerName}`}
                   checked={selectedIds.has(finding.id)}
+                  disabled={bulkBusy}
                   onChange={() => toggleSelected(finding.id)}
                   className="mt-1"
                 />
@@ -1148,7 +1195,7 @@ function FindingsTab({
                 <div className="flex gap-2 flex-shrink-0">
                   <button
                     onClick={() => handleApprove(finding)}
-                    disabled={busyId === finding.id}
+                    disabled={busyId === finding.id || bulkBusy}
                     aria-label={`Approve ${finding.ledgerName}`}
                     className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
                   >
@@ -1215,6 +1262,7 @@ function FindingsTab({
                     onClick={() => handleOverride(finding)}
                     disabled={
                       busyId === finding.id ||
+                      bulkBusy ||
                       (TYPED_INPUT_RULES.includes(finding.ruleCode) && overrideValue.trim() === '')
                     }
                     className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
@@ -1246,7 +1294,7 @@ function FindingsTab({
                 <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => handleReject(finding)}
-                    disabled={busyId === finding.id || rejectNote.trim() === ''}
+                    disabled={busyId === finding.id || bulkBusy || rejectNote.trim() === ''}
                     className="h-9 px-3 bg-[var(--color-danger)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
                   >
                     Confirm Reject

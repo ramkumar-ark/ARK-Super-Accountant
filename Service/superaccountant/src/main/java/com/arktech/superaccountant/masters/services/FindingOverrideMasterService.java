@@ -73,6 +73,11 @@ public class FindingOverrideMasterService {
      * Does not write anything.
      */
     public void validate(ValidationFinding f, String value, UUID orgId) {
+        validate(f, value, orgId, null);
+    }
+
+    /** As {@link #validate(ValidationFinding, String, UUID)}, reading uploaded ledgers from a batch-loaded map when given. */
+    public void validate(ValidationFinding f, String value, UUID orgId, Map<String, UploadLedgerSnapshot> snapshots) {
         if (TYPED_INPUT_RULES.contains(f.getRuleCode())) {
             requireTypedValue(f.getRuleCode(), value);
             return;
@@ -83,7 +88,7 @@ public class FindingOverrideMasterService {
         switch (f.getMismatchType()) {
             case NAME_MISMATCH, PARENT_GROUP_MISMATCH -> { }
             case GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH -> parseFlag(f.getActualValue());
-            case MISSING_IN_CONFIGURATION -> findSnapshot(f);
+            case MISSING_IN_CONFIGURATION -> findSnapshot(f, snapshots);
             default -> throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
     }
@@ -93,7 +98,12 @@ public class FindingOverrideMasterService {
      * clearing any earlier review. Writes nothing to the master.
      */
     public void submit(ValidationFinding f, String value, String note, UUID orgId, String submitter, Instant now) {
-        validate(f, value, orgId);
+        submit(f, value, note, orgId, submitter, now, null);
+    }
+
+    public void submit(ValidationFinding f, String value, String note, UUID orgId, String submitter, Instant now,
+                       Map<String, UploadLedgerSnapshot> snapshots) {
+        validate(f, value, orgId, snapshots);
         f.setResolveStatus(ResolveStatus.ACKNOWLEDGED);
         f.setResolveNote(note);
         f.setProposedValue(value);
@@ -127,6 +137,23 @@ public class FindingOverrideMasterService {
     }
 
     public void apply(ValidationFinding f, UUID orgId, String approver, Map<String, PreconfiguredMaster> masters) {
+        apply(f, orgId, approver, masters, null);
+    }
+
+    /**
+     * The upload's ledgers keyed by normalized name, loaded once for a batch, so each missing-in-configuration
+     * finding does not run its own lookup. The first ledger per name wins, as in the single-finding lookup.
+     */
+    public Map<String, UploadLedgerSnapshot> snapshotsByName(UUID jobId) {
+        Map<String, UploadLedgerSnapshot> byName = new HashMap<>();
+        for (UploadLedgerSnapshot s : snapshotRepository.findByUploadJobId(jobId)) {
+            byName.putIfAbsent(LedgerNames.normalize(s.getLedgerName()), s);
+        }
+        return byName;
+    }
+
+    public void apply(ValidationFinding f, UUID orgId, String approver, Map<String, PreconfiguredMaster> masters,
+                      Map<String, UploadLedgerSnapshot> snapshots) {
         String submitter = f.getSubmittedBy();
         if (TYPED_INPUT_RULES.contains(f.getRuleCode())) {
             String value = f.getProposedValue();
@@ -184,7 +211,7 @@ public class FindingOverrideMasterService {
                 change(master, f, "expected_tds_applicable", str(master.getExpectedTdsApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedTdsApplicable(v));
             }
-            case MISSING_IN_CONFIGURATION -> createFromSnapshot(f, orgId, approver, submitter, masters);
+            case MISSING_IN_CONFIGURATION -> createFromSnapshot(f, orgId, approver, submitter, masters, snapshots);
             default -> throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
     }
@@ -192,8 +219,9 @@ public class FindingOverrideMasterService {
     // --- helpers ---
 
     private void createFromSnapshot(ValidationFinding f, UUID orgId, String approver, String submitter,
-                                    Map<String, PreconfiguredMaster> masters) {
-        UploadLedgerSnapshot s = findSnapshot(f);
+                                    Map<String, PreconfiguredMaster> masters,
+                                    Map<String, UploadLedgerSnapshot> snapshots) {
+        UploadLedgerSnapshot s = findSnapshot(f, snapshots);
         if (masters.containsKey(LedgerNames.normalize(f.getLedgerName()))) {
             throw new FindingOverrideException(HttpStatus.CONFLICT,
                     "Master changed since submission; reject and resubmit.");
@@ -268,7 +296,15 @@ public class FindingOverrideMasterService {
         return master;
     }
 
-    private UploadLedgerSnapshot findSnapshot(ValidationFinding f) {
+    private UploadLedgerSnapshot findSnapshot(ValidationFinding f, Map<String, UploadLedgerSnapshot> snapshots) {
+        if (snapshots != null) {
+            UploadLedgerSnapshot cached = snapshots.get(LedgerNames.normalize(f.getLedgerName()));
+            if (cached == null) {
+                throw new FindingOverrideException(HttpStatus.CONFLICT,
+                        "The uploaded ledger for this finding is no longer available; re-upload the masters file.");
+            }
+            return cached;
+        }
         List<UploadLedgerSnapshot> found = snapshotRepository.findByUploadJobIdAndNormalizedName(
                 f.getUploadJobId(), LedgerNames.normalize(f.getLedgerName()));
         if (found.isEmpty()) {
