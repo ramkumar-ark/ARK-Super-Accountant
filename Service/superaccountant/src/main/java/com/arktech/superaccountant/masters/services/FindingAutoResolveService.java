@@ -52,19 +52,11 @@ public class FindingAutoResolveService {
 
     private boolean submitForReview(ValidationFinding finding, UploadLedgerSnapshot snapshot, String username,
                                     UUID orgId, Instant now) {
-        String previousActual = finding.getActualValue();
-        String value = null;
-        if (FindingOverrideMasterService.TYPED_INPUT_RULES.contains(finding.getRuleCode())) {
-            value = typedValue(finding.getRuleCode(), snapshot);
-        } else {
-            finding.setActualValue(correctedActual(finding.getMismatchType(), snapshot, previousActual));
-        }
         try {
-            findingOverrideMasterService.submit(finding, value,
+            findingOverrideMasterService.submit(finding, typedValue(finding.getRuleCode(), snapshot),
                     "Ledger data corrected inline.", orgId, username, now);
             return true;
         } catch (FindingOverrideException e) {
-            finding.setActualValue(previousActual);
             return false;
         }
     }
@@ -77,15 +69,6 @@ public class FindingAutoResolveService {
             case "GST_APPLICABILITY" -> snapshot.getGstApplicabilityType() == null
                     ? null : snapshot.getGstApplicabilityType().name();
             default -> null;
-        };
-    }
-
-    private String correctedActual(MismatchType type, UploadLedgerSnapshot snapshot, String fallback) {
-        return switch (type) {
-            case PARENT_GROUP_MISMATCH -> snapshot.getParentGroup();
-            case GST_APPLICABILITY_MISMATCH -> String.valueOf(snapshot.getGstApplicable());
-            case TDS_APPLICABILITY_MISMATCH -> String.valueOf(snapshot.getTdsApplicable());
-            default -> fallback;
         };
     }
 
