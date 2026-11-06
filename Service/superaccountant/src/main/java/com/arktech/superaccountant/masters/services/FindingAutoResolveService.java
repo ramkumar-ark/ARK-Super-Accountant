@@ -19,6 +19,11 @@ public class FindingAutoResolveService {
     @Autowired
     private FindingOverrideMasterService findingOverrideMasterService;
 
+    /**
+     * Handles OPEN typed-rule findings that an inline ledger edit now satisfies. An accountant's edit
+     * resolves them in one step; an operator's edit only submits them for accountant review (ACKNOWLEDGED),
+     * so an operator edit can never close a finding or unlock the gate. Mismatch findings are not touched.
+     */
     public List<ValidationFinding> autoResolveForUpdatedSnapshot(
             UUID uploadJobId, UploadLedgerSnapshot snapshot, String username, boolean isAccountant, UUID orgId) {
 
