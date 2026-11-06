@@ -174,7 +174,7 @@ class UploadControllerIT {
     void patchResolve_asOwner_returns403() throws Exception {
         mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
                         .contentType("application/json")
-                        .content("{}")
+                        .content("{\"status\":\"RESOLVED\"}")
                         .header("Authorization", "Bearer " + ownerJwt))
                 .andExpect(status().isForbidden());
     }
@@ -204,7 +204,7 @@ class UploadControllerIT {
     void patchResolve_asAuditorCa_returns403() throws Exception {
         mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
                         .contentType("application/json")
-                        .content("{}")
+                        .content("{\"status\":\"RESOLVED\"}")
                         .header("Authorization", "Bearer " + auditorJwt))
                 .andExpect(status().isForbidden());
     }

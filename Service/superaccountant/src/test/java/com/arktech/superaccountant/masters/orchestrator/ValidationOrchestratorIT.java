@@ -81,8 +81,8 @@ class ValidationOrchestratorIT {
     @Test
     void validate_fixtureWith2GstinGaps_produces2GstinPresenceFindings() {
         List<PreconfiguredMaster> masters = List.of(
-                master("Test Vendor A", LedgerCategory.PURCHASE, "194Q", null),
-                master("Test Vendor B", LedgerCategory.PURCHASE, "194Q", null),
+                master("Test Vendor A", LedgerCategory.CREDITOR, "194Q", null),
+                master("Test Vendor B", LedgerCategory.CREDITOR, "194Q", null),
                 master("Test Income C", LedgerCategory.INCOME,   "NOT_SUBJECT", "29ABCDE1234F1Z5")
         );
 

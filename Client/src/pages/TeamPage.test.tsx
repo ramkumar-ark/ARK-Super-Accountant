@@ -22,7 +22,6 @@ import { api } from '@/lib/api'
 
 const mockUseAuthStore = vi.mocked(useAuthStore)
 const mockGet = vi.mocked(api.get)
-const mockPost = vi.mocked(api.post)
 
 describe('TeamPage — member list', () => {
   beforeEach(() => {

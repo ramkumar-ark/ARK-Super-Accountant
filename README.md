@@ -66,7 +66,7 @@ Open [http://localhost:5173](http://localhost:5173). See [docs/GETTING-STARTED.m
 | Database | PostgreSQL 15, Spring Data JPA / Hibernate |
 | Frontend | React 19, TypeScript, Vite 8, TanStack Router, Zustand, Axios |
 | Styling | Tailwind CSS 4 |
-| Testing | Vitest + Testing Library (frontend), Maven Surefire (backend) |
+| Testing | Vitest + Testing Library (frontend), Maven Surefire + Failsafe with Testcontainers (backend) |
 
 ## Documentation
 
