@@ -1,5 +1,10 @@
 package com.arktech.superaccountant.daybook;
 
+import com.arktech.superaccountant.masters.models.UploadJob;
+import com.arktech.superaccountant.masters.models.UploadJobStatus;
+import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +47,8 @@ class DayBookControllerIT {
     }
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private UploadJobRepository uploadJobRepository;
+    @Autowired private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ── Test 1: TALLY-01, TALLY-06 ───────────────────────────────────────────
@@ -263,6 +270,37 @@ class DayBookControllerIT {
         assertThat(body.get("errorMessage")).isNull();
     }
 
+    /**
+     * Masters gate (MastersGateService) blocks day book uploads until the org has a completed
+     * masters upload with no unresolved findings, and DayBookMasterValidationService rejects
+     * day book ledgers absent from that upload's ledger snapshot. Seed both so these tests
+     * exercise the day book endpoint rather than the gates.
+     */
+    private void seedValidatedMasters(java.util.UUID orgId) {
+        UploadJob masters = new UploadJob();
+        masters.setOrganizationId(orgId);
+        masters.setFileName("masters-fixture.json");
+        masters.setStatus(UploadJobStatus.COMPLETED);
+        masters.setTotalLedgersParsed(FIXTURE_LEDGER_NAMES.size());
+        masters = uploadJobRepository.saveAndFlush(masters);
+
+        for (String name : FIXTURE_LEDGER_NAMES) {
+            UploadLedgerSnapshot snapshot = new UploadLedgerSnapshot();
+            snapshot.setUploadJobId(masters.getId());
+            snapshot.setOrganizationId(orgId);
+            snapshot.setLedgerName(name);
+            uploadLedgerSnapshotRepository.save(snapshot);
+        }
+        uploadLedgerSnapshotRepository.flush();
+    }
+
+    // Every ledgername referenced by the daybook-*.json fixtures.
+    private static final List<String> FIXTURE_LEDGER_NAMES = List.of(
+            "Bank Account", "Cement Purchases", "Cement Supplier", "Client ABC", "Depreciation",
+            "Input CGST @9%", "Input IGST @18%", "Input SGST @9%", "Output CGST @9%",
+            "Output SGST @9%", "Plant & Machinery", "Sales Account", "Steel Purchases",
+            "Test Cement Purchases", "Test Purchases");
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private String setupOrgScopedToken() throws Exception {
@@ -294,6 +332,8 @@ class DayBookControllerIT {
         java.util.Map<String, Object> orgBody = objectMapper.readValue(
                 createOrgResult.getResponse().getContentAsString(), java.util.Map.class);
         String orgId = orgBody.get("id").toString();
+
+        seedValidatedMasters(java.util.UUID.fromString(orgId));
 
         MvcResult selectResult = mockMvc.perform(post("/api/organizations/" + orgId + "/select")
                         .header("Authorization", "Bearer " + token))
