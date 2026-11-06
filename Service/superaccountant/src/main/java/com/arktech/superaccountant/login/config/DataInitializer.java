@@ -159,7 +159,7 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Cash", LedgerCategory.OTHER, "Cash-in-Hand", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Bank Account", LedgerCategory.OTHER, "Bank Accounts", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Bank OD Account", LedgerCategory.OTHER, "Bank OD A/C", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
-        rows.add(template("Sundry Debtors", LedgerCategory.INCOME, "Sundry Debtors", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
+        rows.add(template("Sundry Debtors", LedgerCategory.OTHER, "Sundry Debtors", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Stock-in-Hand", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance to Suppliers", LedgerCategory.PURCHASE, "Current Assets", true, true, "standard", "194Q", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Prepaid Expenses", LedgerCategory.EXPENSE, "Current Assets", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
@@ -225,7 +225,7 @@ public class DataInitializer implements CommandLineRunner {
         // Current Assets
         rows.add(template("Cash", LedgerCategory.OTHER, "Cash-in-Hand", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Bank Account", LedgerCategory.OTHER, "Bank Accounts", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
-        rows.add(template("Sundry Debtors", LedgerCategory.INCOME, "Sundry Debtors", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
+        rows.add(template("Sundry Debtors", LedgerCategory.OTHER, "Sundry Debtors", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Stock-in-Hand", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance to Suppliers", LedgerCategory.PURCHASE, "Current Assets", true, true, "simplified", "194Q", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Input IGST", LedgerCategory.GST, "Current Assets", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
@@ -282,7 +282,7 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Cash", LedgerCategory.OTHER, "Cash-in-Hand", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Bank Account", LedgerCategory.OTHER, "Bank Accounts", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Bank OD Account", LedgerCategory.OTHER, "Bank OD A/C", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
-        rows.add(template("Sundry Debtors", LedgerCategory.INCOME, "Sundry Debtors", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
+        rows.add(template("Sundry Debtors", LedgerCategory.OTHER, "Sundry Debtors", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Stock-in-Hand", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Raw Material Stock", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Work-in-Progress", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));

@@ -25,7 +25,15 @@ class HsnSacCodeRuleTest {
         m.setLedgerName(name);
         m.setCategory(category);
         m.setHsnSacCode(hsnSacCode);
+        m.setExpectedGstApplicable(true);
         m.setActive(true);
+        return m;
+    }
+
+    private PreconfiguredMaster configured(String name, LedgerCategory category, Boolean gstApplicable, String parentGroup) {
+        PreconfiguredMaster m = configured(name, category, null);
+        m.setExpectedGstApplicable(gstApplicable);
+        m.setExpectedParentGroup(parentGroup);
         return m;
     }
 
@@ -42,23 +50,50 @@ class HsnSacCodeRuleTest {
     }
 
     @Test
-    void gstCategoryNullHsnSac_emitsMediumFinding() {
-        PreconfiguredMaster m = configured("Output CGST @18%", LedgerCategory.GST, null);
+    void gstCategoryDutiesAndTaxesLedger_noFinding() {
+        // Output CGST / Input IGST etc. are tax-account ledgers, not goods or services: no HSN/SAC.
+        PreconfiguredMaster m = configured("Output CGST @18%", LedgerCategory.GST, true, "Duties & Taxes");
+        assertTrue(rule.execute(ctx(List.of(m)), List.of()).isEmpty());
+    }
+
+    @Test
+    void expenseWithGstApplicableAndNoHsnSac_emitsMediumFinding() {
+        PreconfiguredMaster m = configured("Professional Fees", LedgerCategory.EXPENSE, true, "Indirect Expenses");
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
         assertEquals(1, findings.size());
         assertEquals(FindingSeverity.MEDIUM, findings.get(0).getSeverity());
     }
 
     @Test
-    void purchaseCategoryNullHsnSac_noFinding() {
-        PreconfiguredMaster m = configured("Cement Purchase", LedgerCategory.PURCHASE, null);
-        List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertTrue(findings.isEmpty());
+    void expenseWithoutGstApplicability_noFinding() {
+        assertTrue(rule.execute(ctx(List.of(
+                configured("Salary & Wages", LedgerCategory.EXPENSE, false, "Indirect Expenses"))), List.of()).isEmpty());
     }
 
     @Test
-    void expenseCategoryNullHsnSac_noFinding() {
-        PreconfiguredMaster m = configured("Labour Charges", LedgerCategory.EXPENSE, null);
+    void incomeWithoutGstApplicability_noFinding() {
+        assertTrue(rule.execute(ctx(List.of(
+                configured("Interest Received", LedgerCategory.INCOME, false, "Indirect Incomes"))), List.of()).isEmpty());
+    }
+
+    @Test
+    void incomeWithUnknownGstApplicability_noFinding() {
+        // No signal either way: do not guess.
+        assertTrue(rule.execute(ctx(List.of(
+                configured("Contract Receipts", LedgerCategory.INCOME, null, "Direct Incomes"))), List.of()).isEmpty());
+    }
+
+    @Test
+    void sundryDebtorsLedger_noFindingEvenWhenCategorisedAsIncome() {
+        // Regression: the seeded "Sundry Debtors" master is filed under INCOME and flagged GST applicable.
+        // A debtor is a party account, not an income ledger, so it never needs an HSN/SAC code.
+        PreconfiguredMaster m = configured("Sundry Debtors", LedgerCategory.INCOME, true, "Sundry Debtors");
+        assertTrue(rule.execute(ctx(List.of(m)), List.of()).isEmpty());
+    }
+
+    @Test
+    void purchaseCategoryNullHsnSac_noFinding() {
+        PreconfiguredMaster m = configured("Cement Purchase", LedgerCategory.PURCHASE, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
         assertTrue(findings.isEmpty());
     }

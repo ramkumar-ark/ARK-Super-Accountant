@@ -8,8 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Checks that INCOME and GST ledgers have an HSN/SAC code assigned.
- * PURCHASE and EXPENSE ledgers are not required to have HSN/SAC codes.
+ * Checks that income and expense ledgers that are GST applicable have an HSN/SAC code assigned.
+ * The signal is the master's {@code expectedGstApplicable} flag: only {@code true} requires a code, so a ledger
+ * with the flag off or unknown is not flagged. GST (Duties &amp; Taxes) ledgers are tax accounts rather than
+ * goods or services, party accounts (Sundry Debtors / Creditors) are not income or expense, and PURCHASE, TDS
+ * and OTHER ledgers are out of scope.
  * Phase 3 rule: iterates preconfiguredMasters (not parsedLedgers) because
  * Tally JSON does not export HSN/SAC code data.
  */
@@ -26,8 +29,10 @@ public class HsnSacCodeRule implements ValidationRule {
         List<ValidationFinding> findings = new ArrayList<>();
 
         for (PreconfiguredMaster master : context.preconfiguredMasters()) {
-            boolean requiresHsnSac = master.getCategory() == LedgerCategory.INCOME
-                    || master.getCategory() == LedgerCategory.GST;
+            boolean requiresHsnSac = (master.getCategory() == LedgerCategory.INCOME
+                    || master.getCategory() == LedgerCategory.EXPENSE)
+                    && Boolean.TRUE.equals(master.getExpectedGstApplicable())
+                    && !isPartyGroup(master.getExpectedParentGroup());
 
             if (requiresHsnSac && master.getHsnSacCode() == null) {
                 // Note: uploadJobId is injected by ValidationOrchestrator.runAndPersist() before persistence.
@@ -45,5 +50,14 @@ public class HsnSacCodeRule implements ValidationRule {
         }
 
         return findings;
+    }
+
+    /** Debtor and creditor accounts are parties, whatever category they were filed under. */
+    private static boolean isPartyGroup(String parentGroup) {
+        if (parentGroup == null) {
+            return false;
+        }
+        String g = parentGroup.trim().toLowerCase();
+        return g.equals("sundry debtors") || g.equals("sundry creditors");
     }
 }
