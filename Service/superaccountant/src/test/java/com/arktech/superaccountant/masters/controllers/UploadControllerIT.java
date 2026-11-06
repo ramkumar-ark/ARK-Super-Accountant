@@ -25,13 +25,14 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Integration tests for UploadController role-based access control.
  *
- * Asserts the permission matrix: ACCOUNTANT and OPERATOR may upload and resolve
- * findings; OWNER and AUDITOR_CA are read-only; reads are open to any
+ * Asserts the permission matrix: ACCOUNTANT and OPERATOR may upload; only ACCOUNTANT may approve
+ * or reject finding resolutions (see FindingOverrideWorkflowIT); OWNER and AUDITOR_CA are read-only; reads are open to any
  * authenticated user.
  */
 @SpringBootTest
@@ -165,48 +166,30 @@ class UploadControllerIT {
                 .andExpect(status().is(not(403)));
     }
 
-    // ── PATCH /api/v1/uploads/{jobId}/mismatches/{findingId}/resolve ─────────
+    // ── removed PATCH /resolve and POST .../action auth ──────────────────────
+    // Per-role action behaviour with real data lives in FindingOverrideWorkflowIT.
 
     private static final String ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 
-    // Scenario 7: OWNER → 403 (OWNER cannot resolve mismatches)
+    // Scenario 8-10: removed self-approval endpoint
     @Test
-    void patchResolve_asOwner_returns403() throws Exception {
-        mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
-                        .contentType("application/json")
-                        .content("{\"status\":\"RESOLVED\"}")
-                        .header("Authorization", "Bearer " + ownerJwt))
-                .andExpect(status().isForbidden());
+    void patchResolve_removedEndpoint_isGoneForEveryRole() throws Exception {
+        for (String jwt : new String[]{ownerJwt, accountantJwt, operatorJwt, auditorJwt}) {
+            mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
+                            .contentType("application/json")
+                            .content("{\"status\":\"APPROVED\"}")
+                            .header("Authorization", "Bearer " + jwt))
+                    .andExpect(status().is(org.hamcrest.Matchers.anyOf(
+                            org.hamcrest.Matchers.is(404), org.hamcrest.Matchers.is(405))));
+        }
     }
 
-    // Scenario 8: ACCOUNTANT → NOT 403 (will be 404 because job doesn't exist)
     @Test
-    void patchResolve_asAccountant_notForbidden() throws Exception {
-        mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
+    void findingAction_withNoJwt_returns401() throws Exception {
+        mockMvc.perform(post("/api/v1/uploads/" + ZERO_UUID + "/findings/" + ZERO_UUID + "/action")
                         .contentType("application/json")
-                        .content("{}")
-                        .header("Authorization", "Bearer " + accountantJwt))
-                .andExpect(status().is(not(403)));
-    }
-
-    // Scenario 9: OPERATOR → NOT 403
-    @Test
-    void patchResolve_asOperator_notForbidden() throws Exception {
-        mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
-                        .contentType("application/json")
-                        .content("{}")
-                        .header("Authorization", "Bearer " + operatorJwt))
-                .andExpect(status().is(not(403)));
-    }
-
-    // Scenario 10: AUDITOR_CA → 403 (read-only role)
-    @Test
-    void patchResolve_asAuditorCa_returns403() throws Exception {
-        mockMvc.perform(patch("/api/v1/uploads/" + ZERO_UUID + "/mismatches/" + ZERO_UUID + "/resolve")
-                        .contentType("application/json")
-                        .content("{\"status\":\"RESOLVED\"}")
-                        .header("Authorization", "Bearer " + auditorJwt))
-                .andExpect(status().isForbidden());
+                        .content("{\"action\":\"APPROVE\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     // Scenario 11: No JWT → 401

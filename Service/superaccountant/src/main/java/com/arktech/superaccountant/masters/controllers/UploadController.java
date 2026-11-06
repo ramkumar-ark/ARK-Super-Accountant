@@ -4,16 +4,18 @@ import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.masters.classifier.LedgerCategoryClassifier;
 import com.arktech.superaccountant.masters.classifier.ParsedLedger;
 import com.arktech.superaccountant.masters.models.*;
+import com.arktech.superaccountant.masters.payload.request.BulkFindingActionRequest;
 import com.arktech.superaccountant.masters.payload.request.FindingActionRequest;
-import com.arktech.superaccountant.masters.payload.request.ResolveRequest;
 import com.arktech.superaccountant.masters.payload.request.UpdateLedgerSnapshotRequest;
 import com.arktech.superaccountant.masters.repository.LedgerEditLogRepository;
 import com.arktech.superaccountant.masters.services.FindingAutoResolveService;
+import com.arktech.superaccountant.masters.services.BulkFindingActionException;
+import com.arktech.superaccountant.masters.services.FindingOverrideException;
+import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
 import com.arktech.superaccountant.masters.payload.response.FindingResponse;
 import com.arktech.superaccountant.masters.payload.response.UploadJobResponse;
 import com.arktech.superaccountant.masters.repository.PreconfiguredMasterRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
-import com.arktech.superaccountant.masters.payload.response.ResolveResponse;
 import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.repository.ValidationRuleConfigRepository;
@@ -70,6 +72,9 @@ public class UploadController {
 
     @Autowired
     private FindingAutoResolveService findingAutoResolveService;
+
+    @Autowired
+    private FindingOverrideMasterService findingOverrideMasterService;
 
     @Transactional
     @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
@@ -261,7 +266,10 @@ public class UploadController {
             @PathVariable UUID id,
             @RequestParam(required = false) LedgerCategory category,
             @RequestParam(required = false) FindingSeverity severity,
+            @RequestParam(required = false) String ruleCode,
+            @RequestParam(required = false) MismatchType mismatchType,
             @RequestParam(defaultValue = "false") boolean showResolved,
+            @RequestParam(defaultValue = "false") boolean resolvedOnly,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserDetailsImpl principal) {
@@ -274,7 +282,7 @@ public class UploadController {
 
         int cappedSize = Math.min(size, 100);
         PageRequest pageable = PageRequest.of(page, cappedSize);
-        Page<ValidationFinding> findings = findingRepository.findFiltered(id, category, severity, showResolved, pageable);
+        Page<ValidationFinding> findings = findingRepository.findFiltered(id, category, severity, ruleCode, mismatchType, showResolved, resolvedOnly, pageable);
 
         return ResponseEntity.ok(findings.map(this::toFindingResponse));
     }
@@ -286,7 +294,10 @@ public class UploadController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) LedgerCategory category,
             @RequestParam(required = false) FindingSeverity severity,
+            @RequestParam(required = false) String ruleCode,
+            @RequestParam(required = false) MismatchType mismatchType,
             @RequestParam(defaultValue = "false") boolean showResolved,
+            @RequestParam(defaultValue = "false") boolean resolvedOnly,
             @AuthenticationPrincipal UserDetailsImpl principal) {
 
         UUID orgId = principal.getOrganizationId();
@@ -305,7 +316,7 @@ public class UploadController {
         UUID jobId = latestJob.get().getId();
         int cappedSize = Math.min(size, 100);
         PageRequest pageable = PageRequest.of(page, cappedSize);
-        Page<ValidationFinding> findings = findingRepository.findFiltered(jobId, category, severity, showResolved, pageable);
+        Page<ValidationFinding> findings = findingRepository.findFiltered(jobId, category, severity, ruleCode, mismatchType, showResolved, resolvedOnly, pageable);
         Page<FindingResponse> response = findings.map(this::toFindingResponse);
         return ResponseEntity.ok(response);
     }
@@ -338,42 +349,6 @@ public class UploadController {
                 .header("Content-Type", "text/csv")
                 .header("Content-Disposition", "attachment; filename=\"mismatches-" + id + ".csv\"")
                 .body(csv.toString());
-    }
-
-    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
-    @PatchMapping("/uploads/{jobId}/mismatches/{findingId}/resolve")
-    public ResponseEntity<?> resolveFinding(
-            @PathVariable UUID jobId,
-            @PathVariable UUID findingId,
-            @Valid @RequestBody ResolveRequest request,
-            @AuthenticationPrincipal UserDetailsImpl principal) {
-
-        UUID orgId = principal.getOrganizationId();
-        Optional<UploadJob> jobOpt = uploadJobRepository.findById(jobId);
-        if (jobOpt.isEmpty() || !jobOpt.get().getOrganizationId().equals(orgId)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return findingRepository.findById(findingId)
-                .filter(f -> f.getUploadJobId().equals(jobId))
-                .map(finding -> {
-                    if (request.getStatus() == ResolveStatus.OPEN) {
-                        return ResponseEntity.badRequest().body((Object) "Cannot set status back to OPEN.");
-                    }
-                    finding.setResolveStatus(request.getStatus());
-                    finding.setResolveNote(request.getNote());
-                    finding.setResolvedBy(principal.getUsername());
-                    finding.setResolvedAt(Instant.now());
-                    findingRepository.save(finding);
-                    return ResponseEntity.ok((Object) ResolveResponse.builder()
-                            .id(finding.getId())
-                            .status(finding.getResolveStatus())
-                            .resolvedBy(finding.getResolvedBy())
-                            .resolvedAt(finding.getResolvedAt())
-                            .note(finding.getResolveNote())
-                            .build());
-                })
-                .orElse(ResponseEntity.notFound().build());
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -506,7 +481,10 @@ public class UploadController {
         // Only trigger auto-resolve if any fields actually changed
         List<ValidationFinding> resolvedFindings = List.of();
         if (!logs.isEmpty()) {
-            resolvedFindings = findingAutoResolveService.autoResolveForUpdatedSnapshot(jobId, snapshot, username);
+            boolean isAccountant = principal.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"));
+            resolvedFindings = findingAutoResolveService.autoResolveForUpdatedSnapshot(
+                    jobId, snapshot, username, isAccountant, orgId);
         }
 
         return ResponseEntity.ok(Map.of(
@@ -515,6 +493,12 @@ public class UploadController {
         ));
     }
 
+    /**
+     * Two-stage finding resolution. ACKNOWLEDGE submits a proposed fix for review (operator) or, for an
+     * accountant, submits and approves in one step. APPROVE/REJECT are accountant-only. Only an APPROVE
+     * writes the master, in the same transaction as the status change; any failure rolls both back.
+     */
+    @Transactional
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/uploads/{jobId}/findings/{findingId}/action")
     public ResponseEntity<?> findingAction(
@@ -531,7 +515,7 @@ public class UploadController {
         }
 
         // 2. Find finding
-        Optional<ValidationFinding> findingOpt = findingRepository.findById(findingId);
+        Optional<ValidationFinding> findingOpt = findingRepository.findByIdForUpdate(findingId);
         if (findingOpt.isEmpty() || !findingOpt.get().getUploadJobId().equals(jobId)) {
             return ResponseEntity.notFound().build();
         }
@@ -540,8 +524,8 @@ public class UploadController {
         // 3. Role + state machine enforcement
         Set<String> roles = principal.getAuthorities().stream()
                 .map(a -> a.getAuthority()).collect(java.util.stream.Collectors.toSet());
-        boolean isOperatorOrAccountant = roles.contains("ROLE_OPERATOR") || roles.contains("ROLE_ACCOUNTANT");
-        boolean isAccountantOrAuditor = roles.contains("ROLE_ACCOUNTANT") || roles.contains("ROLE_AUDITOR_CA");
+        boolean isAccountant = roles.contains("ROLE_ACCOUNTANT");
+        boolean isOperatorOrAccountant = roles.contains("ROLE_OPERATOR") || isAccountant;
 
         String action = request.getAction();
         Instant now = Instant.now();
@@ -550,37 +534,37 @@ public class UploadController {
         switch (action) {
             case "ACKNOWLEDGE" -> {
                 if (!isOperatorOrAccountant) {
-                    return ResponseEntity.status(403).body(Map.of("error", "Only OPERATOR or ACCOUNTANT can acknowledge findings."));
+                    return ResponseEntity.status(403).body(Map.of("error", "Only OPERATOR or ACCOUNTANT can resolve findings."));
                 }
                 if (finding.getResolveStatus() != ResolveStatus.OPEN) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only OPEN findings can be acknowledged."));
+                    return ResponseEntity.badRequest().body(Map.of("error", "Only OPEN findings can be resolved."));
                 }
-                finding.setResolveStatus(ResolveStatus.ACKNOWLEDGED);
-                finding.setResolveNote(request.getNote());
-                finding.setResolvedBy(username);
-                finding.setResolvedAt(now);
+                submit(finding, request.getValue(), request.getNote(), orgId, username, isAccountant, now, null);
             }
             case "APPROVE" -> {
-                if (!isAccountantOrAuditor) {
-                    return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT or AUDITOR_CA can approve findings."));
+                if (!isAccountant) {
+                    return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT can approve findings."));
                 }
                 if (finding.getResolveStatus() != ResolveStatus.ACKNOWLEDGED) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only ACKNOWLEDGED findings can be approved."));
+                    return ResponseEntity.badRequest().body(Map.of("error", "Only findings pending review can be approved."));
                 }
-                finding.setResolveStatus(ResolveStatus.APPROVED);
-                finding.setResolvedBy(username);
-                finding.setResolvedAt(now);
+                approve(finding, orgId, username, now, null);
             }
             case "REJECT" -> {
-                if (!isAccountantOrAuditor) {
-                    return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT or AUDITOR_CA can reject findings."));
+                if (!isAccountant) {
+                    return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT can reject findings."));
                 }
                 if (finding.getResolveStatus() != ResolveStatus.ACKNOWLEDGED) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only ACKNOWLEDGED findings can be rejected."));
+                    return ResponseEntity.badRequest().body(Map.of("error", "Only findings pending review can be rejected."));
                 }
-                // REJECT: back to OPEN, write rejection reason to resolve_note, clear resolved fields
+                if (request.getNote() == null || request.getNote().isBlank()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "A note is required to reject a finding."));
+                }
+                // Back to OPEN; the proposal and the submitter's note stay visible, the master is untouched.
                 finding.setResolveStatus(ResolveStatus.OPEN);
-                finding.setResolveNote(request.getNote());
+                finding.setReviewedBy(username);
+                finding.setReviewedAt(now);
+                finding.setReviewNote(request.getNote());
                 finding.setResolvedBy(null);
                 finding.setResolvedAt(null);
             }
@@ -591,6 +575,141 @@ public class UploadController {
 
         findingRepository.save(finding);
         return ResponseEntity.ok(toFindingResponse(finding));
+    }
+
+    /**
+     * Thrown from inside the @Transactional action method, so the transaction (master write, audit rows,
+     * finding status) has already been rolled back by the time this handler maps it to a response.
+     */
+    @ExceptionHandler(FindingOverrideException.class)
+    public ResponseEntity<?> handleFindingOverride(FindingOverrideException e) {
+        return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
+    }
+
+    /**
+     * Records an override proposal on an OPEN finding (a resubmission clears any earlier review). An accountant's
+     * own submission is approved in the same step (D4). Must run inside the caller's transaction.
+     */
+    private void submit(ValidationFinding finding, String value, String note, UUID orgId, String username,
+                        boolean isAccountant, Instant now, Map<String, PreconfiguredMaster> masters) {
+        findingOverrideMasterService.submit(finding, value, note, orgId, username, now);
+        if (isAccountant) {
+            approve(finding, orgId, username, now, masters);
+        }
+    }
+
+    /**
+     * Bulk override of OPEN findings (action ACKNOWLEDGE, the default) or bulk approval of pending ones (action
+     * APPROVE, accountants only), for the listed ids or for everything matching the filter. Same rules as the single
+     * actions: an operator's submissions go to review, an accountant's are approved in one step, approval runs the
+     * same per-finding checks (including the stale NAME_MISMATCH 409). Findings that need a typed value cannot be
+     * bulk-overridden. There is no bulk reject. All-or-nothing: if any finding fails, the whole transaction
+     * rolls back and the failures are reported per finding.
+     */
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
+    @Transactional
+    @PostMapping("/uploads/{jobId}/findings/bulk-action")
+    public ResponseEntity<?> bulkFindingAction(
+            @PathVariable UUID jobId,
+            @RequestBody @Valid BulkFindingActionRequest request,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+
+        UUID orgId = principal.getOrganizationId();
+        Optional<UploadJob> jobOpt = uploadJobRepository.findById(jobId);
+        if (jobOpt.isEmpty() || !jobOpt.get().getOrganizationId().equals(orgId)) {
+            return ResponseEntity.notFound().build();
+        }
+        boolean isAccountant = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ACCOUNTANT"));
+        String action = request.getAction() == null ? "ACKNOWLEDGE" : request.getAction();
+        if (!action.equals("ACKNOWLEDGE") && !action.equals("APPROVE")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Unknown bulk action. Must be ACKNOWLEDGE or APPROVE."));
+        }
+        boolean approving = action.equals("APPROVE");
+        if (approving && !isAccountant) {
+            return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT can approve findings."));
+        }
+        ResolveStatus requiredStatus = approving ? ResolveStatus.ACKNOWLEDGED : ResolveStatus.OPEN;
+        boolean byIds = request.getFindingIds() != null && !request.getFindingIds().isEmpty();
+        if (!byIds && !request.hasFilter()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Select findings or choose a filter to resolve."));
+        }
+
+        List<ValidationFinding> targets = byIds
+                ? findingRepository.findByIdsForUpdate(jobId, new java.util.LinkedHashSet<>(request.getFindingIds()))
+                : findingRepository.findMatchingForUpdate(jobId, requiredStatus, request.getCategory(), request.getSeverity(),
+                        blankToNull(request.getRuleCode()), request.getMismatchType());
+        if (!byIds && !approving) {
+            targets = targets.stream().filter(FindingOverrideMasterService::isDerivable).toList();
+        }
+        if (targets.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", approving ? "No findings pending review match." : "No open findings match."));
+        }
+
+        String username = principal.getUsername();
+        Instant now = Instant.now();
+
+        Map<String, PreconfiguredMaster> masters = approving || isAccountant
+                ? findingOverrideMasterService.activeMastersByName(orgId) : Map.of();
+        List<BulkFindingActionException.Failure> failures = new java.util.ArrayList<>();
+        if (byIds) {
+            java.util.Set<UUID> found = targets.stream().map(ValidationFinding::getId).collect(Collectors.toSet());
+            for (UUID id : new java.util.LinkedHashSet<>(request.getFindingIds())) {
+                if (!found.contains(id)) {
+                    failures.add(new BulkFindingActionException.Failure(id, null, "Finding not found."));
+                }
+            }
+        }
+        for (ValidationFinding f : targets) {
+            if (f.getResolveStatus() != requiredStatus) {
+                failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(),
+                        approving ? "Only findings pending review can be approved." : "Only OPEN findings can be resolved."));
+                continue;
+            }
+            try {
+                if (approving) {
+                    approve(f, orgId, username, now, masters);
+                } else {
+                    submit(f, null, request.getNote(), orgId, username, isAccountant, now, masters);
+                }
+            } catch (FindingOverrideException e) {
+                failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(), e.getMessage()));
+            }
+        }
+        if (!failures.isEmpty()) {
+            throw new BulkFindingActionException(failures.size() + " finding"
+                    + (failures.size() == 1 ? "" : "s") + " cannot be resolved; nothing was changed.", failures);
+        }
+
+        findingRepository.saveAll(targets);
+        return ResponseEntity.ok(Map.of(
+                "processed", targets.size(),
+                "status", approving || isAccountant ? ResolveStatus.APPROVED : ResolveStatus.ACKNOWLEDGED));
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s;
+    }
+
+    /** Mapped after the @Transactional method has rolled back, so nothing from the batch is persisted. */
+    @ExceptionHandler(BulkFindingActionException.class)
+    public ResponseEntity<?> handleBulkFailure(BulkFindingActionException e) {
+        return ResponseEntity.status(409).body(Map.of("error", e.getMessage(), "failures", e.getFailures()));
+    }
+
+    /** Writes the proposal to the master and marks the finding APPROVED. Must run inside the caller's transaction. */
+    private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now,
+                         Map<String, PreconfiguredMaster> masters) {
+        if (masters == null) {
+            findingOverrideMasterService.apply(finding, orgId, approver);
+        } else {
+            findingOverrideMasterService.apply(finding, orgId, approver, masters);
+        }
+        finding.setResolveStatus(ResolveStatus.APPROVED);
+        finding.setReviewedBy(approver);
+        finding.setReviewedAt(now);
+        finding.setResolvedBy(approver);
+        finding.setResolvedAt(now);
     }
 
     // --- helpers ---
@@ -628,6 +747,12 @@ public class UploadController {
                 .resolveNote(f.getResolveNote())
                 .resolvedBy(f.getResolvedBy())
                 .resolvedAt(f.getResolvedAt())
+                .proposedValue(f.getProposedValue())
+                .submittedBy(f.getSubmittedBy())
+                .submittedAt(f.getSubmittedAt())
+                .reviewedBy(f.getReviewedBy())
+                .reviewedAt(f.getReviewedAt())
+                .reviewNote(f.getReviewNote())
                 .createdAt(f.getCreatedAt())
                 .build();
     }

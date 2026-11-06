@@ -16,8 +16,16 @@ public class FindingAutoResolveService {
     @Autowired
     private ValidationFindingRepository findingRepository;
 
+    @Autowired
+    private FindingOverrideMasterService findingOverrideMasterService;
+
+    /**
+     * Handles OPEN typed-rule findings that an inline ledger edit now satisfies. An accountant's edit
+     * resolves them in one step; an operator's edit only submits them for accountant review (ACKNOWLEDGED),
+     * so an operator edit can never close a finding or unlock the gate. Mismatch findings are not touched.
+     */
     public List<ValidationFinding> autoResolveForUpdatedSnapshot(
-            UUID uploadJobId, UploadLedgerSnapshot snapshot, String username) {
+            UUID uploadJobId, UploadLedgerSnapshot snapshot, String username, boolean isAccountant, UUID orgId) {
 
         List<ValidationFinding> openFindings = findingRepository
                 .findOpenByUploadJobIdAndLedgerName(uploadJobId, snapshot.getLedgerName());
@@ -28,11 +36,14 @@ public class FindingAutoResolveService {
         List<ValidationFinding> resolved = new ArrayList<>();
 
         for (ValidationFinding finding : openFindings) {
-            if (isResolvedBySnapshot(finding, snapshot)) {
+            if (!isResolvedBySnapshot(finding, snapshot)) continue;
+            if (isAccountant) {
                 finding.setResolveStatus(ResolveStatus.RESOLVED);
                 finding.setResolvedBy(username);
                 finding.setResolvedAt(now);
                 finding.setResolveNote("Auto-resolved: ledger data corrected inline.");
+                resolved.add(finding);
+            } else if (submitForReview(finding, snapshot, username, orgId, now)) {
                 resolved.add(finding);
             }
         }
@@ -42,6 +53,28 @@ public class FindingAutoResolveService {
         }
 
         return resolved;
+    }
+
+    private boolean submitForReview(ValidationFinding finding, UploadLedgerSnapshot snapshot, String username,
+                                    UUID orgId, Instant now) {
+        try {
+            findingOverrideMasterService.submit(finding, typedValue(finding.getRuleCode(), snapshot),
+                    "Ledger data corrected inline.", orgId, username, now);
+            return true;
+        } catch (FindingOverrideException e) {
+            return false;
+        }
+    }
+
+    private String typedValue(String ruleCode, UploadLedgerSnapshot snapshot) {
+        return switch (ruleCode) {
+            case "TDS_SECTION_MAPPING" -> snapshot.getTdsSection();
+            case "HSN_SAC_CODE" -> snapshot.getHsnSacCode();
+            case "GSTIN_PRESENCE" -> snapshot.getGstin();
+            case "GST_APPLICABILITY" -> snapshot.getGstApplicabilityType() == null
+                    ? null : snapshot.getGstApplicabilityType().name();
+            default -> null;
+        };
     }
 
     private boolean isResolvedBySnapshot(ValidationFinding finding, UploadLedgerSnapshot snapshot) {
