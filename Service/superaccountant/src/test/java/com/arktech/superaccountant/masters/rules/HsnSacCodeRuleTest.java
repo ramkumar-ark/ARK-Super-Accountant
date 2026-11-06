@@ -91,6 +91,38 @@ class HsnSacCodeRuleTest {
         assertTrue(rule.execute(ctx(List.of(m)), List.of()).isEmpty());
     }
 
+    private ValidationContext ctx(List<PreconfiguredMaster> masters, boolean requireOnExpense) {
+        return new ValidationContext(UUID.randomUUID(), "testuser", masters,
+                Map.of("REQUIRE_HSN_SAC_ON_EXPENSE", requireOnExpense));
+    }
+
+    @Test
+    void expenseSetting_missingKeyDefaultsToOn() {
+        PreconfiguredMaster m = configured("Professional Fees", LedgerCategory.EXPENSE, true, "Indirect Expenses");
+        assertEquals(1, rule.execute(ctx(List.of(m)), List.of()).size());
+    }
+
+    @Test
+    void expenseSettingOn_flagsExpense() {
+        PreconfiguredMaster m = configured("Professional Fees", LedgerCategory.EXPENSE, true, "Indirect Expenses");
+        assertEquals(1, rule.execute(ctx(List.of(m), true), List.of()).size());
+    }
+
+    @Test
+    void expenseSettingOff_neverFlagsExpense() {
+        PreconfiguredMaster m = configured("Professional Fees", LedgerCategory.EXPENSE, true, "Indirect Expenses");
+        assertTrue(rule.execute(ctx(List.of(m), false), List.of()).isEmpty());
+    }
+
+    @Test
+    void expenseSettingOff_incomeStillFlagged() {
+        PreconfiguredMaster income = configured("Sales Account", LedgerCategory.INCOME, true, "Sales Accounts");
+        PreconfiguredMaster expense = configured("Professional Fees", LedgerCategory.EXPENSE, true, "Indirect Expenses");
+        List<ValidationFinding> findings = rule.execute(ctx(List.of(income, expense), false), List.of());
+        assertEquals(1, findings.size());
+        assertEquals("Sales Account", findings.get(0).getLedgerName());
+    }
+
     @Test
     void purchaseCategoryNullHsnSac_noFinding() {
         PreconfiguredMaster m = configured("Cement Purchase", LedgerCategory.PURCHASE, null);

@@ -591,3 +591,17 @@ describe('MastersPage — findings paging and select-all-matching', () => {
   })
 })
 
+
+describe('MastersPage — validation settings tab', () => {
+  it('is reachable from the tab bar', async () => {
+    setRole('ROLE_OWNER')
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      if (url === '/v1/validation-settings') return Promise.resolve({ data: { requireHsnSacOnExpense: true } })
+      return Promise.resolve({ data: {} })
+    })
+    render(<MastersPage />)
+    await userEvent.click(await screen.findByRole('tab', { name: /Validation settings/ }))
+    expect(await screen.findByRole('checkbox', { name: /Require HSN\/SAC/ })).toBeInTheDocument()
+  })
+})

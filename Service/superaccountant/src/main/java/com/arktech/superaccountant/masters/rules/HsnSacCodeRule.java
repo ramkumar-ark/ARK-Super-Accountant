@@ -2,6 +2,7 @@ package com.arktech.superaccountant.masters.rules;
 
 import com.arktech.superaccountant.masters.classifier.ParsedLedger;
 import com.arktech.superaccountant.masters.models.*;
+import com.arktech.superaccountant.masters.services.OrganizationSettingsService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.List;
  * with the flag off or unknown is not flagged. GST (Duties &amp; Taxes) ledgers are tax accounts rather than
  * goods or services, party accounts (Sundry Debtors / Creditors) are not income or expense, and PURCHASE, TDS
  * and OTHER ledgers are out of scope.
+ * Expense ledgers are skipped when the org turned off REQUIRE_HSN_SAC_ON_EXPENSE (income is unaffected).
  * Phase 3 rule: iterates preconfiguredMasters (not parsedLedgers) because
  * Tally JSON does not export HSN/SAC code data.
  */
@@ -27,10 +29,13 @@ public class HsnSacCodeRule implements ValidationRule {
     @Override
     public List<ValidationFinding> execute(ValidationContext context, List<ParsedLedger> parsedLedgers) {
         List<ValidationFinding> findings = new ArrayList<>();
+        // Per-org setting; a missing key means the default, ON.
+        boolean requireOnExpense = !Boolean.FALSE.equals(
+                context.settings().get(OrganizationSettingsService.REQUIRE_HSN_SAC_ON_EXPENSE));
 
         for (PreconfiguredMaster master : context.preconfiguredMasters()) {
             boolean requiresHsnSac = (master.getCategory() == LedgerCategory.INCOME
-                    || master.getCategory() == LedgerCategory.EXPENSE)
+                    || (master.getCategory() == LedgerCategory.EXPENSE && requireOnExpense))
                     && Boolean.TRUE.equals(master.getExpectedGstApplicable())
                     && !isPartyGroup(master.getExpectedParentGroup());
 

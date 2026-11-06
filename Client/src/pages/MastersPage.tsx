@@ -4,6 +4,7 @@ import { Database, Upload, SearchX, CheckCircle2, Loader2, AlertCircle } from 'l
 import { LedgerMappingPanel } from '@/components/LedgerMappingPanel'
 import { AppShell } from '@/components/AppShell'
 import { useAuthStore } from '@/store/authStore'
+import { ValidationSettingsPanel } from '@/components/ValidationSettingsPanel'
 
 interface PreconfiguredMaster {
   id: string
@@ -83,7 +84,7 @@ function apiErrorMessage(err: unknown, fallback: string): string {
 }
 
 export function MastersPage() {
-  const [activeTab, setActiveTab] = useState<'ledgers' | 'findings'>('ledgers')
+  const [activeTab, setActiveTab] = useState<'ledgers' | 'findings' | 'settings'>('ledgers')
   const [masters, setMasters] = useState<PreconfiguredMaster[]>([])
   const [findings, setFindings] = useState<ValidationFinding[]>([])
   const [openFindingsCount, setOpenFindingsCount] = useState(0)
@@ -294,6 +295,19 @@ export function MastersPage() {
               </span>
             )}
           </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'settings'}
+            aria-controls="settings-panel"
+            onClick={() => setActiveTab('settings')}
+            className={`h-11 px-4 text-sm font-normal border-b-2 transition-colors ${
+              activeTab === 'settings'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)]'
+            }`}
+          >
+            Validation settings
+          </button>
         </div>
 
         {/* LEDGERS TAB */}
@@ -482,6 +496,12 @@ export function MastersPage() {
         )}
 
         {/* FINDINGS TAB */}
+        {activeTab === 'settings' && (
+          <div id="settings-panel" role="tabpanel">
+            <ValidationSettingsPanel />
+          </div>
+        )}
+
         {activeTab === 'findings' && (
           <FindingsTab
             findings={findings}

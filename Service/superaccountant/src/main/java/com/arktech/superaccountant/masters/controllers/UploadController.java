@@ -20,6 +20,7 @@ import com.arktech.superaccountant.masters.repository.ValidationFindingRepositor
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.repository.ValidationRuleConfigRepository;
 import com.arktech.superaccountant.masters.rules.ValidationContext;
+import com.arktech.superaccountant.masters.services.OrganizationSettingsService;
 import com.arktech.superaccountant.masters.services.ValidationOrchestrator;
 import com.arktech.superaccountant.tally.services.TallyParserService;
 import jakarta.validation.Valid;
@@ -42,6 +43,9 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1")
 public class UploadController {
+
+    @Autowired
+    private OrganizationSettingsService organizationSettingsService;
 
     @Autowired
     private TallyParserService tallyParserService;
@@ -227,7 +231,7 @@ public class UploadController {
                 orgId,
                 principal.getUsername(),
                 configuredMasters,
-                Map.of()
+                organizationSettingsService.validationSettings(orgId)
         );
 
         job = orchestrator.runAndPersist(job, parsedLedgers, context);
