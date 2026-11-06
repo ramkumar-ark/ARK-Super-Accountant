@@ -50,6 +50,12 @@ function setRole(role: string) {
   })
 }
 
+const stubConfirm = (answer: boolean) => {
+  const fn = vi.fn().mockReturnValue(answer)
+  window.confirm = fn as unknown as typeof window.confirm
+  return fn
+}
+
 describe('MastersPage — findings resolution (two-stage)', () => {
   let current: typeof baseFinding
 
@@ -269,8 +275,22 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
       }
       return Promise.resolve({ data: {} })
     })
-    mockPost.mockResolvedValue({ data: {} })
+    mockPost.mockImplementation(((_url: string, body: Record<string, unknown>) => {
+      if (body?.dryRun) {
+        const want = body.action === 'APPROVE' ? 'ACKNOWLEDGED' : 'OPEN'
+        const n = rows.filter(
+          (r) =>
+            r.resolveStatus === want &&
+            (!body.mismatchType || r.mismatchType === body.mismatchType) &&
+            (!body.ruleCode || r.ruleCode === body.ruleCode),
+        ).length
+        return Promise.resolve({ data: { matched: n } })
+      }
+      return Promise.resolve({ data: {} })
+    }) as never)
   })
+
+  const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
 
   async function openTab() {
     render(<MastersPage />)
@@ -316,33 +336,19 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
     expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull()
   })
 
-  it('operator bulk-submits all matching the current filter', async () => {
+  it('select all offers every match; choosing it confirms with the true count, then sends filter mode', async () => {
+    const confirm = stubConfirm(true)
+    rows = [mk('a'), mk('b'), mk('c', { mismatchType: 'PARENT_GROUP_MISMATCH', actualValue: 'X' })]
     await openTab()
     await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
-    await userEvent.click(await screen.findByRole('button', { name: /Submit for review all matching \(2\)/ }))
-
-    await waitFor(() =>
-      expect(mockPost).toHaveBeenCalledWith(BULK_URL, {
-        action: 'ACKNOWLEDGE',
-        mismatchType: 'MISSING_IN_CONFIGURATION',
-      }),
-    )
-  })
-
-  it('typed-value and missing-in-upload findings are not offered for bulk override', async () => {
-    rows.push(
-      mk('gstin', { ruleCode: 'GSTIN_PRESENCE', mismatchType: null }),
-      mk('gone', { mismatchType: 'MISSING_IN_UPLOAD' }),
-      mk('noflag', { mismatchType: 'GST_APPLICABILITY_MISMATCH', actualValue: 'null' }),
-      mk('flag', { mismatchType: 'GST_APPLICABILITY_MISMATCH', actualValue: 'true' }),
-    )
-    await openTab()
-    await screen.findByText('Ledger gone')
-    expect(screen.queryByLabelText('Select Ledger gstin')).toBeNull()
-    expect(screen.queryByLabelText('Select Ledger gone')).toBeNull()
-    expect(screen.queryByLabelText('Select Ledger noflag')).toBeNull()
-    expect(screen.getByLabelText('Select Ledger flag')).toBeInTheDocument()
-    expect(screen.getByLabelText('Select Ledger a')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Ledger c')).toBeNull())
+    await userEvent.click(screen.getByLabelText('Select all'))
+    // 2 on the page and 2 matching: nothing beyond the page, so no "select all matching" offer.
+    expect(screen.queryByText(/Select all \d+ matching/)).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(2\)/ }))
+    await waitFor(() => expect(realPosts()).toHaveLength(1))
+    expect(realPosts()[0][1]).toEqual({ action: 'ACKNOWLEDGE', findingIds: ['a', 'b'] })
+    expect(confirm).not.toHaveBeenCalled()
   })
 
   it('accountant can bulk resolve and bulk approve pending', async () => {
@@ -362,14 +368,18 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
   })
 
   it('shows every failure when a bulk action is rejected', async () => {
-    mockPost.mockRejectedValueOnce({
+    const dry = mockPost.getMockImplementation()!
+    mockPost.mockImplementation(((url: string, body: Record<string, unknown>) =>
+      body?.dryRun
+        ? dry(url, body)
+        : Promise.reject({
       response: {
         data: {
           error: '1 finding(s) cannot be resolved; nothing was changed.',
           failures: [{ findingId: 'a', ledgerName: 'Ledger a', error: 'needs a value' }],
         },
       },
-    })
+    })) as never)
     await openTab()
     await userEvent.click(screen.getByLabelText('Select Ledger a'))
     await userEvent.click(screen.getByRole('button', { name: /Submit for review selected/ }))
@@ -384,5 +394,156 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
     expect(screen.queryByLabelText(/Select all/)).toBeNull()
     expect(screen.queryByLabelText('Select Ledger a')).toBeNull()
     expect(screen.queryByRole('button', { name: /selected|all matching|all pending/ })).toBeNull()
+  })
+})
+
+describe('MastersPage — findings paging and select-all-matching', () => {
+  const BULK_URL = '/v1/uploads/job-1/findings/bulk-action'
+  const TOTAL = 250
+  const mk = (i: number, over: Record<string, unknown> = {}) => ({
+    ...baseFinding,
+    id: `f${i}`,
+    ledgerName: `Ledger ${String(i).padStart(3, '0')}`,
+    ruleCode: 'MISMATCH_DETECTION',
+    mismatchType: 'MISSING_IN_CONFIGURATION',
+    ...over,
+  })
+  // 250 open derivable findings plus 7 typed GSTIN ones, all served by a paging server stub.
+  let all: Array<ReturnType<typeof mk>>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setRole('ROLE_OPERATOR')
+    all = [
+      ...Array.from({ length: TOTAL }, (_, i) => mk(i)),
+      ...Array.from({ length: 7 }, (_, i) => mk(1000 + i, { ruleCode: 'GSTIN_PRESENCE', mismatchType: null })),
+    ]
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) return Promise.resolve({ data: { totalElements: all.length } })
+      if (url.startsWith('/v1/uploads/latest/mismatches')) {
+        const q = new URLSearchParams(url.split('?')[1])
+        let out = all
+        if (q.get('ruleCode')) out = out.filter((r) => r.ruleCode === q.get('ruleCode'))
+        if (q.get('mismatchType')) out = out.filter((r) => r.mismatchType === q.get('mismatchType'))
+        const size = Number(q.get('size'))
+        const page = Number(q.get('page') ?? 0)
+        return Promise.resolve({
+          data: { content: out.slice(page * size, page * size + size), totalElements: out.length },
+        })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    mockPost.mockImplementation(((_u: string, body: Record<string, unknown>) =>
+      body?.dryRun
+        ? Promise.resolve({
+            data: { matched: all.filter((r) => r.ruleCode === 'MISMATCH_DETECTION').length },
+          })
+        : Promise.resolve({ data: {} })) as never)
+  })
+
+  const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
+
+  async function openTab() {
+    render(<MastersPage />)
+    const tab = await screen.findByRole('tab', { name: /Findings/ })
+    await waitFor(() => expect(tab).not.toBeDisabled())
+    await userEvent.click(tab)
+    await screen.findByText('Ledger 000')
+  }
+
+  it('lists numbered pages of 100 driven by the server total and fetches the clicked page', async () => {
+    await openTab()
+    expect(screen.getByText(/1–100 of 257/)).toBeInTheDocument()
+    expect(screen.getAllByLabelText(/^Select Ledger/)).toHaveLength(100)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Page 3' }))
+
+    await screen.findByText('Ledger 200')
+    expect(screen.getByText(/201–257 of 257/)).toBeInTheDocument()
+    expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('page=2'))
+    expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('size=100'))
+  })
+
+  it('rule-type filter is applied by the server, so total and pages are correct', async () => {
+    await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'GSTIN_PRESENCE')
+
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('ruleCode=GSTIN_PRESENCE')))
+    await waitFor(() => expect(screen.queryByText('Ledger 000')).toBeNull())
+    expect(screen.queryByRole('navigation', { name: 'Findings pages' })).toBeNull() // 7 results: one page
+  })
+
+  it('select all offers "Select all N matching" with the true server count, and no "+"', async () => {
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select all'))
+
+    expect(screen.getByText(/100 on this page selected\./)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select all 250 matching' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Submit for review selected \(100\)/ })).toBeInTheDocument()
+    expect(screen.queryByText(/100\+/)).toBeNull()
+  })
+
+  it('choosing all matching confirms with the count, then bulk-acts in filter mode', async () => {
+    const confirm = stubConfirm(true)
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select all'))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    expect(screen.getByText(/All 250 matching findings selected/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('250'))
+    await waitFor(() => expect(realPosts()).toHaveLength(1))
+    expect(realPosts()[0]).toEqual([BULK_URL, { action: 'ACKNOWLEDGE', allMatching: true }])
+  })
+
+  it('declining the confirmation sends nothing', async () => {
+    const confirm = stubConfirm(false)
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select all'))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
+
+    expect(confirm).toHaveBeenCalled()
+    expect(realPosts()).toHaveLength(0)
+  })
+
+  it('all-matching carries the current filters', async () => {
+    stubConfirm(true)
+    await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('mismatchType=MISSING')))
+    await userEvent.click(screen.getByLabelText('Select all'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
+
+    await waitFor(() => expect(realPosts()).toHaveLength(1))
+    expect(realPosts()[0][1]).toEqual({
+      action: 'ACKNOWLEDGE',
+      allMatching: true,
+      mismatchType: 'MISSING_IN_CONFIGURATION',
+    })
+  })
+
+  it('changing page clears the selection and the all-matching choice', async () => {
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select all'))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Page 2' }))
+    await screen.findByText('Ledger 100')
+
+    expect(screen.queryByText(/All 250 matching findings selected/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /selected \(/ })).toBeNull()
+  })
+
+  it.each(['ROLE_AUDITOR_CA', 'ROLE_OWNER'])('%s still pages but gets no bulk or select-all controls', async (role) => {
+    setRole(role)
+    await openTab()
+    expect(screen.getByText(/1–100 of 257/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Select all')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Select all \d+ matching/ })).toBeNull()
   })
 })

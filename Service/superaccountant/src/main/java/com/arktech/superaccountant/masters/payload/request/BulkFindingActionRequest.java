@@ -29,6 +29,12 @@ public class BulkFindingActionRequest {
 
     private String note;
 
+    /** Explicit opt-in to act on every matching finding when no ids and no filter fields are given. */
+    private boolean allMatching;
+
+    /** Only count the findings the action would touch; changes nothing. */
+    private boolean dryRun;
+
     public boolean hasFilter() {
         return (ruleCode != null && !ruleCode.isBlank()) || mismatchType != null || severity != null || category != null;
     }

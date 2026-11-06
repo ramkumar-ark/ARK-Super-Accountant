@@ -631,8 +631,14 @@ public class UploadController {
         }
         ResolveStatus requiredStatus = approving ? ResolveStatus.ACKNOWLEDGED : ResolveStatus.OPEN;
         boolean byIds = request.getFindingIds() != null && !request.getFindingIds().isEmpty();
-        if (!byIds && !request.hasFilter()) {
+        if (!byIds && !request.hasFilter() && !request.isAllMatching()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Select findings or choose a filter to resolve."));
+        }
+        if (request.isDryRun()) {
+            if (byIds) {
+                return ResponseEntity.badRequest().body(Map.of("error", "A count applies to a filter, not to listed ids."));
+            }
+            return ResponseEntity.ok(Map.of("matched", countMatching(jobId, requiredStatus, approving, request)));
         }
 
         List<ValidationFinding> targets = byIds
@@ -685,6 +691,13 @@ public class UploadController {
         return ResponseEntity.ok(Map.of(
                 "processed", targets.size(),
                 "status", approving || isAccountant ? ResolveStatus.APPROVED : ResolveStatus.ACKNOWLEDGED));
+    }
+
+    /** How many findings a filter-mode action would touch: the same targeting as the real run, without locks or changes. */
+    private long countMatching(UUID jobId, ResolveStatus status, boolean approving, BulkFindingActionRequest request) {
+        List<ValidationFinding> matching = findingRepository.findMatching(jobId, status, request.getCategory(),
+                request.getSeverity(), blankToNull(request.getRuleCode()), request.getMismatchType());
+        return approving ? matching.size() : matching.stream().filter(FindingOverrideMasterService::isDerivable).count();
     }
 
     private static String blankToNull(String s) {

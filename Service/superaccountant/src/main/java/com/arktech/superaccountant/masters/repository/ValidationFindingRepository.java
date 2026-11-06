@@ -67,6 +67,21 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
             @Param("ruleCode") String ruleCode,
             @Param("mismatchType") MismatchType mismatchType);
 
+    /** Same targeting as {@link #findMatchingForUpdate} without the lock, for counting. */
+    @Query("SELECT f FROM ValidationFinding f WHERE f.uploadJobId = :jobId " +
+           "AND f.resolveStatus = :status " +
+           "AND (:category IS NULL OR f.category = :category) " +
+           "AND (:severity IS NULL OR f.severity = :severity) " +
+           "AND (:ruleCode IS NULL OR f.ruleCode = :ruleCode) " +
+           "AND (:mismatchType IS NULL OR f.mismatchType = :mismatchType)")
+    List<ValidationFinding> findMatching(
+            @Param("jobId") UUID jobId,
+            @Param("status") com.arktech.superaccountant.masters.models.ResolveStatus status,
+            @Param("category") LedgerCategory category,
+            @Param("severity") FindingSeverity severity,
+            @Param("ruleCode") String ruleCode,
+            @Param("mismatchType") MismatchType mismatchType);
+
     /** The listed findings of one job, locked for update, whatever their status. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT f FROM ValidationFinding f WHERE f.uploadJobId = :jobId AND f.id IN :ids " +

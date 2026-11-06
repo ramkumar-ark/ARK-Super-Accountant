@@ -289,4 +289,52 @@ class UploadControllerBulkActionTest {
         assertThat(controller.bulkFindingAction(jobId, filterReq("ACKNOWLEDGE"), other).getStatusCode().value())
                 .isEqualTo(404);
     }
+
+    @Test
+    void bulkOverride_allMatchingWithNoFilter_isAllowedOnlyWithTheExplicitFlag() {
+        ValidationFinding a = finding("A", ResolveStatus.OPEN);
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, null, null, null))
+                .thenReturn(List.of(a));
+        BulkFindingActionRequest r = new BulkFindingActionRequest();
+        r.setAllMatching(true);
+
+        ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        assertThat(a.getResolveStatus()).isEqualTo(ResolveStatus.ACKNOWLEDGED);
+    }
+
+    @Test
+    void dryRun_countsWhatTheActionWouldTouch_andChangesNothing() {
+        ValidationFinding derivable = finding("A", ResolveStatus.OPEN);
+        ValidationFinding typed = finding("Typed", ResolveStatus.OPEN);
+        typed.setRuleCode("GSTIN_PRESENCE");
+        typed.setMismatchType(null);
+        when(findingRepository.findMatching(jobId, ResolveStatus.OPEN, null, null, null, null))
+                .thenReturn(List.of(derivable, typed));
+        BulkFindingActionRequest r = new BulkFindingActionRequest();
+        r.setAllMatching(true);
+        r.setDryRun(true);
+
+        ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR"));
+
+        assertThat(((Map<?, ?>) res.getBody()).get("matched")).isEqualTo(1L);
+        assertThat(derivable.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
+        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any());
+        verify(findingRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void dryRun_ofApprove_countsPendingFindings_andIsForbiddenForOperators() {
+        when(findingRepository.findMatching(jobId, ResolveStatus.ACKNOWLEDGED, null, null, null,
+                MismatchType.MISSING_IN_CONFIGURATION))
+                .thenReturn(List.of(finding("A", ResolveStatus.ACKNOWLEDGED), finding("B", ResolveStatus.ACKNOWLEDGED)));
+        BulkFindingActionRequest r = filterReq("APPROVE");
+        r.setDryRun(true);
+
+        assertThat(((Map<?, ?>) controller.bulkFindingAction(jobId, r, user("acct", "ROLE_ACCOUNTANT")).getBody())
+                .get("matched")).isEqualTo(2L);
+        assertThat(controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR")).getStatusCode().value())
+                .isEqualTo(403);
+    }
 }

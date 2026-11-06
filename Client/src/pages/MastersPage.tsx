@@ -53,6 +53,8 @@ const DERIVABLE_MISMATCH_TYPES = [
 ]
 const GST_APPLICABILITY_TYPES = ['TAXABLE', 'EXEMPT', 'ZERO_RATED', 'NON_GST', 'RCM', 'NOT_APPLICABLE']
 // Detection reasons a mismatch finding can have (MismatchType on the server).
+const FINDINGS_PAGE_SIZE = 100
+
 const MISMATCH_REASONS: Record<string, string> = {
   MISSING_IN_CONFIGURATION: 'Missing in configuration',
   MISSING_IN_UPLOAD: 'Missing in upload',
@@ -93,6 +95,8 @@ export function MastersPage() {
   const [severityFilter, setSeverityFilter] = useState('')
   const [mismatchFilter, setMismatchFilter] = useState('')
   const [findingsTotal, setFindingsTotal] = useState(0)
+  const [ruleFilter, setRuleFilter] = useState('')
+  const [findingsPage, setFindingsPage] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [showResolved, setShowResolved] = useState(false)
   const [editingMaster, setEditingMaster] = useState<PreconfiguredMaster | null>(null)
@@ -126,14 +130,21 @@ export function MastersPage() {
     try {
       // "Show resolved" lists the closed findings only; unchecked lists the open and pending ones.
       const params = new URLSearchParams({
-        size: '100',
+        size: String(FINDINGS_PAGE_SIZE),
+        page: String(findingsPage),
         showResolved: String(showResolved),
         resolvedOnly: String(showResolved),
       })
       if (severityFilter) params.set('severity', severityFilter)
       if (mismatchFilter) params.set('mismatchType', mismatchFilter)
+      if (ruleFilter) params.set('ruleCode', ruleFilter)
       const res = await api.get(`/v1/uploads/latest/mismatches?${params}`)
       const items: ValidationFinding[] = res.data.content ?? []
+      if (items.length === 0 && findingsPage > 0) {
+        // The last page emptied (everything on it was resolved): step back to the new last page.
+        setFindingsPage(findingsPage - 1)
+        return
+      }
       setFindings(items)
       setFindingsTotal(res.data.totalElements ?? items.length)
       loadOpenFindingsCount()
@@ -198,7 +209,7 @@ export function MastersPage() {
 
   useEffect(() => {
     if (activeTab === 'findings') loadFindings()
-  }, [activeTab, showResolved, severityFilter, mismatchFilter])
+  }, [activeTab, showResolved, severityFilter, mismatchFilter, ruleFilter, findingsPage])
 
   const filteredMasters = masters.filter((m) =>
     searchQuery ? m.ledgerName.toLowerCase().includes(searchQuery.toLowerCase()) : true,
@@ -480,9 +491,25 @@ export function MastersPage() {
             severityFilter={severityFilter}
             mismatchFilter={mismatchFilter}
             total={findingsTotal}
-            onMismatchFilterChange={setMismatchFilter}
-            onShowResolvedChange={setShowResolved}
-            onSeverityFilterChange={setSeverityFilter}
+            ruleFilter={ruleFilter}
+            page={findingsPage}
+            onPageChange={setFindingsPage}
+            onRuleFilterChange={(v) => {
+              setFindingsPage(0)
+              setRuleFilter(v)
+            }}
+            onMismatchFilterChange={(v) => {
+              setFindingsPage(0)
+              setMismatchFilter(v)
+            }}
+            onShowResolvedChange={(v) => {
+              setFindingsPage(0)
+              setShowResolved(v)
+            }}
+            onSeverityFilterChange={(v) => {
+              setFindingsPage(0)
+              setSeverityFilter(v)
+            }}
             onFindingResolved={loadFindings}
           />
         )}
@@ -555,6 +582,10 @@ function FindingsTab({
   severityFilter,
   mismatchFilter,
   total,
+  ruleFilter,
+  page,
+  onPageChange,
+  onRuleFilterChange,
   onMismatchFilterChange,
   onShowResolvedChange,
   onSeverityFilterChange,
@@ -567,6 +598,10 @@ function FindingsTab({
   severityFilter: string
   mismatchFilter: string
   total: number
+  ruleFilter: string
+  page: number
+  onPageChange: (p: number) => void
+  onRuleFilterChange: (v: string) => void
   onMismatchFilterChange: (v: string) => void
   onShowResolvedChange: (v: boolean) => void
   onSeverityFilterChange: (v: string) => void
@@ -583,11 +618,15 @@ function FindingsTab({
   const isAccountant = role === 'ROLE_ACCOUNTANT'
   const canSubmit = isAccountant || role === 'ROLE_OPERATOR'
   const [findingErrors, setFindingErrors] = useState<Record<string, string>>({})
-  const [ruleFilter, setRuleFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkError, setBulkError] = useState('')
   const [bulkFailures, setBulkFailures] = useState<BulkFailure[]>([])
+  // "Select all N matching": the action then targets every finding matching the filters, not just this page.
+  const [allMatching, setAllMatching] = useState(false)
+  // True server counts of what a bulk override / approve would touch under the current filters.
+  const [matchedOverride, setMatchedOverride] = useState(0)
+  const [matchedApprove, setMatchedApprove] = useState(0)
 
   const SEVERITY_BORDER: Record<string, string> = {
     HIGH: 'border-l-[var(--color-danger)]',
@@ -681,23 +720,32 @@ function FindingsTab({
       f.actualValue === 'false')
   const canBulkApprove = (f: ValidationFinding) => isAccountant && f.resolveStatus === 'ACKNOWLEDGED'
 
+  // The filters currently applied to the list, as the bulk endpoint's filter mode takes them.
+  const filterBody = (): Record<string, unknown> => {
+    const body: Record<string, unknown> = { allMatching: true }
+    if (mismatchFilter) body.mismatchType = mismatchFilter
+    if (ruleFilter) body.ruleCode = ruleFilter
+    if (severityFilter) body.severity = severityFilter
+    return body
+  }
+
   async function runBulk(action: 'ACKNOWLEDGE' | 'APPROVE', ids: string[] | null) {
+    if (!ids) {
+      const count = action === 'APPROVE' ? matchedApprove : matchedOverride
+      const verb = action === 'APPROVE' ? 'Approve' : isAccountant ? 'Resolve' : 'Submit for review'
+      // Reaches beyond the rows on this page: say exactly how many findings it covers.
+      if (!window.confirm(`${verb} all ${count} matching findings, not just the ${visibleFindings.length} on this page?`)) return
+    }
     setBulkBusy(true)
     setBulkError('')
     setBulkFailures([])
-    const body: Record<string, unknown> = { action }
-    if (ids) {
-      body.findingIds = ids
-    } else {
-      // Everything matching the filters currently applied to the list.
-      if (mismatchFilter) body.mismatchType = mismatchFilter
-      if (ruleFilter) body.ruleCode = ruleFilter
-      if (severityFilter) body.severity = severityFilter
-    }
+    const body: Record<string, unknown> = ids ? { findingIds: ids } : filterBody()
+    body.action = action
     try {
       const jobId = findings[0]?.uploadJobId
       await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, body)
       setSelectedIds(new Set())
+      setAllMatching(false)
       onFindingResolved()
     } catch (err) {
       setBulkError(apiErrorMessage(err, 'Could not apply the bulk action. Nothing was changed.'))
@@ -721,9 +769,8 @@ function FindingsTab({
   const proposedDisplay = (f: ValidationFinding) =>
     TYPED_INPUT_RULES.includes(f.ruleCode) ? f.proposedValue : f.actualValue
 
-  const filteredFindings = ruleFilter
-    ? findings.filter((f) => f.ruleCode === ruleFilter)
-    : findings
+  // Every filter, the rule type included, is applied by the server so paging and counts are exact.
+  const filteredFindings = findings
   const openFindings = filteredFindings.filter((f) => !isResolved(f))
   // "Show resolved" lists closed findings only; otherwise the open and pending ones.
   const visibleFindings = showResolved ? filteredFindings.filter(isResolved) : openFindings
@@ -731,9 +778,29 @@ function FindingsTab({
   const approvable = visibleFindings.filter(canBulkApprove)
   const selectedOverridable = overridable.filter((f) => selectedIds.has(f.id))
   const selectedApprovable = approvable.filter((f) => selectedIds.has(f.id))
-  // The list is capped at one server page; "+" marks that more match than are loaded.
-  const more = total > findings.length ? '+' : ''
-  const bulkFilterActive = Boolean(mismatchFilter || ruleFilter || severityFilter)
+  const totalPages = Math.max(1, Math.ceil(total / FINDINGS_PAGE_SIZE))
+  const jobId = findings[0]?.uploadJobId
+
+  // Server counts for the current filters; refreshed whenever the list is (reload, page, filter, after an action).
+  useEffect(() => {
+    if (!jobId || showResolved) return
+    let live = true
+    const count = async (action: 'ACKNOWLEDGE' | 'APPROVE') => {
+      const res = await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, {
+        ...filterBody(),
+        action,
+        dryRun: true,
+      })
+      return Number(res.data?.matched ?? 0)
+    }
+    const safe = (p: Promise<number>) => p.catch(() => 0)
+    safe(canSubmit ? count('ACKNOWLEDGE') : Promise.resolve(0)).then((n) => live && setMatchedOverride(n))
+    safe(isAccountant ? count('APPROVE') : Promise.resolve(0)).then((n) => live && setMatchedApprove(n))
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findings, showResolved, canSubmit, isAccountant])
 
   const RULE_LABELS: Record<string, string> = {
     MISMATCH_DETECTION: 'Mismatch Detection',
@@ -743,7 +810,6 @@ function FindingsTab({
     TDS_SECTION_MAPPING: 'TDS Section Mapping',
   }
 
-  const availableRules = [...new Set(findings.map((f) => f.ruleCode))].sort()
 
   const filterBar = (
     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-4 shadow-[var(--shadow-sm)] mb-4 flex flex-wrap gap-3 items-center">
@@ -759,11 +825,16 @@ function FindingsTab({
       </select>
       <select
         value={ruleFilter}
-        onChange={(e) => setRuleFilter(e.target.value)}
+        aria-label="Filter by rule type"
+        onChange={(e) => {
+          setSelectedIds(new Set())
+          setAllMatching(false)
+          onRuleFilterChange(e.target.value)
+        }}
         className="h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
       >
         <option value="">All Types</option>
-        {availableRules.map((code) => (
+        {Object.keys(RULE_LABELS).map((code) => (
           <option key={code} value={code}>
             {RULE_LABELS[code] ?? code}
           </option>
@@ -856,8 +927,19 @@ function FindingsTab({
       </div>
     )
 
+  const pageSelected = selectedOverridable.length + selectedApprovable.length
+  const pageEligible = overridable.length + approvable.length
+  const allOnPageSelected = pageEligible > 0 && pageSelected === pageEligible
+  const matchedTotal = matchedOverride + matchedApprove
+  const btn =
+    'h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] disabled:opacity-40'
+  const overrideVerb = isAccountant ? 'Resolve' : 'Submit for review'
+  // With "all matching" chosen, a button covers the server's count; otherwise just the ticked rows.
+  const overrideCount = allMatching ? matchedOverride : selectedOverridable.length
+  const approveCount = allMatching ? matchedApprove : selectedApprovable.length
+
   const bulkBar =
-    !showResolved && (overridable.length > 0 || approvable.length > 0) ? (
+    !showResolved && (pageEligible > 0 || matchedTotal > 0) ? (
       <div
         className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-3 mb-3 flex flex-wrap gap-3 items-center text-sm"
         aria-label="Bulk actions"
@@ -866,57 +948,62 @@ function FindingsTab({
           <input
             type="checkbox"
             aria-label="Select all"
-            checked={
-              overridable.length + approvable.length > 0 &&
-              selectedOverridable.length + selectedApprovable.length === overridable.length + approvable.length
-            }
-            onChange={(e) =>
+            checked={allOnPageSelected}
+            onChange={(e) => {
+              setAllMatching(false)
               setSelectedIds(
                 e.target.checked ? new Set([...overridable, ...approvable].map((f) => f.id)) : new Set(),
               )
-            }
+            }}
           />
           Select all
         </label>
-        {overridable.length > 0 && (
-          <>
-            <button
-              disabled={bulkBusy || selectedOverridable.length === 0}
-              onClick={() => runBulk('ACKNOWLEDGE', selectedOverridable.map((f) => f.id))}
-              className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] disabled:opacity-40"
-            >
-              {isAccountant ? 'Resolve' : 'Submit for review'} selected ({selectedOverridable.length})
-            </button>
-            <button
-              disabled={bulkBusy || !bulkFilterActive}
-              title={bulkFilterActive ? undefined : 'Choose a reason, type or severity filter first'}
-              onClick={() => runBulk('ACKNOWLEDGE', null)}
-              className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] disabled:opacity-40"
-            >
-              {isAccountant ? 'Resolve' : 'Submit for review'} all matching ({overridable.length}
-              {more})
-            </button>
-          </>
+        {overrideCount > 0 && (
+          <button
+            disabled={bulkBusy}
+            onClick={() =>
+              allMatching ? runBulk('ACKNOWLEDGE', null) : runBulk('ACKNOWLEDGE', selectedOverridable.map((f) => f.id))
+            }
+            className={btn}
+          >
+            {overrideVerb} selected ({overrideCount})
+          </button>
         )}
-        {approvable.length > 0 && (
-          <>
+        {approveCount > 0 && (
+          <button
+            disabled={bulkBusy}
+            onClick={() =>
+              allMatching ? runBulk('APPROVE', null) : runBulk('APPROVE', selectedApprovable.map((f) => f.id))
+            }
+            className={btn}
+          >
+            Approve selected ({approveCount})
+          </button>
+        )}
+        {allOnPageSelected && !allMatching && matchedTotal > pageSelected && (
+          <div className="basis-full text-[var(--color-text-secondary)]">
+            {pageSelected} on this page selected.{' '}
             <button
-              disabled={bulkBusy || selectedApprovable.length === 0}
-              onClick={() => runBulk('APPROVE', selectedApprovable.map((f) => f.id))}
-              className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] disabled:opacity-40"
+              className="underline text-[var(--color-primary)]"
+              onClick={() => setAllMatching(true)}
             >
-              Approve selected ({selectedApprovable.length})
+              Select all {matchedTotal} matching
             </button>
+          </div>
+        )}
+        {allMatching && (
+          <div className="basis-full text-[var(--color-text-secondary)]">
+            All {matchedTotal} matching findings selected.{' '}
             <button
-              disabled={bulkBusy || !bulkFilterActive}
-              title={bulkFilterActive ? undefined : 'Choose a reason, type or severity filter first'}
-              onClick={() => runBulk('APPROVE', null)}
-              className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] disabled:opacity-40"
+              className="underline text-[var(--color-primary)]"
+              onClick={() => {
+                setAllMatching(false)
+                setSelectedIds(new Set())
+              }}
             >
-              Approve all pending matching ({approvable.length}
-              {more})
+              Clear selection
             </button>
-          </>
+          </div>
         )}
         {bulkError && (
           <div className="basis-full text-xs text-[var(--color-danger)]" role="alert">
@@ -933,6 +1020,44 @@ function FindingsTab({
           </div>
         )}
       </div>
+    ) : null
+
+  const pageWindow = (() => {
+    const pages = new Set([0, totalPages - 1, page - 1, page, page + 1].filter((p) => p >= 0 && p < totalPages))
+    return [...pages].sort((a, b) => a - b)
+  })()
+  const goToPage = (p: number) => {
+    setSelectedIds(new Set())
+    setAllMatching(false)
+    onPageChange(p)
+  }
+  const pager =
+    total > FINDINGS_PAGE_SIZE ? (
+      <nav aria-label="Findings pages" className="flex flex-wrap items-center gap-2 mt-4 text-sm">
+        <span className="text-[var(--color-text-muted)] mr-2">
+          {page * FINDINGS_PAGE_SIZE + 1}–{Math.min((page + 1) * FINDINGS_PAGE_SIZE, total)} of {total}
+        </span>
+        <button className={btn} disabled={page === 0} onClick={() => goToPage(page - 1)}>
+          Previous
+        </button>
+        {pageWindow.map((p, i) => (
+          <span key={p} className="flex items-center gap-2">
+            {i > 0 && p - pageWindow[i - 1] > 1 && <span aria-hidden>…</span>}
+            <button
+              className={btn}
+              aria-label={`Page ${p + 1}`}
+              aria-current={p === page ? 'page' : undefined}
+              disabled={p === page}
+              onClick={() => goToPage(p)}
+            >
+              {p + 1}
+            </button>
+          </span>
+        ))}
+        <button className={btn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}>
+          Next
+        </button>
+      </nav>
     ) : null
 
   return (
@@ -1141,6 +1266,7 @@ function FindingsTab({
           </div>
         ))}
       </div>
+      {pager}
     </div>
   )
 }
