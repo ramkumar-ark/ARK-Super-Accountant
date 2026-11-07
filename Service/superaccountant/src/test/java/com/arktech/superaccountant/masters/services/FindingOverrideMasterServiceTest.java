@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -389,6 +390,21 @@ class FindingOverrideMasterServiceTest {
         }
         verify(masterRepository, never()).save(any());
         verifyNoInteractions(editLogRepository);
+    }
+
+    @Test
+    void validate_tdsSection_acceptsOnlyTheListedCodes() {
+        for (String ok : List.of("NOT_SUBJECT", "194C", "194J_A", "194J_B", "194H", "194I", "194Q", "194A",
+                "194B", "194D", "194M", "OTHER")) {
+            ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
+            assertThatCode(() -> service.validate(f, ok, orgId)).as(ok).doesNotThrowAnyException();
+        }
+        for (String bad : List.of("194J", "194j_a", "194J(a)", "206AA", "Not subject to TDS", "194C ;")) {
+            ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
+            assertThatThrownBy(() -> service.validate(f, bad, orgId)).as(bad)
+                    .isInstanceOfSatisfying(FindingOverrideException.class,
+                            e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        }
     }
 
     @Test

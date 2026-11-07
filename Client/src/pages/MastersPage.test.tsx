@@ -163,6 +163,34 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     })
   })
 
+  it('TDS section override is a dropdown with readable labels, posting the stored code', async () => {
+    current = { ...baseFinding, ruleCode: 'TDS_SECTION_MAPPING', mismatchType: null } as typeof baseFinding
+    await openFindingsTab()
+
+    await userEvent.click(screen.getByRole('button', { name: /Override Value/ }))
+    const submit = screen.getByRole('button', { name: /Submit for Review/ })
+    expect(submit).toBeDisabled()
+    const select = screen.getByRole('combobox', { name: /TDS section/ })
+    expect(select.tagName).toBe('SELECT')
+    expect(screen.getByRole('option', { name: 'Not subject to TDS' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', {
+        name: '194J(a) - Fees for technical services, royalty for films, call centre (2%)',
+      }),
+    ).toHaveValue('194J_A')
+    expect(
+      screen.getByRole('option', {
+        name: '194J(b) - Fees for professional services, royalty, non-compete fees, director fees (10%)',
+      }),
+    ).toHaveValue('194J_B')
+
+    await userEvent.selectOptions(select, '194J_B')
+    await userEvent.click(submit)
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(ACTION_URL, { action: 'ACKNOWLEDGE', note: '', value: '194J_B' }),
+    )
+  })
+
   it('GST applicability override renders a select of the six enum values', async () => {
     current = { ...current, ruleCode: 'GST_APPLICABILITY' }
     await openFindingsTab()
