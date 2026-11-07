@@ -42,19 +42,17 @@ class GstApplicabilityRuleTest {
     }
 
     @Test
-    void gstCategoryNullGstType_emitsMediumFinding() {
+    void gstCategoryNullGstType_outOfScope_noFinding() {
         PreconfiguredMaster m = configured("Output CGST @18%", LedgerCategory.GST, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.MEDIUM, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test
-    void purchaseCategoryNullGstType_emitsLowFinding() {
+    void purchaseCategoryNullGstType_outOfScope_noFinding() {
         PreconfiguredMaster m = configured("Cement Purchase", LedgerCategory.PURCHASE, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.LOW, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test
@@ -66,19 +64,50 @@ class GstApplicabilityRuleTest {
     }
 
     @Test
-    void tdsCategoryNullGstType_emitsLowFinding() {
+    void tdsCategoryNullGstType_outOfScope_noFinding() {
         PreconfiguredMaster m = configured("TDS Payable 194C", LedgerCategory.TDS, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.LOW, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
     }
 
     @Test
-    void otherCategoryNullGstType_emitsLowFinding() {
+    void otherCategoryNullGstType_outOfScope_noFinding() {
         PreconfiguredMaster m = configured("Miscellaneous", LedgerCategory.OTHER, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.LOW, findings.get(0).getSeverity());
+        assertTrue(findings.isEmpty());
+    }
+
+    private PreconfiguredMaster inGroups(String name, LedgerCategory category, String chain) {
+        PreconfiguredMaster m = configured(name, category, null);
+        m.setGroupChain(chain);
+        return m;
+    }
+
+    @Test
+    void customSubGroupOfIndirectExpenses_isInScope() {
+        PreconfiguredMaster m = inGroups("Site Costs", LedgerCategory.OTHER, "site costs|indirect expenses");
+        assertEquals(1, rule.execute(ctx(List.of(m)), List.of()).size());
+    }
+
+    @Test
+    void customSubGroupOfSalesAccounts_isInScope() {
+        PreconfiguredMaster m = inGroups("Export Sales", LedgerCategory.OTHER, "export sales|sales accounts");
+        assertEquals(1, rule.execute(ctx(List.of(m)), List.of()).size());
+    }
+
+    @Test
+    void sundryCreditorsAndDebtors_neverInScope_evenIfFiledAsIncomeOrExpense() {
+        assertTrue(rule.execute(ctx(List.of(
+                inGroups("ABC Traders", LedgerCategory.CREDITOR, "sundry creditors"),
+                inGroups("Mislabelled Debtor", LedgerCategory.INCOME, "sundry debtors"),
+                inGroups("Mislabelled Vendor", LedgerCategory.EXPENSE, "south vendors|sundry creditors"))), List.of()).isEmpty());
+    }
+
+    @Test
+    void loansAndFixedAssets_notInScope() {
+        assertTrue(rule.execute(ctx(List.of(
+                inGroups("Bank Loan", LedgerCategory.OTHER, "secured loans"),
+                inGroups("Plant", LedgerCategory.OTHER, "fixed assets"))), List.of()).isEmpty());
     }
 
     @Test

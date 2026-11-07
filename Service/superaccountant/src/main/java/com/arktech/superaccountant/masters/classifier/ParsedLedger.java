@@ -17,4 +17,7 @@ public class ParsedLedger {
     private String gstApplicabilityType;
     private String hsnSacCode;
     private String gstin;
+    private String gstRegistrationType;
+    /** Parent-group chain, lower-case, nearest group first, joined by '|'. */
+    private String groupChain;
 }

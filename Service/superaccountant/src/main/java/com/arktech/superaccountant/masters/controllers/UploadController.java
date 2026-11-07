@@ -159,6 +159,8 @@ public class UploadController {
             snap.setGstin(pl.getGstin());
             snap.setTdsSection(pl.getTdsSection());
             snap.setHsnSacCode(pl.getHsnSacCode());
+            snap.setGstRegistrationType(pl.getGstRegistrationType());
+            snap.setGroupChain(pl.getGroupChain());
             return snap;
         }).collect(Collectors.toList());
         uploadLedgerSnapshotRepository.saveAll(snapshots);
@@ -174,6 +176,9 @@ public class UploadController {
                     m.setExpectedParentGroup(pl.getParentGroup());
                     m.setExpectedGstApplicable(pl.getGstApplicable());
                     m.setExpectedTdsApplicable(pl.getTdsApplicable());
+                    m.setGstin(pl.getGstin());
+                    m.setGstRegistrationType(pl.getGstRegistrationType());
+                    m.setGroupChain(pl.getGroupChain());
                     if (pl.getGstApplicabilityType() != null) {
                         try {
                             m.setGstApplicabilityType(
@@ -206,6 +211,19 @@ public class UploadController {
                                     GstApplicabilityType.valueOf(pl.getGstApplicabilityType()));
                             changed = true;
                         } catch (IllegalArgumentException ignored) {}
+                    }
+                    // Registration type and group chain come straight from Tally: always refresh them.
+                    if (!Objects.equals(m.getGstRegistrationType(), pl.getGstRegistrationType())) {
+                        m.setGstRegistrationType(pl.getGstRegistrationType());
+                        changed = true;
+                    }
+                    if (!Objects.equals(m.getGroupChain(), pl.getGroupChain())) {
+                        m.setGroupChain(pl.getGroupChain());
+                        changed = true;
+                    }
+                    if ((m.getGstin() == null || m.getGstin().isBlank()) && pl.getGstin() != null) {
+                        m.setGstin(pl.getGstin());
+                        changed = true;
                     }
                     if (m.getExpectedParentGroup() == null && pl.getParentGroup() != null) {
                         m.setExpectedParentGroup(pl.getParentGroup());

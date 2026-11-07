@@ -57,11 +57,40 @@ class TdsSectionMappingRuleTest {
     }
 
     @Test
-    void incomeCategoryNullSection_emitsMediumFinding() {
+    void incomeCategoryNullSection_outOfScope_noFinding() {
         PreconfiguredMaster m = configured("Sales Account", LedgerCategory.INCOME, null);
-        List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
-        assertEquals(1, findings.size());
-        assertEquals(FindingSeverity.MEDIUM, findings.get(0).getSeverity());
+        assertTrue(rule.execute(ctx(List.of(m)), List.of()).isEmpty());
+    }
+
+    private PreconfiguredMaster inGroups(String name, LedgerCategory category, String chain) {
+        PreconfiguredMaster m = configured(name, category, null);
+        m.setGroupChain(chain);
+        return m;
+    }
+
+    @Test
+    void fixedAssetLedger_emitsFinding_includingCustomSubGroup() {
+        assertEquals(1, rule.execute(ctx(List.of(inGroups("Plant", LedgerCategory.OTHER, "fixed assets"))), List.of()).size());
+        assertEquals(1, rule.execute(ctx(List.of(inGroups("Crane", LedgerCategory.OTHER, "heavy machinery|fixed assets"))), List.of()).size());
+    }
+
+    @Test
+    void customSubGroupOfExpenses_emitsFinding() {
+        assertEquals(1, rule.execute(ctx(List.of(inGroups("Site Costs", LedgerCategory.OTHER, "site costs|direct expenses"))), List.of()).size());
+    }
+
+    @Test
+    void creditors_neverInScope_evenIfCategorisedAsExpense() {
+        assertTrue(rule.execute(ctx(List.of(
+                inGroups("ABC Traders", LedgerCategory.CREDITOR, "sundry creditors"),
+                inGroups("Mislabelled", LedgerCategory.EXPENSE, "sundry creditors"))), List.of()).isEmpty());
+    }
+
+    @Test
+    void debtorsAndLoans_notInScope() {
+        assertTrue(rule.execute(ctx(List.of(
+                inGroups("Customer", LedgerCategory.OTHER, "sundry debtors"),
+                inGroups("Loan", LedgerCategory.OTHER, "unsecured loans"))), List.of()).isEmpty());
     }
 
     @Test

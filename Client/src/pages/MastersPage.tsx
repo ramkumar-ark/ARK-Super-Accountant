@@ -43,6 +43,8 @@ interface ValidationFinding {
 }
 
 // Rule codes whose corrected value is typed in by the user; everything else is derived server-side.
+// Sentinel the backend reads as "mark this ledger GST not applicable" instead of a GSTIN.
+const GST_NOT_APPLICABLE = 'NOT_APPLICABLE'
 const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
 const APPLICABILITY_MISMATCH_TYPES = ['GST_APPLICABILITY_MISMATCH', 'TDS_APPLICABILITY_MISMATCH']
 const DERIVABLE_MISMATCH_TYPES = [
@@ -1258,11 +1260,22 @@ function FindingsTab({
                         <input
                           type="text"
                           value={overrideValue}
+                          disabled={overrideValue === GST_NOT_APPLICABLE}
                           onChange={(e) => setOverrideValue(e.target.value)}
-                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
+                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
                         />
                       )}
                     </label>
+                    {finding.ruleCode === 'GSTIN_PRESENCE' && (
+                      <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+                        <input
+                          type="checkbox"
+                          checked={overrideValue === GST_NOT_APPLICABLE}
+                          onChange={(e) => setOverrideValue(e.target.checked ? GST_NOT_APPLICABLE : '')}
+                        />
+                        GST not applicable for this ledger
+                      </label>
+                    )}
                   </div>
                 ) : (
                   <p className="mb-2 text-xs text-[var(--color-text-secondary)]">

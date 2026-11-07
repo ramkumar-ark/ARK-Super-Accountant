@@ -108,6 +108,21 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     })
   })
 
+  it('GSTIN finding can be marked GST not applicable instead of typing a GSTIN', async () => {
+    await openFindingsTab()
+
+    await userEvent.click(screen.getByRole('button', { name: /Override Value/ }))
+    const submit = screen.getByRole('button', { name: /Submit for Review/ })
+    expect(submit).toBeDisabled()
+    await userEvent.click(screen.getByLabelText(/GST not applicable/))
+    expect(submit).toBeEnabled()
+    await userEvent.click(submit)
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(ACTION_URL, { action: 'ACKNOWLEDGE', note: '', value: 'NOT_APPLICABLE' })
+    })
+  })
+
   it('accountant sees Confirm Override instead of Submit for Review', async () => {
     setRole('ROLE_ACCOUNTANT')
     current = { ...current, ruleCode: 'MISMATCH_DETECTION', mismatchType: 'NAME_MISMATCH' }

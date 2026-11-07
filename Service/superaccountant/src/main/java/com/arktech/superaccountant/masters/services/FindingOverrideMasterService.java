@@ -35,6 +35,9 @@ public class FindingOverrideMasterService {
     private static final Pattern TDS_SECTION_PATTERN =
             Pattern.compile("NOT_SUBJECT|194C|194J_A|194J_B|194H|194I|194Q|194A|194B|194D|194M|OTHER");
 
+    /** Value of a GSTIN_PRESENCE override that marks the ledger's GST as not applicable instead of entering a GSTIN. */
+    public static final String GST_NOT_APPLICABLE = "NOT_APPLICABLE";
+
     static final Set<String> TYPED_INPUT_RULES =
             Set.of("GSTIN_PRESENCE", "HSN_SAC_CODE", "TDS_SECTION_MAPPING", "GST_APPLICABILITY");
 
@@ -160,8 +163,17 @@ public class FindingOverrideMasterService {
             requireTypedValue(f.getRuleCode(), value);
             PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
             switch (f.getRuleCode()) {
-                case "GSTIN_PRESENCE" -> change(master, f, "gstin", master.getGstin(), value.trim(),
-                        approver, submitter, () -> master.setGstin(value.trim()));
+                case "GSTIN_PRESENCE" -> {
+                    if (GST_NOT_APPLICABLE.equals(value.trim())) {
+                        change(master, f, "gst_applicability_type",
+                                master.getGstApplicabilityType() == null ? null : master.getGstApplicabilityType().name(),
+                                GstApplicabilityType.NOT_APPLICABLE.name(), approver, submitter,
+                                () -> master.setGstApplicabilityType(GstApplicabilityType.NOT_APPLICABLE));
+                    } else {
+                        change(master, f, "gstin", master.getGstin(), value.trim(),
+                                approver, submitter, () -> master.setGstin(value.trim()));
+                    }
+                }
                 case "HSN_SAC_CODE" -> change(master, f, "hsn_sac_code", master.getHsnSacCode(), value.trim(),
                         approver, submitter, () -> master.setHsnSacCode(value.trim()));
                 case "TDS_SECTION_MAPPING" -> change(master, f, "tds_section", master.getTdsSection(), value.trim(),
@@ -234,6 +246,8 @@ public class FindingOverrideMasterService {
         m.setExpectedGstApplicable(s.getGstApplicable());
         m.setExpectedTdsApplicable(s.getTdsApplicable());
         m.setGstin(s.getGstin());
+        m.setGstRegistrationType(s.getGstRegistrationType());
+        m.setGroupChain(s.getGroupChain());
         m.setTdsSection(s.getTdsSection());
         m.setHsnSacCode(s.getHsnSacCode());
         m.setGstApplicabilityType(s.getGstApplicabilityType());
@@ -320,8 +334,11 @@ public class FindingOverrideMasterService {
         }
         String v = value.trim();
         switch (ruleCode) {
-            case "GSTIN_PRESENCE" -> requireMatch(GSTIN_PATTERN, v,
-                    "GSTIN must be 15 characters in format: 22AAAAA0000A1Z5");
+            case "GSTIN_PRESENCE" -> {
+                if (!GST_NOT_APPLICABLE.equals(v)) {
+                    requireMatch(GSTIN_PATTERN, v, "GSTIN must be 15 characters in format: 22AAAAA0000A1Z5");
+                }
+            }
             case "HSN_SAC_CODE" -> requireMatch(HSN_SAC_PATTERN, v, "HSN/SAC code must be 4-8 digits");
             case "TDS_SECTION_MAPPING" -> requireMatch(TDS_SECTION_PATTERN, v, "Invalid TDS section code");
             default -> parseGstType(v);

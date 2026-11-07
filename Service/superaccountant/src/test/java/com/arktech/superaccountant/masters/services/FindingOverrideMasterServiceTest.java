@@ -437,4 +437,29 @@ class FindingOverrideMasterServiceTest {
                 .isInstanceOfSatisfying(FindingOverrideException.class,
                         e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
+
+    @Test
+    void apply_gstinPresence_notApplicable_marksGstNotApplicableAndAudits() {
+        masters();
+        ValidationFinding f = finding("GSTIN_PRESENCE", null, "Office Rent", null, null);
+        f.setProposedValue("NOT_APPLICABLE");
+
+        service.apply(f, orgId, "acct1");
+
+        assertThat(master.getGstApplicabilityType()).isEqualTo(GstApplicabilityType.NOT_APPLICABLE);
+        assertThat(master.getGstin()).isNull();
+        MasterEditLog log = onlyLog();
+        assertThat(log.getFieldName()).isEqualTo("gst_applicability_type");
+        assertThat(log.getNewValue()).isEqualTo("NOT_APPLICABLE");
+    }
+
+    @Test
+    void validate_gstinPresence_acceptsNotApplicableMarker_butStillRejectsJunk() {
+        ValidationFinding ok = finding("GSTIN_PRESENCE", null, "Office Rent", null, null);
+        service.validate(ok, "NOT_APPLICABLE", orgId);
+
+        ValidationFinding bad = finding("GSTIN_PRESENCE", null, "Office Rent", null, null);
+        assertThatThrownBy(() -> service.validate(bad, "NOT APPLICABLE", orgId))
+                .isInstanceOf(FindingOverrideException.class);
+    }
 }

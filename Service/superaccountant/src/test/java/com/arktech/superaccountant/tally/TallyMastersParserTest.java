@@ -347,4 +347,43 @@ class TallyMastersParserTest {
         assertEquals("POOJA TRADERS", ledgers.get(0).getName());
         assertEquals(LedgerCategory.CREDITOR, ledgers.get(0).getCategory());
     }
+
+    @Test
+    void ledgerCarriesGstinRegistrationTypeAndParentGroupChain() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    { "group": { "name": "Sundry Creditors", "parent": "Current Liabilities" } },
+                    { "group": { "name": "South Vendors", "parent": "Sundry Creditors" } },
+                    { "group": { "name": "Chennai Vendors", "parent": "South Vendors" } },
+                    { "ledger": { "name": "ABC Traders", "guid": "g-1", "parent": "Chennai Vendors",
+                                  "gstregistrationtype": "Regular", "gstin": "33ABCDE1234F1Z5" } },
+                    { "ledger": { "name": "Walk-in", "guid": "g-2", "parent": "Sundry Creditors",
+                                  "gstregistrationtype": "Unregistered/Consumer" } }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        ParsedLedger abc = ledgers.get(0);
+        assertEquals("Regular", abc.getGstRegistrationType());
+        assertEquals("33ABCDE1234F1Z5", abc.getGstin());
+        assertEquals("chennai vendors|south vendors|sundry creditors|current liabilities", abc.getGroupChain());
+        assertEquals(LedgerCategory.CREDITOR, abc.getCategory());
+        assertEquals("Unregistered/Consumer", ledgers.get(1).getGstRegistrationType());
+        assertNull(ledgers.get(1).getGstin());
+    }
+
+    @Test
+    void groupChainStopsOnCycle() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    { "group": { "name": "A", "parent": "B" } },
+                    { "group": { "name": "B", "parent": "A" } },
+                    { "ledger": { "name": "L", "guid": "g-1", "parent": "A" } }
+                  ]
+                }
+                """;
+        assertEquals("a|b", service.parseMastersJson(json(json)).get(0).getGroupChain());
+    }
 }

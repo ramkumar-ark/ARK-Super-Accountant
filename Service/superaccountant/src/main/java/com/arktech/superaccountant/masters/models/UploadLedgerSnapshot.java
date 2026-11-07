@@ -48,6 +48,14 @@ public class UploadLedgerSnapshot {
     @Column(name = "gst_applicability_type")
     private GstApplicabilityType gstApplicabilityType;
 
+    /** Tally "GST registration type" (e.g. Regular, Composition, Unregistered/Consumer); null when not exported. */
+    @Column(name = "gst_registration_type")
+    private String gstRegistrationType;
+
+    /** The ledger's parent-group chain from the uploaded Tally data, lower-case, nearest group first, joined by '|'. */
+    @Column(name = "group_chain", columnDefinition = "TEXT")
+    private String groupChain;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }

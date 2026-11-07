@@ -53,12 +53,23 @@ class ValidationOrchestratorIT {
         return m;
     }
 
+    private static PreconfiguredMaster inGroup(PreconfiguredMaster m, String chain) {
+        m.setGroupChain(chain);
+        return m;
+    }
+
+    private static PreconfiguredMaster registered(PreconfiguredMaster m) {
+        m.setGstRegistrationType("Regular");
+        return m;
+    }
+
     @Test
     void validate_fixtureWith3TdsGaps_produces3TdsSectionMappingFindings() {
         List<PreconfiguredMaster> masters = List.of(
                 master("Test Vendor A",  LedgerCategory.PURCHASE, null, null),
                 master("Test Expense B", LedgerCategory.EXPENSE,  null, null),
-                master("Test Income C",  LedgerCategory.INCOME,   null, null),
+                inGroup(master("Test Plant C", LedgerCategory.OTHER, null, null), "fixed assets"),
+                master("Test Income C",  LedgerCategory.INCOME,   null, null), // income is out of TDS scope
                 master("Test Capital D", LedgerCategory.OTHER,    "NOT_SUBJECT", null)
         );
 
@@ -81,8 +92,8 @@ class ValidationOrchestratorIT {
     @Test
     void validate_fixtureWith2GstinGaps_produces2GstinPresenceFindings() {
         List<PreconfiguredMaster> masters = List.of(
-                master("Test Vendor A", LedgerCategory.CREDITOR, "194Q", null),
-                master("Test Vendor B", LedgerCategory.CREDITOR, "194Q", null),
+                registered(inGroup(master("Test Vendor A", LedgerCategory.CREDITOR, "194Q", null), "sundry creditors")),
+                registered(inGroup(master("Test Vendor B", LedgerCategory.CREDITOR, "194Q", null), "sundry creditors")),
                 master("Test Income C", LedgerCategory.INCOME,   "NOT_SUBJECT", "29ABCDE1234F1Z5")
         );
 
