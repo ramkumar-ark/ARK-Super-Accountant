@@ -28,6 +28,10 @@ class GstinPresenceRuleTest {
         m.setGstin(gstin);
         m.setActive(true);
         m.setGstApplicabilityType(GstApplicabilityType.TAXABLE);
+        m.setGstRegistrationType("Regular");
+        if (category == LedgerCategory.CREDITOR) {
+            m.setExpectedParentGroup("Sundry Creditors");
+        }
         return m;
     }
 
@@ -117,6 +121,60 @@ class GstinPresenceRuleTest {
         PreconfiguredMaster m = configured("ABC Traders", LedgerCategory.CREDITOR, null);
         List<ValidationFinding> findings = rule.execute(ctx(List.of(m)), List.of());
         assertEquals("ABC Traders", findings.get(0).getLedgerName());
+    }
+
+    private PreconfiguredMaster party(String name, String chain, String registrationType, String gstin) {
+        PreconfiguredMaster m = configured(name, LedgerCategory.OTHER, gstin);
+        m.setGroupChain(chain);
+        m.setGstRegistrationType(registrationType);
+        return m;
+    }
+
+    private int count(PreconfiguredMaster m) {
+        return rule.execute(ctx(List.of(m)), List.of()).size();
+    }
+
+    @Test
+    void inScopeGroups_registeredWithoutGstin_areFlagged() {
+        assertEquals(1, count(party("D", "sundry debtors", "Regular", null)));
+        assertEquals(1, count(party("C", "sundry creditors", "Composition", null)));
+        assertEquals(1, count(party("L1", "loans & advances (asset)", "Regular", null)));
+        assertEquals(1, count(party("L2", "secured loans", "Regular", null)));
+        assertEquals(1, count(party("L3", "unsecured loans", "Regular", null)));
+    }
+
+    @Test
+    void customSubGroup_isFoundThroughTheParentChain() {
+        assertEquals(1, count(party("Vendor", "south vendors|regional vendors|sundry creditors", "Regular", null)));
+    }
+
+    @Test
+    void unregisteredConsumerUnknownOrBlankRegistration_notFlagged() {
+        assertEquals(0, count(party("a", "sundry creditors", "Unregistered/Consumer", null)));
+        assertEquals(0, count(party("b", "sundry debtors", "Unregistered", null)));
+        assertEquals(0, count(party("c", "sundry debtors", "Consumer", null)));
+        assertEquals(0, count(party("d", "sundry creditors", "Unknown", null)));
+        assertEquals(0, count(party("e", "sundry creditors", "", null)));
+        assertEquals(0, count(party("f", "sundry creditors", null, null)));
+    }
+
+    @Test
+    void outOfScopeGroups_notFlagged() {
+        assertEquals(0, count(party("Sales", "sales accounts", "Regular", null)));
+        assertEquals(0, count(party("Cash", "cash-in-hand", "Regular", null)));
+        assertEquals(0, count(party("Plant", "fixed assets", "Regular", null)));
+    }
+
+    @Test
+    void gstinPresent_notFlagged() {
+        assertEquals(0, count(party("C", "sundry creditors", "Regular", "29ABCDE1234F1Z5")));
+    }
+
+    @Test
+    void markedGstNotApplicable_notFlagged() {
+        PreconfiguredMaster m = party("C", "sundry creditors", "Regular", null);
+        m.setGstApplicabilityType(GstApplicabilityType.NOT_APPLICABLE);
+        assertEquals(0, count(m));
     }
 
     @Test

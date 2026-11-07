@@ -115,6 +115,8 @@ public class TallyParserService {
             Boolean tdsApplicable = resolveBooleanField(ledgerNode, "istdsapplicable", "yes",
                     "istdsapplicable", null);
             String gstApplicabilityType = resolveGstApplicabilityType(ledgerNode);
+            String gstin = firstText(ledgerNode, "gstin", "partygstin");
+            String gstRegistrationType = textOrNull(ledgerNode, "gstregistrationtype");
 
             com.arktech.superaccountant.masters.models.LedgerCategory category =
                     categoryClassifier.classify(parentGroup, gstApplicable, tdsApplicable, groupHierarchy);
@@ -126,6 +128,9 @@ public class TallyParserService {
                     .gstApplicable(gstApplicable)
                     .tdsApplicable(tdsApplicable)
                     .gstApplicabilityType(gstApplicabilityType)
+                    .gstin(gstin)
+                    .gstRegistrationType(gstRegistrationType)
+                    .groupChain(groupChain(parentGroup, groupHierarchy))
                     .category(category)
                     .build());
         }
@@ -287,6 +292,25 @@ public class TallyParserService {
         if (cleaned.contains("applicable")) return "TAXABLE";
         if (cleaned.contains("exempt")) return "EXEMPT";
         return null;
+    }
+
+    private String firstText(JsonNode node, String... fieldNames) {
+        for (String f : fieldNames) {
+            String v = textOrNull(node, f);
+            if (v != null) return v;
+        }
+        return null;
+    }
+
+    /** The parent-group chain of a ledger, nearest group first, lower-case, '|'-joined; cycle-safe. */
+    static String groupChain(String parentGroup, Map<String, String> hierarchy) {
+        if (parentGroup == null || parentGroup.isBlank()) return null;
+        java.util.LinkedHashSet<String> chain = new java.util.LinkedHashSet<>();
+        String current = parentGroup.trim().toLowerCase();
+        while (current != null && !current.isBlank() && chain.add(current)) {
+            current = hierarchy.get(current);
+        }
+        return String.join("|", chain);
     }
 
     private String textOrNull(JsonNode node, String fieldName) {

@@ -60,6 +60,25 @@ public class ValidationFinding {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
+    /** Corrected master value proposed by the submitter (typed-input rules only). */
+    @Column(name = "proposed_value", columnDefinition = "TEXT")
+    private String proposedValue;
+
+    @Column(name = "submitted_by")
+    private String submittedBy;
+
+    @Column(name = "submitted_at")
+    private Instant submittedAt;
+
+    @Column(name = "reviewed_by")
+    private String reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
+    @Column(name = "review_note", columnDefinition = "TEXT")
+    private String reviewNote;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 }

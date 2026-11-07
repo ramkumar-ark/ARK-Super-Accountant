@@ -75,6 +75,22 @@ class MismatchDetectionRuleTest {
     }
 
     @Test
+    void missingInConfiguration_messageSaysInTallyUploadButNotInApprovedMasters() {
+        ParsedLedger l = uploaded("A.R.Hardwares A/c", LedgerCategory.EXPENSE, "Indirect Expenses", null, null);
+        String msg = rule.execute(ctx(List.of()), List.of(l)).get(0).getMessage();
+        assertEquals("Ledger 'A.R.Hardwares A/c' (group Indirect Expenses) is in the uploaded Tally data but not in the approved masters.", msg);
+        assertFalse(msg.contains("expected"));
+        assertFalse(msg.contains("found"));
+    }
+
+    @Test
+    void missingInConfiguration_messageOmitsGroupWhenUnknown() {
+        ParsedLedger l = uploaded("Cement", LedgerCategory.PURCHASE, null, null, null);
+        assertEquals("Ledger 'Cement' is in the uploaded Tally data but not in the approved masters.",
+                rule.execute(ctx(List.of()), List.of(l)).get(0).getMessage());
+    }
+
+    @Test
     void nameMismatch_differentCasing_emitsNameMismatch() {
         PreconfiguredMaster m = configured("Cement", LedgerCategory.PURCHASE, "Purchase Accounts", null, null);
         ParsedLedger l = uploaded("cement", LedgerCategory.PURCHASE, "Purchase Accounts", null, null);

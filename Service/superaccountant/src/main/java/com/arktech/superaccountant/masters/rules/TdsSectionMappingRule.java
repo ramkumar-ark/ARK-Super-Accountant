@@ -8,7 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Checks that every PreconfiguredMaster has a TDS section assigned.
+ * Checks that expense ledgers (and purchase accounts, which are expense-like) and fixed asset ledgers have a
+ * TDS section assigned. Creditors and every other ledger type are out of scope; scope follows the parent-group chain.
  * Phase 3 rule: iterates preconfiguredMasters (not parsedLedgers) because
  * Tally JSON does not export TDS section data.
  */
@@ -25,17 +26,12 @@ public class TdsSectionMappingRule implements ValidationRule {
         List<ValidationFinding> findings = new ArrayList<>();
 
         for (PreconfiguredMaster master : context.preconfiguredMasters()) {
-            // GST, TDS, and OTHER category ledgers are structurally not subject to TDS — skip them
-            if (master.getCategory() == LedgerCategory.GST
-                    || master.getCategory() == LedgerCategory.TDS
-                    || master.getCategory() == LedgerCategory.OTHER) {
+            if (!inScope(master)) {
                 continue;
             }
             if (master.getTdsSection() == null) {
-                FindingSeverity severity = switch (master.getCategory()) {
-                    case PURCHASE, EXPENSE, INCOME -> FindingSeverity.MEDIUM;
-                    default -> FindingSeverity.LOW;
-                };
+                FindingSeverity severity = master.getCategory() == LedgerCategory.OTHER
+                        ? FindingSeverity.LOW : FindingSeverity.MEDIUM;
 
                 // Note: uploadJobId is injected by ValidationOrchestrator.runAndPersist() before persistence.
                 // Do not set it here; it is not available at rule execution time.
@@ -52,5 +48,14 @@ public class TdsSectionMappingRule implements ValidationRule {
         }
 
         return findings;
+    }
+
+    private static boolean inScope(PreconfiguredMaster master) {
+        if (LedgerGroups.inAny(master, LedgerGroups.GSTIN_PARTY_AND_LOAN_GROUPS)
+                || master.getCategory() == LedgerCategory.CREDITOR) {
+            return false;
+        }
+        return LedgerGroups.inAny(master, LedgerGroups.EXPENSE) || LedgerGroups.inAny(master, LedgerGroups.FIXED_ASSETS)
+                || master.getCategory() == LedgerCategory.EXPENSE || master.getCategory() == LedgerCategory.PURCHASE;
     }
 }

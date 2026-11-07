@@ -7,7 +7,7 @@ A multi-tenant accounting and business management platform built for Indian busi
 - **Tally Masters validation** — Upload a JSON export from Tally ERP and automatically detect ledger mismatches (wrong parent group, missing GST/TDS flags, misclassified categories).
 - **Organization management** — Create organizations with GSTIN, PAN, and financial year settings. Invite team members by role.
 - **Role-based access** — Four roles (Owner, Accountant, Operator, CA Auditor) with different permissions across upload, resolve, and admin actions.
-- **Mismatch resolution workflow** — Review flagged findings, mark them as accepted or overridden, and export the results to CSV.
+- **Mismatch resolution workflow** — Operators propose a corrected master value for a flagged finding; an Accountant approves (applying the override to the master and unlocking the gate) or rejects it with a note. Accountants' own proposals are approved in one step. Findings can be filtered by mismatch reason and submitted or approved in bulk (including TDS section and "GST not applicable" overrides). Per-organization validation settings, such as whether expense ledgers need an HSN/SAC code, tune which findings are raised. Results export to CSV.
 - **Pre-configured masters** — Define expected ledger standards per organization; use a built-in Construction/Works Contractor template or build from scratch.
 
 ## Architecture
@@ -54,8 +54,8 @@ Open [http://localhost:5173](http://localhost:5173). See [docs/GETTING-STARTED.m
 | Role | API key | Default capabilities |
 |------|---------|----------------------|
 | Owner | `owner` | Create organizations, invite members, manage masters |
-| Accountant | `accountant` | Upload files, manage masters, invite members |
-| Operator | `operator` | Upload files, manage masters |
+| Accountant | `accountant` | Upload files, manage masters, invite members, approve/reject finding overrides |
+| Operator | `operator` | Upload files, manage masters, submit finding overrides for review |
 | CA Auditor | `auditor_ca` | Read-only access; can switch between client organizations |
 
 ## Tech stack

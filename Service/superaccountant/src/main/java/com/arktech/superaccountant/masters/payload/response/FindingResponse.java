@@ -25,5 +25,11 @@ public class FindingResponse {
     private String resolveNote;
     private String resolvedBy;
     private Instant resolvedAt;
+    private String proposedValue;
+    private String submittedBy;
+    private Instant submittedAt;
+    private String reviewedBy;
+    private Instant reviewedAt;
+    private String reviewNote;
     private Instant createdAt;
 }
