@@ -1277,6 +1277,10 @@ function FindingsTab({
                       </label>
                     )}
                   </div>
+                ) : finding.mismatchType === 'MISSING_IN_CONFIGURATION' ? (
+                  <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+                    <span className="font-mono">{finding.ledgerName}</span> will be added to the approved masters.
+                  </p>
                 ) : (
                   <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
                     The master will be updated to:{' '}

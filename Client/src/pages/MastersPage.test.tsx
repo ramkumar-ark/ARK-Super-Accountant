@@ -123,6 +123,15 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     })
   })
 
+  it('missing-in-configuration override says the ledger will be added to the approved masters', async () => {
+    current = { ...current, ruleCode: 'MISMATCH_DETECTION', mismatchType: 'MISSING_IN_CONFIGURATION', actualValue: 'Acme Traders' }
+    await openFindingsTab()
+
+    await userEvent.click(screen.getByRole('button', { name: /Override Value/ }))
+    expect(screen.getByText(/will be added to the approved masters/)).toBeInTheDocument()
+    expect(screen.queryByText(/will be updated to/)).toBeNull()
+  })
+
   it('accountant sees Confirm Override instead of Submit for Review', async () => {
     setRole('ROLE_ACCOUNTANT')
     current = { ...current, ruleCode: 'MISMATCH_DETECTION', mismatchType: 'NAME_MISMATCH' }

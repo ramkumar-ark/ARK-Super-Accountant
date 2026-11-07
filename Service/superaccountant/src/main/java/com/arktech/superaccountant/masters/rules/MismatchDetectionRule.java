@@ -43,11 +43,14 @@ public class MismatchDetectionRule implements ValidationRule {
         // Uploaded ledgers not in configured masters
         for (Map.Entry<String, ParsedLedger> entry : uploadedMap.entrySet()) {
             if (!configuredMap.containsKey(entry.getKey())) {
-                findings.add(buildFinding(entry.getValue().getName(),
-                        entry.getValue().getCategory(),
+                ParsedLedger uploaded = entry.getValue();
+                ValidationFinding f = buildFinding(uploaded.getName(),
+                        uploaded.getCategory(),
                         MismatchType.MISSING_IN_CONFIGURATION,
                         FindingSeverity.MEDIUM,
-                        null, entry.getValue().getName(), null));
+                        null, uploaded.getName(), null);
+                f.setMessage(missingInConfigurationMessage(uploaded));
+                findings.add(f);
             }
         }
 
@@ -102,6 +105,14 @@ public class MismatchDetectionRule implements ValidationRule {
         }
 
         return findings;
+    }
+
+    /** Plain statement of the situation: the ledger is in the Tally upload but not in the approved masters. */
+    static String missingInConfigurationMessage(ParsedLedger uploaded) {
+        String group = uploaded.getParentGroup();
+        String where = group == null || group.isBlank() ? "" : " (group " + group + ")";
+        return String.format("Ledger '%s'%s is in the uploaded Tally data but not in the approved masters.",
+                uploaded.getName(), where);
     }
 
     private String normalize(String name) {
