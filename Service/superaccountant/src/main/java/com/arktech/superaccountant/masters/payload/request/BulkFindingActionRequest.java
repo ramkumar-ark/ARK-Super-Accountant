@@ -27,6 +27,13 @@ public class BulkFindingActionRequest {
     private FindingSeverity severity;
     private LedgerCategory category;
 
+    /**
+     * One resolution applied to every targeted finding: a TDS section code (or NOT_SUBJECT) for TDS_SECTION_MAPPING
+     * findings, or NOT_APPLICABLE for GSTIN_PRESENCE findings. Absent means the derived override of mismatch findings.
+     * HSN/SAC and GST applicability type are not available in bulk.
+     */
+    private String value;
+
     private String note;
 
     /** Explicit opt-in to act on every matching finding when no ids and no filter fields are given. */

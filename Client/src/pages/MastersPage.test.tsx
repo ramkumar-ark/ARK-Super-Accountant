@@ -463,7 +463,13 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     mockPost.mockImplementation(((_u: string, body: Record<string, unknown>) =>
       body?.dryRun
         ? Promise.resolve({
-            data: { matched: all.filter((r) => r.ruleCode === 'MISMATCH_DETECTION').length },
+            data: {
+              matched: all.filter(
+                (r) =>
+                  r.ruleCode ===
+                  (body.value === 'NOT_APPLICABLE' ? 'GSTIN_PRESENCE' : body.value ? 'TDS_SECTION_MAPPING' : 'MISMATCH_DETECTION'),
+              ).length,
+            },
           })
         : Promise.resolve({ data: {} })) as never)
   })
@@ -506,7 +512,7 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     await userEvent.click(screen.getByLabelText('Select all'))
 
     expect(screen.getByText(/100 on this page selected\./)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Select all 250 matching' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select all 257 matching' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Submit for review selected \(100\)/ })).toBeInTheDocument()
     expect(screen.queryByText(/100\+/)).toBeNull()
   })
@@ -515,8 +521,8 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     const confirm = stubConfirm(true)
     await openTab()
     await userEvent.click(screen.getByLabelText('Select all'))
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
-    expect(screen.getByText(/All 250 matching findings selected/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 257 matching' }))
+    expect(screen.getByText(/All 257 matching findings selected/)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
 
@@ -529,7 +535,7 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     const confirm = stubConfirm(false)
     await openTab()
     await userEvent.click(screen.getByLabelText('Select all'))
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 257 matching' }))
     await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
 
     expect(confirm).toHaveBeenCalled()
@@ -556,11 +562,11 @@ describe('MastersPage — findings paging and select-all-matching', () => {
   it('changing page clears the selection and the all-matching choice', async () => {
     await openTab()
     await userEvent.click(screen.getByLabelText('Select all'))
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 257 matching' }))
     await userEvent.click(screen.getByRole('button', { name: 'Page 2' }))
     await screen.findByText('Ledger 100')
 
-    expect(screen.queryByText(/All 250 matching findings selected/)).toBeNull()
+    expect(screen.queryByText(/All 257 matching findings selected/)).toBeNull()
     expect(screen.queryByRole('button', { name: /selected \(/ })).toBeNull()
   })
 
@@ -580,7 +586,7 @@ describe('MastersPage — findings paging and select-all-matching', () => {
       body?.dryRun ? dry(url, body) : new Promise((r) => (finish = r))) as never)
     await openTab()
     await userEvent.click(screen.getByLabelText('Select all'))
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 257 matching' }))
     await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
 
     expect(await screen.findByText(/Submitting 250 findings/)).toBeInTheDocument()
@@ -612,6 +618,139 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     await openTab2()
 
     expect(screen.queryByRole('note')).toBeNull()
+  })
+})
+
+
+describe('MastersPage — bulk TDS section and GST not applicable', () => {
+  const BULK_URL = '/v1/uploads/job-1/findings/bulk-action'
+  const mk = (id: string, over: Record<string, unknown> = {}) => ({
+    ...baseFinding,
+    id,
+    ledgerName: `Ledger ${id}`,
+    ruleCode: 'TDS_SECTION_MAPPING',
+    mismatchType: null,
+    ...over,
+  })
+  let rows: Array<ReturnType<typeof mk>>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setRole('ROLE_OPERATOR')
+    rows = [
+      mk('t1'),
+      mk('t2'),
+      mk('t3'),
+      mk('g1', { ruleCode: 'GSTIN_PRESENCE' }),
+      mk('g2', { ruleCode: 'GSTIN_PRESENCE' }),
+      mk('h1', { ruleCode: 'HSN_SAC_CODE' }),
+    ]
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) return Promise.resolve({ data: { totalElements: rows.length } })
+      if (url.startsWith('/v1/uploads/latest/mismatches')) {
+        return Promise.resolve({ data: { content: rows, totalElements: rows.length } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    mockPost.mockImplementation(((_u: string, body: Record<string, unknown>) => {
+      if (body?.dryRun) {
+        const rule = body.value === 'NOT_APPLICABLE' ? 'GSTIN_PRESENCE' : body.value ? 'TDS_SECTION_MAPPING' : 'MISMATCH_DETECTION'
+        return Promise.resolve({ data: { matched: rows.filter((r) => r.ruleCode === rule).length } })
+      }
+      return Promise.resolve({ data: {} })
+    }) as never)
+  })
+
+  const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
+
+  async function openTab() {
+    render(<MastersPage />)
+    const tab = await screen.findByRole('tab', { name: /Findings/ })
+    await waitFor(() => expect(tab).not.toBeDisabled())
+    await userEvent.click(tab)
+    await screen.findByText('Ledger t1')
+  }
+
+  it('operator submits ticked TDS findings with one chosen section, then repeats with another value', async () => {
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger t1'))
+    await userEvent.click(screen.getByLabelText('Select Ledger t2'))
+    const submit = screen.getByRole('button', { name: /Submit for review TDS section \(2\)/ })
+    expect(submit).toBeDisabled()
+    await userEvent.selectOptions(screen.getByLabelText('TDS section for selected'), '194C')
+    await userEvent.click(submit)
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, { action: 'ACKNOWLEDGE', findingIds: ['t1', 't2'], value: '194C' }),
+    )
+
+    await userEvent.click(await screen.findByLabelText('Select Ledger t3'))
+    await userEvent.selectOptions(screen.getByLabelText('TDS section for selected'), 'NOT_SUBJECT')
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review TDS section \(1\)/ }))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, { action: 'ACKNOWLEDGE', findingIds: ['t3'], value: 'NOT_SUBJECT' }),
+    )
+  })
+
+  it('GST not applicable is applied to ticked GSTIN findings only', async () => {
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger g1'))
+    await userEvent.click(screen.getByLabelText('Select Ledger g2'))
+    await userEvent.click(screen.getByRole('button', { name: /GST not applicable \(2\)/ }))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(BULK_URL, {
+        action: 'ACKNOWLEDGE',
+        findingIds: ['g1', 'g2'],
+        value: 'NOT_APPLICABLE',
+      }),
+    )
+    // no bulk GSTIN entry: there is no free-text input in the bulk bar
+    expect(screen.queryByPlaceholderText(/GSTIN/i)).toBeNull()
+  })
+
+  it('a mixed selection keeps rules apart: each button only carries its own rule ids', async () => {
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger t1'))
+    await userEvent.click(screen.getByLabelText('Select Ledger g1'))
+    await userEvent.click(screen.getByRole('button', { name: /GST not applicable \(1\)/ }))
+    await waitFor(() => expect(realPosts()).toHaveLength(1))
+    expect(realPosts()[0][1]).toEqual({ action: 'ACKNOWLEDGE', findingIds: ['g1'], value: 'NOT_APPLICABLE' })
+  })
+
+  it('select all matching sends the value in filter mode after confirming the true count', async () => {
+    const confirm = stubConfirm(true)
+    // The server has more TDS findings than this page shows.
+    mockPost.mockImplementation(((_u: string, body: Record<string, unknown>) =>
+      body?.dryRun
+        ? Promise.resolve({ data: { matched: body.value === 'NOT_APPLICABLE' ? 2 : body.value ? 120 : 0 } })
+        : Promise.resolve({ data: {} })) as never)
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select all'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Select all 122 matching' }))
+    await userEvent.selectOptions(screen.getByLabelText('TDS section for selected'), '194J_A')
+    await userEvent.click(screen.getByRole('button', { name: /Submit for review TDS section \(120\)/ }))
+
+    await waitFor(() => expect(realPosts()).toHaveLength(1))
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('120'))
+    expect(realPosts()[0][1]).toEqual({ action: 'ACKNOWLEDGE', allMatching: true, value: '194J_A' })
+  })
+
+  it('accountant sees Resolve wording and HSN/SAC stays out of bulk', async () => {
+    setRole('ROLE_ACCOUNTANT')
+    await openTab()
+    await userEvent.click(screen.getByLabelText('Select Ledger t1'))
+    expect(screen.getByRole('button', { name: /Resolve TDS section \(1\)/ })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Select Ledger h1')).toBeNull()
+    expect(screen.getByRole('note')).toHaveTextContent(/1 finding on this page needs a typed value/)
+  })
+
+  it('auditor gets no bulk controls', async () => {
+    setRole('ROLE_AUDITOR_CA')
+    await openTab()
+    expect(screen.queryByLabelText('Select Ledger t1')).toBeNull()
+    expect(screen.queryByLabelText('TDS section for selected')).toBeNull()
   })
 })
 

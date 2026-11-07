@@ -652,6 +652,26 @@ public class UploadController {
         if (approving && !isAccountant) {
             return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT can approve findings."));
         }
+        String bulkValue = blankToNull(request.getValue());
+        bulkValue = bulkValue == null ? null : bulkValue.trim();
+        String valueRule = null;
+        if (bulkValue != null) {
+            if (approving) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Approval takes no value; it applies what was proposed."));
+            }
+            valueRule = FindingOverrideMasterService.bulkRuleForValue(bulkValue);
+            if (valueRule == null) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "Bulk accepts a TDS section (or NOT_SUBJECT) for TDS findings, or NOT_APPLICABLE for GSTIN findings."));
+            }
+            String requested = blankToNull(request.getRuleCode());
+            if (requested != null && !requested.equals(valueRule)) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "Value '" + bulkValue + "' applies to " + valueRule + " findings, not " + requested + "."));
+            }
+        }
+        final String typedRule = valueRule;
+        final String typedValue = bulkValue;
         ResolveStatus requiredStatus = approving ? ResolveStatus.ACKNOWLEDGED : ResolveStatus.OPEN;
         boolean byIds = request.getFindingIds() != null && !request.getFindingIds().isEmpty();
         if (!byIds && !request.hasFilter() && !request.isAllMatching()) {
@@ -661,15 +681,15 @@ public class UploadController {
             if (byIds) {
                 return ResponseEntity.badRequest().body(Map.of("error", "A count applies to a filter, not to listed ids."));
             }
-            return ResponseEntity.ok(Map.of("matched", countMatching(jobId, requiredStatus, approving, request)));
+            return ResponseEntity.ok(Map.of("matched", countMatching(jobId, requiredStatus, approving, request, typedRule)));
         }
 
         List<ValidationFinding> targets = byIds
                 ? findingRepository.findByIdsForUpdate(jobId, new java.util.LinkedHashSet<>(request.getFindingIds()))
                 : findingRepository.findMatchingForUpdate(jobId, requiredStatus, request.getCategory(), request.getSeverity(),
-                        blankToNull(request.getRuleCode()), request.getMismatchType());
-        if (!byIds && !approving) {
-            targets = targets.stream().filter(FindingOverrideMasterService::isDerivable).toList();
+                        typedRule != null ? typedRule : blankToNull(request.getRuleCode()), request.getMismatchType());
+        if (!byIds) {
+            targets = narrow(targets, approving, typedRule != null);
         }
         if (targets.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", approving ? "No findings pending review match." : "No open findings match."));
@@ -699,11 +719,16 @@ public class UploadController {
                         approving ? "Only findings pending review can be approved." : "Only OPEN findings can be resolved."));
                 continue;
             }
+            if (typedRule != null && !typedRule.equals(f.getRuleCode())) {
+                failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(),
+                        "Value '" + typedValue + "' applies to " + typedRule + " findings only."));
+                continue;
+            }
             try {
                 if (approving) {
                     approve(f, orgId, username, now, masters, snapshots);
                 } else {
-                    submit(f, null, request.getNote(), orgId, username, isAccountant, now, masters, snapshots);
+                    submit(f, typedValue, request.getNote(), orgId, username, isAccountant, now, masters, snapshots);
                 }
             } catch (FindingOverrideException e) {
                 failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(), e.getMessage()));
@@ -721,10 +746,18 @@ public class UploadController {
     }
 
     /** How many findings a filter-mode action would touch: the same targeting as the real run, without locks or changes. */
-    private long countMatching(UUID jobId, ResolveStatus status, boolean approving, BulkFindingActionRequest request) {
+    private long countMatching(UUID jobId, ResolveStatus status, boolean approving, BulkFindingActionRequest request,
+                               String typedRule) {
         List<ValidationFinding> matching = findingRepository.findMatching(jobId, status, request.getCategory(),
-                request.getSeverity(), blankToNull(request.getRuleCode()), request.getMismatchType());
-        return approving ? matching.size() : matching.stream().filter(FindingOverrideMasterService::isDerivable).count();
+                request.getSeverity(), typedRule != null ? typedRule : blankToNull(request.getRuleCode()), request.getMismatchType());
+        return narrow(matching, approving, typedRule != null).size();
+    }
+
+    /** For a plain (value-less) override only findings whose corrected value is derivable are bulk-eligible. */
+    private List<ValidationFinding> narrow(List<ValidationFinding> findings, boolean approving, boolean typed) {
+        return findings.stream()
+                .filter(f -> approving || typed || FindingOverrideMasterService.isDerivable(f))
+                .toList();
     }
 
     private static String blankToNull(String s) {

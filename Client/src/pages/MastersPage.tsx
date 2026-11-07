@@ -46,6 +46,8 @@ interface ValidationFinding {
 // Sentinel the backend reads as "mark this ledger GST not applicable" instead of a GSTIN.
 const GST_NOT_APPLICABLE = 'NOT_APPLICABLE'
 const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
+// Sections the server accepts for a TDS finding (NOT_SUBJECT marks the ledger as outside TDS).
+const TDS_SECTIONS = ['NOT_SUBJECT', '194C', '194J_A', '194J_B', '194H', '194I', '194Q', '194A', '194B', '194D', '194M', 'OTHER']
 const APPLICABILITY_MISMATCH_TYPES = ['GST_APPLICABILITY_MISMATCH', 'TDS_APPLICABILITY_MISMATCH']
 const DERIVABLE_MISMATCH_TYPES = [
   'MISSING_IN_CONFIGURATION',
@@ -651,6 +653,10 @@ function FindingsTab({
   // True server counts of what a bulk override / approve would touch under the current filters.
   const [matchedOverride, setMatchedOverride] = useState(0)
   const [matchedApprove, setMatchedApprove] = useState(0)
+  // Bulk TDS / GSTIN: one value is applied to the ticked findings of that rule, repeated per value.
+  const [matchedTds, setMatchedTds] = useState(0)
+  const [matchedGstin, setMatchedGstin] = useState(0)
+  const [bulkTdsSection, setBulkTdsSection] = useState('')
 
   const SEVERITY_BORDER: Record<string, string> = {
     HIGH: 'border-l-[var(--color-danger)]',
@@ -742,6 +748,8 @@ function FindingsTab({
     (!APPLICABILITY_MISMATCH_TYPES.includes(f.mismatchType) ||
       f.actualValue === 'true' ||
       f.actualValue === 'false')
+  const canBulkTyped = (f: ValidationFinding, rule: string) =>
+    canSubmit && f.resolveStatus === 'OPEN' && f.ruleCode === rule
   const canBulkApprove = (f: ValidationFinding) => isAccountant && f.resolveStatus === 'ACKNOWLEDGED'
 
   // The filters currently applied to the list, as the bulk endpoint's filter mode takes them.
@@ -753,14 +761,19 @@ function FindingsTab({
     return body
   }
 
-  async function runBulk(action: 'ACKNOWLEDGE' | 'APPROVE', ids: string[] | null) {
+  async function runBulk(
+    action: 'ACKNOWLEDGE' | 'APPROVE',
+    ids: string[] | null,
+    value?: string,
+    matched?: number,
+  ) {
     if (!ids) {
-      const count = action === 'APPROVE' ? matchedApprove : matchedOverride
+      const count = matched ?? (action === 'APPROVE' ? matchedApprove : matchedOverride)
       const verb = action === 'APPROVE' ? 'Approve' : isAccountant ? 'Resolve' : 'Submit for review'
       // Reaches beyond the rows on this page: say exactly how many findings it covers.
       if (!window.confirm(`${verb} all ${count} matching findings, not just the ${visibleFindings.length} on this page?`)) return
     }
-    const count = ids ? ids.length : action === 'APPROVE' ? matchedApprove : matchedOverride
+    const count = ids ? ids.length : matched ?? (action === 'APPROVE' ? matchedApprove : matchedOverride)
     setBulkBusy(true)
     setBulkError('')
     setBulkResult('')
@@ -770,6 +783,11 @@ function FindingsTab({
     )
     const body: Record<string, unknown> = ids ? { findingIds: ids } : filterBody()
     body.action = action
+    if (value) {
+      body.value = value
+      // The value implies the rule; a stale rule filter must not clash with it.
+      delete body.ruleCode
+    }
     try {
       const jobId = findings[0]?.uploadJobId
       const res = await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, body)
@@ -810,6 +828,10 @@ function FindingsTab({
   // "Show resolved" lists closed findings only; otherwise the open and pending ones.
   const visibleFindings = showResolved ? filteredFindings.filter(isResolved) : openFindings
   const overridable = visibleFindings.filter(canBulkOverride)
+  const tdsEligible = visibleFindings.filter((f) => canBulkTyped(f, 'TDS_SECTION_MAPPING'))
+  const gstinEligible = visibleFindings.filter((f) => canBulkTyped(f, 'GSTIN_PRESENCE'))
+  const selectedTds = tdsEligible.filter((f) => selectedIds.has(f.id))
+  const selectedGstin = gstinEligible.filter((f) => selectedIds.has(f.id))
   const approvable = visibleFindings.filter(canBulkApprove)
   const selectedOverridable = overridable.filter((f) => selectedIds.has(f.id))
   const selectedApprovable = approvable.filter((f) => selectedIds.has(f.id))
@@ -831,6 +853,18 @@ function FindingsTab({
     const safe = (p: Promise<number>) => p.catch(() => 0)
     safe(canSubmit ? count('ACKNOWLEDGE') : Promise.resolve(0)).then((n) => live && setMatchedOverride(n))
     safe(isAccountant ? count('APPROVE') : Promise.resolve(0)).then((n) => live && setMatchedApprove(n))
+    // A typed value implies its rule, so these only make sense when the filters leave room for that rule.
+    const typedCount = async (rule: string, value: string) => {
+      if (mismatchFilter || (ruleFilter && ruleFilter !== rule)) return 0
+      const body: Record<string, unknown> = { ...filterBody(), action: 'ACKNOWLEDGE', dryRun: true, value }
+      delete body.ruleCode
+      const res = await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, body)
+      return Number(res.data?.matched ?? 0)
+    }
+    safe(canSubmit ? typedCount('TDS_SECTION_MAPPING', '194C') : Promise.resolve(0)).then((n) => live && setMatchedTds(n))
+    safe(canSubmit ? typedCount('GSTIN_PRESENCE', GST_NOT_APPLICABLE) : Promise.resolve(0)).then(
+      (n) => live && setMatchedGstin(n),
+    )
     return () => {
       live = false
     }
@@ -977,26 +1011,34 @@ function FindingsTab({
       </div>
     )
 
-  const pageSelected = selectedOverridable.length + selectedApprovable.length
-  const pageEligible = overridable.length + approvable.length
+  const pageSelected = selectedOverridable.length + selectedApprovable.length + selectedTds.length + selectedGstin.length
+  const pageEligible = overridable.length + approvable.length + tdsEligible.length + gstinEligible.length
   const allOnPageSelected = pageEligible > 0 && pageSelected === pageEligible
-  const matchedTotal = matchedOverride + matchedApprove
+  const matchedTotal = matchedOverride + matchedApprove + matchedTds + matchedGstin
   const btn =
     'h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] disabled:opacity-40'
   const overrideVerb = isAccountant ? 'Resolve' : 'Submit for review'
   // With "all matching" chosen, a button covers the server's count; otherwise just the ticked rows.
   const overrideCount = allMatching ? matchedOverride : selectedOverridable.length
   const approveCount = allMatching ? matchedApprove : selectedApprovable.length
+  const tdsCount = allMatching ? matchedTds : selectedTds.length
+  const gstinCount = allMatching ? matchedGstin : selectedGstin.length
 
   // Open findings that need a typed value (GSTIN, HSN/SAC, TDS section, ...): bulk leaves them out by design.
   const typedOnly = canSubmit && !showResolved
-    ? visibleFindings.filter((f) => f.resolveStatus === 'OPEN' && !canBulkOverride(f))
+    ? visibleFindings.filter(
+        (f) =>
+          f.resolveStatus === 'OPEN' &&
+          !canBulkOverride(f) &&
+          f.ruleCode !== 'TDS_SECTION_MAPPING' &&
+          f.ruleCode !== 'GSTIN_PRESENCE',
+      )
     : []
   const typedNote =
     typedOnly.length > 0 ? (
       <p className="text-xs text-[var(--color-text-muted)] mb-3" role="note">
         {typedOnly.length} finding{typedOnly.length === 1 ? '' : 's'} on this page need
-        {typedOnly.length === 1 ? 's' : ''} a typed value (such as a GSTIN, HSN/SAC code or TDS section), so
+        {typedOnly.length === 1 ? 's' : ''} a typed value (such as an HSN/SAC code or GST applicability), so
         bulk actions are not available for {typedOnly.length === 1 ? 'it' : 'them'}. Resolve
         {typedOnly.length === 1 ? ' it' : ' them'} one at a time.
       </p>
@@ -1017,7 +1059,9 @@ function FindingsTab({
             onChange={(e) => {
               setAllMatching(false)
               setSelectedIds(
-                e.target.checked ? new Set([...overridable, ...approvable].map((f) => f.id)) : new Set(),
+                e.target.checked
+                  ? new Set([...overridable, ...approvable, ...tdsEligible, ...gstinEligible].map((f) => f.id))
+                  : new Set(),
               )
             }}
           />
@@ -1032,6 +1076,48 @@ function FindingsTab({
             className={btn}
           >
             {overrideVerb} selected ({overrideCount})
+          </button>
+        )}
+        {tdsCount > 0 && (
+          <span className="flex items-center gap-2">
+            <select
+              aria-label="TDS section for selected"
+              value={bulkTdsSection}
+              disabled={bulkBusy}
+              onChange={(e) => setBulkTdsSection(e.target.value)}
+              className="h-9 px-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)]"
+            >
+              <option value="">TDS section…</option>
+              {TDS_SECTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s === 'NOT_SUBJECT' ? 'Not subject to TDS' : s}
+                </option>
+              ))}
+            </select>
+            <button
+              disabled={bulkBusy || !bulkTdsSection}
+              onClick={() =>
+                allMatching
+                  ? runBulk('ACKNOWLEDGE', null, bulkTdsSection, matchedTds)
+                  : runBulk('ACKNOWLEDGE', selectedTds.map((f) => f.id), bulkTdsSection)
+              }
+              className={btn}
+            >
+              {overrideVerb} TDS section ({tdsCount})
+            </button>
+          </span>
+        )}
+        {gstinCount > 0 && (
+          <button
+            disabled={bulkBusy}
+            onClick={() =>
+              allMatching
+                ? runBulk('ACKNOWLEDGE', null, GST_NOT_APPLICABLE, matchedGstin)
+                : runBulk('ACKNOWLEDGE', selectedGstin.map((f) => f.id), GST_NOT_APPLICABLE)
+            }
+            className={btn}
+          >
+            GST not applicable ({gstinCount})
           </button>
         )}
         {approveCount > 0 && (
@@ -1139,7 +1225,10 @@ function FindingsTab({
             className={`bg-[var(--color-surface)] rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 ${SEVERITY_BORDER[finding.severity] ?? ''} p-4`}
           >
             <div className="flex items-start gap-4">
-              {(canBulkOverride(finding) || canBulkApprove(finding)) && (
+              {(canBulkOverride(finding) ||
+                canBulkApprove(finding) ||
+                canBulkTyped(finding, 'TDS_SECTION_MAPPING') ||
+                canBulkTyped(finding, 'GSTIN_PRESENCE')) && (
                 <input
                   type="checkbox"
                   aria-label={`Select ${finding.ledgerName}`}

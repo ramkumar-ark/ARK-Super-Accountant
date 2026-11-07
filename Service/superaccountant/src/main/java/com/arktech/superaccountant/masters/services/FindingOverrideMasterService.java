@@ -46,6 +46,21 @@ public class FindingOverrideMasterService {
             MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH,
             MismatchType.MISSING_IN_CONFIGURATION);
 
+    /**
+     * The rule a bulk value applies to, or null when the value is not an allowed bulk value. Bulk takes one chosen TDS
+     * section (or NOT_SUBJECT) for TDS findings, or NOT_APPLICABLE for GSTIN findings; never a GSTIN, HSN/SAC or GST type.
+     */
+    public static String bulkRuleForValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        String v = value.trim();
+        if (GST_NOT_APPLICABLE.equals(v)) {
+            return "GSTIN_PRESENCE";
+        }
+        return TDS_SECTION_PATTERN.matcher(v).matches() ? "TDS_SECTION_MAPPING" : null;
+    }
+
     /** True when the corrected master value comes from the finding itself, so no typed value is needed. */
     public static boolean isDerivable(ValidationFinding f) {
         if (!isOverridableMismatch(f)) {
