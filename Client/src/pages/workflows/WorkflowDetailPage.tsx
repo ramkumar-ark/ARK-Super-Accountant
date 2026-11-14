@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { WorkflowFindingsTab } from '@/components/workflow/WorkflowFindingsTab'
 import { WorkflowStepper } from '@/components/workflow/WorkflowStepper'
+import { WorkflowStageActions } from '@/components/workflow/WorkflowStageActions'
 import { WorkflowUploadStep } from '@/components/workflow/WorkflowUploadStep'
 import { WorkflowEventsTimeline } from '@/components/workflow/WorkflowEventsTimeline'
 import type { ReviewRole } from '@/components/review/FindingReviewPanel'
@@ -103,6 +104,8 @@ export function WorkflowDetailPage() {
           </header>
 
           <WorkflowStepper stage={workflow.stage} dependencies={detail.dependencies} />
+
+          <WorkflowStageActions detail={detail} role={role ?? ''} />
 
           {boundButNotAnalyzed && (
             <section className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--color-warning-bg)] bg-[var(--color-warning-bg)] p-4">

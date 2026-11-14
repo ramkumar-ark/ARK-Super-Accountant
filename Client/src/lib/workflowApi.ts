@@ -159,6 +159,29 @@ export function analyzeWorkflow(id: string): Promise<Workflow> {
   return api.post(`/v1/workflows/${id}/analyze`).then((res) => res.data)
 }
 
+export function advanceWorkflow(id: string): Promise<Workflow> {
+  return api.post(`/v1/workflows/${id}/advance`).then((res) => res.data)
+}
+
+export function finalizeWorkflow(id: string): Promise<Workflow> {
+  return api.post(`/v1/workflows/${id}/finalize`).then((res) => res.data)
+}
+
+export function unfinalizeWorkflow(id: string, reason: string): Promise<Workflow> {
+  return api.post(`/v1/workflows/${id}/unfinalize`, { reason }).then((res) => res.data)
+}
+
+export function recordFiling(id: string, ref: string, date: string): Promise<Workflow> {
+  return api.post(`/v1/workflows/${id}/filing`, { ref, date }).then((res) => res.data)
+}
+
+export const FILING_REF_LABEL: Record<WorkflowType, string> = {
+  GSTR1: 'ARN',
+  GSTR3B: 'ARN',
+  TDS_PAYMENT: 'Challan CIN / BSR + serial',
+  TDS_26Q: 'Token / acknowledgement no.',
+}
+
 export function invalidateWorkflow(
   queryClient: { invalidateQueries: (filters: { queryKey: unknown[] }) => Promise<unknown> },
   id: string,
