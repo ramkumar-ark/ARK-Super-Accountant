@@ -7,29 +7,38 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import com.arktech.superaccountant.workflow.models.WorkflowStage;
+import com.arktech.superaccountant.workflow.models.WorkflowType;
+
 import java.util.UUID;
 
 public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
 
     Optional<Workflow> findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-            UUID organizationId, String type, String periodKey);
+            UUID organizationId, WorkflowType type, String periodKey);
 
     List<Workflow> findAllByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
     List<Workflow> findAllByOrganizationIdAndPeriodKey(UUID organizationId, String periodKey);
 
     Optional<Workflow> findFirstByOrganizationIdAndTypeAndStageOrderByFinalizedAtDesc(
-            UUID organizationId, String type, String stage);
+            UUID organizationId, WorkflowType type, WorkflowStage stage);
 
     @Query("""
             select count(w) > 0 from Workflow w
             where w.organizationId = :orgId and w.type = :type
               and w.periodKey = :periodKey and w.active = true
-              and w.stage in ('BASELINE', 'FINALIZED', 'FILED')
+              and w.stage in :stages
             """)
-    boolean existsFinalized(@Param("orgId") UUID orgId,
-                            @Param("type") String type,
-                            @Param("periodKey") String periodKey);
+    boolean existsFinalizedInStages(@Param("orgId") UUID orgId,
+                                    @Param("type") WorkflowType type,
+                                    @Param("periodKey") String periodKey,
+                                    @Param("stages") java.util.Collection<WorkflowStage> stages);
+
+    default boolean existsFinalized(UUID orgId, WorkflowType type, String periodKey) {
+        return existsFinalizedInStages(orgId, type, periodKey,
+                java.util.List.of(WorkflowStage.BASELINE, WorkflowStage.FINALIZED, WorkflowStage.FILED));
+    }
 
     List<Workflow> findAllByOrganizationIdAndActiveTrue(UUID organizationId);
 }

@@ -115,8 +115,8 @@ class WorkflowServiceTest {
     @Test
     void start_createsStartedWorkflow() {
         when(workflowRepository.findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-                orgId, "GSTR1", "2026-04")).thenReturn(Optional.empty());
-        when(workflowRepository.existsFinalized(orgId, "GSTR1", "2026-03")).thenReturn(false);
+                orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(Optional.empty());
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR1, "2026-03")).thenReturn(false);
 
         Workflow w = service.start(orgId, actor, WorkflowType.GSTR1, "2026-04");
 
@@ -138,7 +138,7 @@ class WorkflowServiceTest {
         existing.setStage(WorkflowStage.STARTED);
         existing.setActive(true);
         when(workflowRepository.findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-                orgId, "GSTR1", "2026-04")).thenReturn(Optional.of(existing));
+                orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(Optional.of(existing));
 
         assertThrows(WorkflowConflictException.class,
                 () -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-04"));
@@ -156,7 +156,7 @@ class WorkflowServiceTest {
         existing.setActive(true);
         existing.setRevision(0);
         when(workflowRepository.findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-                orgId, "GSTR1", "2026-04")).thenReturn(Optional.of(existing));
+                orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(Optional.of(existing));
 
         Workflow w = service.start(orgId, actor, WorkflowType.GSTR1, "2026-04");
 
@@ -197,7 +197,7 @@ class WorkflowServiceTest {
 
         // GSTR1 stays monthly without IFF opt-in
         when(workflowRepository.findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-                orgId, "GSTR1", "2026-04")).thenReturn(Optional.empty());
+                orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(Optional.empty());
         assertDoesNotThrow(() -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-04"));
     }
 
@@ -231,15 +231,15 @@ class WorkflowServiceTest {
         Workflow w = prepareWorkflow(WorkflowType.GSTR3B, "2026-04");
         when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
         when(workflowGate.blockingFindingCount(w.getId())).thenReturn(0);
-        when(workflowRepository.existsFinalized(orgId, "GSTR1", "2026-04")).thenReturn(false);
-        when(workflowRepository.existsFinalized(orgId, "GSTR3B", "2026-03")).thenReturn(false);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(false);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR3B, "2026-03")).thenReturn(false);
 
         assertThrows(WorkflowConflictException.class,
                 () -> service.finalize(orgId, actor, w.getId()));
 
         // with both deps satisfied, finalize succeeds
-        when(workflowRepository.existsFinalized(orgId, "GSTR1", "2026-04")).thenReturn(true);
-        when(workflowRepository.existsFinalized(orgId, "GSTR3B", "2026-03")).thenReturn(true);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(true);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR3B, "2026-03")).thenReturn(true);
 
         Workflow finalized = service.finalize(orgId, actor, w.getId());
         assertEquals(WorkflowStage.FINALIZED, finalized.getStage());
@@ -252,7 +252,7 @@ class WorkflowServiceTest {
         when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
         when(workflowGate.blockingFindingCount(w.getId())).thenReturn(0);
         for (String month : List.of("2026-04", "2026-05", "2026-06")) {
-            when(workflowRepository.existsFinalized(orgId, "TDS_PAYMENT", month))
+            when(workflowRepository.existsFinalized(orgId, WorkflowType.TDS_PAYMENT, month))
                     .thenReturn(month.equals("2026-06") ? false : true);
         }
 
@@ -274,7 +274,7 @@ class WorkflowServiceTest {
 
         // a period inside the open FY with no finalized workflow is not satisfied
         Workflow w2 = prepareWorkflow(WorkflowType.GSTR1, "2026-07");
-        when(workflowRepository.existsFinalized(orgId, "GSTR1", "2026-06")).thenReturn(false);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR1, "2026-06")).thenReturn(false);
         var deps2 = service.evaluateDependencies(w2);
         assertFalse(deps2.get(deps2.size() - 1).satisfied());
     }
@@ -357,7 +357,7 @@ class WorkflowServiceTest {
         when(workflowRepository.findById(gstr3b.getId())).thenReturn(Optional.of(gstr3b));
         when(workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId))
                 .thenReturn(List.of(gstr1, gstr3b));
-        when(workflowRepository.existsFinalized(orgId, "GSTR1", "2026-04")).thenReturn(true);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(true);
 
         assertThrows(WorkflowConflictException.class,
                 () -> service.unfinalize(orgId, actor, gstr1.getId(), "fix"));

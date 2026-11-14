@@ -32,6 +32,7 @@ public class WorkflowEvent {
     @Column(columnDefinition = "TEXT")
     private String reason;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "payload", columnDefinition = "jsonb")
     private String payload;
 }

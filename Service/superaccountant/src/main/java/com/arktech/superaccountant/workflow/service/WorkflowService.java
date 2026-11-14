@@ -122,9 +122,14 @@ public class WorkflowService {
             throw new WorkflowBadRequestException("TDS_26Q periods are quarterly");
         }
 
-        PeriodCalendar.PeriodRange range = keyIsQuarterly
-                ? PeriodCalendar.resolveQuarter(periodKey, fyStartMonth)
-                : PeriodCalendar.resolveMonthly(periodKey, fyStartMonth);
+        PeriodCalendar.PeriodRange range;
+        try {
+            range = keyIsQuarterly
+                    ? PeriodCalendar.resolveQuarter(periodKey, fyStartMonth)
+                    : PeriodCalendar.resolveMonthly(periodKey, fyStartMonth);
+        } catch (java.time.DateTimeException e) {
+            throw new WorkflowBadRequestException("Invalid period key: " + periodKey);
+        }
 
         if (type == WorkflowType.GSTR1 || type == WorkflowType.GSTR3B) {
             FilerProfile profile = profileInForce(organizationId, range.start());
@@ -153,7 +158,7 @@ public class WorkflowService {
 
         Workflow existing = workflowRepository
                 .findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-                        organizationId, type.name(), periodKey)
+                        organizationId, type, periodKey)
                 .orElse(null);
 
         int revision = 0;
@@ -397,7 +402,7 @@ public class WorkflowService {
     }
 
     private boolean isFinalizedFor(UUID orgId, WorkflowType type, String periodKey) {
-        return workflowRepository.existsFinalized(orgId, type.name(), periodKey);
+        return workflowRepository.existsFinalized(orgId, type, periodKey);
     }
 
     private boolean dependsOn(Workflow dependent, Workflow candidate) {
