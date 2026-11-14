@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -114,8 +115,10 @@ public class WorkflowFindingsController {
             findingReviewService.act(finding, request.getAction(), request.getValue(), request.getNote(),
                     ReviewActor.of(principal), Instant.now(), owning.applier(w));
         } catch (FindingReviewException e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
         } catch (FindingOverrideException e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
         }
         owning.save(finding);

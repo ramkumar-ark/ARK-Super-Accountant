@@ -208,6 +208,8 @@ class WorkflowFindingsControllerIT {
     @TestConfiguration
     static class FakeSourceConfig {
         static final Map<UUID, FakeFinding> FINDINGS = new ConcurrentHashMap<>();
+        static volatile boolean failApply;
+        static volatile Integer completionStatus;
 
         @Bean
         @Primary
@@ -254,6 +256,18 @@ class WorkflowFindingsControllerIT {
 
                         @Override
                         public void apply(ReviewableFinding finding, String approver) {
+                            if (failApply) {
+                                org.springframework.transaction.support.TransactionSynchronizationManager
+                                        .registerSynchronization(
+                                                new org.springframework.transaction.support.TransactionSynchronization() {
+                                                    @Override
+                                                    public void afterCompletion(int status) {
+                                                        completionStatus = status;
+                                                    }
+                                                });
+                                throw new com.arktech.superaccountant.masters.services.FindingOverrideException(
+                                        org.springframework.http.HttpStatus.CONFLICT, "stale");
+                            }
                         }
                     };
                 }
@@ -295,6 +309,8 @@ class WorkflowFindingsControllerIT {
     @BeforeEach
     void seed() {
         FakeSourceConfig.FINDINGS.clear();
+        FakeSourceConfig.failApply = false;
+        FakeSourceConfig.completionStatus = null;
         Organization org = new Organization();
         org.setName("Findings IT " + UUID.randomUUID());
         org.setBooksStartDate(LocalDate.of(2025, 4, 1));
@@ -408,5 +424,22 @@ class WorkflowFindingsControllerIT {
 
         assertThat(acknowledged.resolveStatus).isEqualTo(ResolveStatus.ACKNOWLEDGED); // all-or-nothing
         assertThat(open.resolveStatus).isEqualTo(ResolveStatus.OPEN);
+    }
+
+    @Test
+    void action_applierFailure_returns409AndRollsBackTransaction() throws Exception {
+        FakeFinding f = seedFinding(true);
+        FakeSourceConfig.failApply = true;
+
+        mockMvc.perform(post("/api/v1/workflows/" + workflow.getId() + "/findings/" + f.id + "/action")
+                        .with(user(accountant))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"ACKNOWLEDGE\",\"value\":\"V\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("stale"));
+
+        assertThat(FakeSourceConfig.completionStatus)
+                .isEqualTo(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+        assertThat(f.resolveStatus).isEqualTo(ResolveStatus.OPEN);
     }
 }
