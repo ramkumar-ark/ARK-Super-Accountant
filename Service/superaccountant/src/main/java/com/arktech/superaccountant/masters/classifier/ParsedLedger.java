@@ -18,6 +18,8 @@ public class ParsedLedger {
     private String hsnSacCode;
     private String gstin;
     private String gstRegistrationType;
+    private String pan;
+    private java.math.BigDecimal openingBalance;
     /** Parent-group chain, lower-case, nearest group first, joined by '|'. */
     private String groupChain;
 }

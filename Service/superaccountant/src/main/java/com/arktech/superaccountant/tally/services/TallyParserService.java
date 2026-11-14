@@ -117,6 +117,14 @@ public class TallyParserService {
             String gstApplicabilityType = resolveGstApplicabilityType(ledgerNode);
             String gstin = firstText(ledgerNode, "gstin", "partygstin");
             String gstRegistrationType = textOrNull(ledgerNode, "gstregistrationtype");
+            String pan = textOrNull(ledgerNode, "incometaxnumber");
+            java.math.BigDecimal openingBalance = null;
+            String obRaw = textOrNull(ledgerNode, "openingbalance");
+            if (obRaw != null && !obRaw.isBlank()) {
+                try {
+                    openingBalance = new java.math.BigDecimal(obRaw.trim().replace(",", ""));
+                } catch (NumberFormatException ignored) { /* leave null on unparseable */ }
+            }
 
             com.arktech.superaccountant.masters.models.LedgerCategory category =
                     categoryClassifier.classify(parentGroup, gstApplicable, tdsApplicable, groupHierarchy);
@@ -130,6 +138,8 @@ public class TallyParserService {
                     .gstApplicabilityType(gstApplicabilityType)
                     .gstin(gstin)
                     .gstRegistrationType(gstRegistrationType)
+                    .pan(pan)
+                    .openingBalance(openingBalance)
                     .groupChain(groupChain(parentGroup, groupHierarchy))
                     .category(category)
                     .build());

@@ -159,6 +159,8 @@ public class UploadController {
             snap.setGstin(pl.getGstin());
             snap.setTdsSection(pl.getTdsSection());
             snap.setHsnSacCode(pl.getHsnSacCode());
+            snap.setPan(pl.getPan());
+            snap.setOpeningBalance(pl.getOpeningBalance());
             snap.setGstRegistrationType(pl.getGstRegistrationType());
             snap.setGroupChain(pl.getGroupChain());
             return snap;
