@@ -398,6 +398,28 @@ class DayBookControllerIT {
     }
 
     @Test
+    void listUploads_invalidPaging_isClampedNotServerError() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "a.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-04-30")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/day-book/uploads").param("size", "0").param("page", "-1")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.size").value(1));
+
+        mockMvc.perform(get("/api/v1/day-book/uploads").param("size", "100000")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+    }
+
+    @Test
     void listUploads_otherOrgSeesNothing() throws Exception {
         String token1 = setupOrgScopedToken();
         byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
