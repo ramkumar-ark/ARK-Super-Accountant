@@ -278,8 +278,9 @@ The plan says the record shapes are a floor and that research may add fields. Ad
   `deductorEmail`, `deductorMobile`, `responsiblePersonPan`, `responsiblePersonAddress`,
   `responsiblePersonStateCode`, `responsiblePersonPin`, `responsiblePersonEmail`,
   `responsiblePersonMobile`, `deductorAddressChanged`, `responsiblePersonAddressChanged`
-  and `regularStatementFiledEarlier`. All are null/false when Tc has no source. A
-  convenience constructor with the plan's original 11 arguments fills them with defaults.
+  and `regularStatementFiledEarlier`. All but the last are null/false when Tc has no
+  source. A convenience constructor with the plan's original 11 arguments plus an explicit
+  `regularStatementFiledEarlier` fills the rest with defaults.
 - `BhData` gains `batchTotalDeposit` (sum of CD field 27).
 - `CdData` gains the deductee-annexure sums (fields 29–33), computed by the generator
   from the DD values, because those columns are mandatory statements of the DD totals.
@@ -294,8 +295,8 @@ Value derivations:
 - CD field 26 ("others") receives `TdsChallan.penalty`; CD fields 34/35 mirror 25/26.
 - CD field 39 (fee) is always `0.00`; CD field 40 is `200` for a challan and blank for a
   nil challan.
-- BH field 52 is `Y` when `originalReceiptNumber` is present or the quarter is after Q1,
-  otherwise `N`. Tc may refine this by supplying `regularStatementFiledEarlier`.
+- BH field 52 is `Y` when `regularStatementFiledEarlier` is true, otherwise `N`. It is an
+  explicit input; the generator does not derive it from quarter or receipt number.
 - DD field 12 (deductee reference number) is left blank: the input model has no reference
   number source. Flagged as a known gap for Tc.
 - Nil challans are emitted with zero DD records per the worker plan's pinned test. This
