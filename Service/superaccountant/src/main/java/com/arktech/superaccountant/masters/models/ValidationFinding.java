@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.masters.models;
 
+import com.arktech.superaccountant.review.ReviewableFinding;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,7 +12,7 @@ import java.util.UUID;
 @Table(name = "validation_findings")
 @Data
 @NoArgsConstructor
-public class ValidationFinding {
+public class ValidationFinding implements ReviewableFinding {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

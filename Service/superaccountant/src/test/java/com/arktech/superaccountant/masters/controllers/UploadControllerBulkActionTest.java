@@ -8,11 +8,13 @@ import com.arktech.superaccountant.masters.repository.ValidationFindingRepositor
 import com.arktech.superaccountant.masters.services.BulkFindingActionException;
 import com.arktech.superaccountant.masters.services.FindingOverrideException;
 import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
+import com.arktech.superaccountant.review.FindingReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,6 +48,8 @@ class UploadControllerBulkActionTest {
     ValidationFindingRepository findingRepository;
     @Mock
     FindingOverrideMasterService overrideService;
+    @Spy
+    FindingReviewService findingReviewService = new FindingReviewService();
 
     @InjectMocks
     UploadController controller;
@@ -55,7 +59,6 @@ class UploadControllerBulkActionTest {
 
     @BeforeEach
     void setUp() {
-        lenient().doCallRealMethod().when(overrideService).submit(any(), any(), any(), any(), any(), any(), any());
         UploadJob job = new UploadJob();
         job.setOrganizationId(orgId);
         lenient().when(uploadJobRepository.findById(jobId)).thenReturn(Optional.of(job));

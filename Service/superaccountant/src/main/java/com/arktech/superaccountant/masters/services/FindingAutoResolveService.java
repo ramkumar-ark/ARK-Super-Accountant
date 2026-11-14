@@ -2,6 +2,9 @@ package com.arktech.superaccountant.masters.services;
 
 import com.arktech.superaccountant.masters.models.*;
 import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
+import com.arktech.superaccountant.review.FindingReviewException;
+import com.arktech.superaccountant.review.FindingReviewService;
+import com.arktech.superaccountant.review.ReviewActor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +21,9 @@ public class FindingAutoResolveService {
 
     @Autowired
     private FindingOverrideMasterService findingOverrideMasterService;
+
+    @Autowired
+    private FindingReviewService findingReviewService;
 
     /**
      * Handles OPEN typed-rule findings that an inline ledger edit now satisfies. An accountant's edit
@@ -58,10 +64,11 @@ public class FindingAutoResolveService {
     private boolean submitForReview(ValidationFinding finding, UploadLedgerSnapshot snapshot, String username,
                                     UUID orgId, Instant now) {
         try {
-            findingOverrideMasterService.submit(finding, typedValue(finding.getRuleCode(), snapshot),
-                    "Ledger data corrected inline.", orgId, username, now);
+            findingReviewService.submit(finding, typedValue(finding.getRuleCode(), snapshot),
+                    "Ledger data corrected inline.", new ReviewActor(username, false, true), now,
+                    new MastersFindingApplier(findingOverrideMasterService, orgId, null, null));
             return true;
-        } catch (FindingOverrideException e) {
+        } catch (FindingOverrideException | FindingReviewException e) {
             return false;
         }
     }
