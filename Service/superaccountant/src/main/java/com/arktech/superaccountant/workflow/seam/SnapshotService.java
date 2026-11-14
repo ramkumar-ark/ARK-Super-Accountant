@@ -16,6 +16,7 @@ import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
 import com.arktech.superaccountant.workflow.snapshot.VoucherPayload;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,6 +41,7 @@ public class SnapshotService {
     @Autowired
     private FrozenVoucherRepository frozenVoucherRepository;
 
+    @Transactional
     public void freeze(UUID workflowId, UUID organizationId, String actor) {
         Workflow w = workflowRepository.findById(workflowId).orElse(null);
         if (w == null || w.getUploadJobId() == null || w.getPeriodEnd() == null) {

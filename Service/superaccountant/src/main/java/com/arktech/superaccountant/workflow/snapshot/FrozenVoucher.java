@@ -34,6 +34,7 @@ public class FrozenVoucher {
 
     private String contentHash;
 
+    @jakarta.persistence.Column(columnDefinition = "text")
     private String payload;
 
     private UUID frozenByWorkflowId;
