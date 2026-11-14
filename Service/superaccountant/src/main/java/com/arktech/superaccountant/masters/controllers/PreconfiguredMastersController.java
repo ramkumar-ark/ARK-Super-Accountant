@@ -57,7 +57,7 @@ public class PreconfiguredMastersController {
         return ResponseEntity.ok(results.map(this::toResponse));
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping
     public ResponseEntity<?> create(
             @Valid @RequestBody CreatePreconfiguredMasterRequest request,
@@ -92,7 +92,7 @@ public class PreconfiguredMastersController {
         return ResponseEntity.status(201).body(toResponse(master));
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable UUID id,
@@ -140,7 +140,7 @@ public class PreconfiguredMastersController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(
             @PathVariable UUID id,
@@ -162,7 +162,7 @@ public class PreconfiguredMastersController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/bulk")
     public ResponseEntity<?> bulkImport(
             @Valid @RequestBody BulkImportRequest request,
@@ -205,7 +205,7 @@ public class PreconfiguredMastersController {
                 .build());
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
     @PostMapping("/onboard")
     public ResponseEntity<?> onboard(
             @RequestBody OnboardRequest request,

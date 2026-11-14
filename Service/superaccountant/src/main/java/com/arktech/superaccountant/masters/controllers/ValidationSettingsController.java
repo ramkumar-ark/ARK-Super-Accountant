@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
-/** Per-organization validation settings. Any member reads; only ACCOUNTANT and OWNER change. */
+/** Per-organization validation settings. Any member reads; only ACCOUNTANT changes. */
 @CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/v1/validation-settings")
@@ -36,7 +36,7 @@ public class ValidationSettingsController {
         return ResponseEntity.ok(toResponse(orgId));
     }
 
-    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
     @PutMapping
     public ResponseEntity<?> update(@RequestBody UpdateRequest request,
                                     @AuthenticationPrincipal UserDetailsImpl principal) {

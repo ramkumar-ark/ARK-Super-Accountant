@@ -17,4 +17,6 @@ public interface UploadJobRepository extends JpaRepository<UploadJob, UUID> {
     java.util.Optional<UploadJob> findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(UUID organizationId, UploadJobStatus status);
     java.util.Optional<UploadJob> findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(UUID organizationId, Collection<UploadJobStatus> statuses);
     java.util.Optional<UploadJob> findTopByOrganizationIdAndStatusNotInOrderByCreatedAtDesc(UUID organizationId, Collection<UploadJobStatus> statuses);
+    java.util.Optional<UploadJob> findTopByOrganizationIdAndStatusInAndCreatedAtBeforeOrderByCreatedAtDesc(
+            UUID organizationId, Collection<UploadJobStatus> statuses, java.time.Instant before);
 }

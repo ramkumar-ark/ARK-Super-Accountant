@@ -117,11 +117,13 @@ class ValidationSettingsIT {
     }
 
     @Test
-    void owner_canChange_andLastWriterIsRecorded() throws Exception {
+    void owner_change_403_andValueUnchanged() throws Exception {
         putAs(accountantJwt, false).andExpect(status().isOk());
-        putAs(ownerJwt, true).andExpect(status().isOk())
-                .andExpect(jsonPath("$.requireHsnSacOnExpense").value(true))
-                .andExpect(jsonPath("$.updatedBy").value("vs_owner"));
+        putAs(ownerJwt, true).andExpect(status().isForbidden());
+
+        getAs(accountantJwt).andExpect(status().isOk())
+                .andExpect(jsonPath("$.requireHsnSacOnExpense").value(false))
+                .andExpect(jsonPath("$.updatedBy").value("vs_accountant"));
     }
 
     @Test

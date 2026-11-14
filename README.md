@@ -53,7 +53,7 @@ Open [http://localhost:5173](http://localhost:5173). See [docs/GETTING-STARTED.m
 
 | Role | API key | Default capabilities |
 |------|---------|----------------------|
-| Owner | `owner` | Create organizations, invite members, manage masters |
+| Owner | `owner` | Create organizations, invite members |
 | Accountant | `accountant` | Upload files, manage masters, invite members, approve/reject finding overrides |
 | Operator | `operator` | Upload files, manage masters, submit finding overrides for review |
 | CA Auditor | `auditor_ca` | Read-only access; can switch between client organizations |
