@@ -103,7 +103,7 @@ public class TdsEngine {
                     } else if (tdsSection == null && baseBySection.size() == 1) {
                         tdsBySection.merge(baseBySection.keySet().iterator().next(),
                                 e.getAmount().abs(), BigDecimal::add);
-                    } else {
+                    } else if (isInPeriod(v.getVoucherDate(), input)) {
                         findings.add(finding(input, v, TdsFindingType.WRONG_SECTION, FindingSeverity.HIGH,
                                 tdsSection,
                                 null, e.getAmount().abs().setScale(2, RoundingMode.HALF_UP),
@@ -127,6 +127,9 @@ public class TdsEngine {
                 partyName = creditorEntries.size() == 1 ? creditorEntries.get(0).getLedgerName() : null;
             }
             String partyKey = key(partyName);
+            if (partyKey == null) {
+                continue;
+            }
             for (Map.Entry<String, BigDecimal> baseEntry : baseBySection.entrySet()) {
                 String section = baseEntry.getKey();
                 BigDecimal base = baseEntry.getValue();
@@ -134,8 +137,7 @@ public class TdsEngine {
                 if (cfg == null) {
                     continue;
                 }
-                UploadLedgerSnapshot partySnapshot = partyKey == null
-                        ? null : input.snapshotsByName().get(partyKey);
+                UploadLedgerSnapshot partySnapshot = input.snapshotsByName().get(partyKey);
                 String pan = partySnapshot == null ? null : partySnapshot.getPan();
                 boolean panValid = pan != null && pan.trim().matches(PAN_PATTERN);
                 String trimmedPan = pan == null ? null : pan.trim();
