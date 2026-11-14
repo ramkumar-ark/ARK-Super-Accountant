@@ -48,7 +48,7 @@ class WorkflowControllerIT {
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"username":"%s","email":"%s","password":"pass1234"}
+                    {"username":"%s","email":"%s","password":"pass1234","role":"owner"}
                     """.formatted(username, email)))
                 .andExpect(status().isOk());
         return login(username);
