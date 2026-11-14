@@ -21,6 +21,11 @@ public class FindingReviewService {
      */
     public <F extends ReviewableFinding> F act(F finding, String action, String value, String note,
                                                ReviewActor actor, Instant now, FindingApplier<F> applier) {
+        // Runs before the role checks: the caller holds the row lock, so DISCARDED means a
+        // re-upload superseded this finding while a reviewer had it open.
+        if (finding.getResolveStatus() == ResolveStatus.DISCARDED) {
+            throw new FindingReviewException(409, "Finding was superseded by a newer upload");
+        }
         switch (action) {
             case "ACKNOWLEDGE" -> submit(finding, value, note, actor, now, applier);
             case "APPROVE" -> approve(finding, actor, now, applier);

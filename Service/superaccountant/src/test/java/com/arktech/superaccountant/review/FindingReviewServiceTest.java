@@ -210,6 +210,20 @@ class FindingReviewServiceTest {
     }
 
     @Test
+    void act_onDiscarded_conflict409() {
+        finding.setResolveStatus(ResolveStatus.DISCARDED);
+
+        assertThatThrownBy(() -> service.act(finding, "APPROVE", null, null, accountant(), NOW, applier))
+                .isInstanceOfSatisfying(FindingReviewException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(409);
+                    assertThat(e.getMessage()).isEqualTo("Finding was superseded by a newer upload");
+                });
+        assertThatThrownBy(() -> service.act(finding, "ACKNOWLEDGE", "v", null, operator(), NOW, applier))
+                .isInstanceOf(FindingReviewException.class)
+                .extracting(e -> ((FindingReviewException) e).getStatus()).isEqualTo(409);
+    }
+
+    @Test
     void noteOnlyApplier_blankNote_400() {
         NoteOnlyApplier<FakeFinding> noteOnly = new NoteOnlyApplier<>();
 
