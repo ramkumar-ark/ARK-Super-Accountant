@@ -158,7 +158,11 @@ class TdsEnginePass1Test {
         cancelled.setCancelled(true);
         var plain = voucher("V2", LocalDate.of(2026, 5, 11), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-100000"}});
-        var result = engine.analyze(inputQ1(List.of(cancelled, plain), stdSnaps("ABCPE1234F")));
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                new java.util.LinkedHashMap<>(stdSnaps("ABCPE1234F"));
+        snaps.put(TdsEngine.key("Subcontractor Charges"),
+                snap("Subcontractor Charges", LedgerCategory.EXPENSE, false, "194C", null));
+        var result = engine.analyze(inputQ1(List.of(cancelled, plain), snaps));
         assertTrue(result.findings().isEmpty());
         assertTrue(result.entries().isEmpty());
     }

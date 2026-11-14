@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,6 +38,7 @@ public class TdsEngine {
         List<TdsDeducteeEntry> entries = new ArrayList<>();
         List<VoucherFact> facts = new ArrayList<>();
         runPerVoucherPass(input, facts, findings, entries);
+        runThresholdPass(facts, input, findings);
         return new TdsAnalysisResult(findings, entries);
     }
 
@@ -193,6 +195,97 @@ public class TdsEngine {
                 }
             }
         }
+    }
+
+    private void runThresholdPass(List<VoucherFact> facts, TdsAnalysisInput input, List<TdsFinding> findings) {
+        Map<String, List<VoucherFact>> groups = new LinkedHashMap<>();
+        for (VoucherFact fact : facts) {
+            groups.computeIfAbsent(fact.partyKey() + "|" + fact.section(), k -> new ArrayList<>()).add(fact);
+        }
+        for (List<VoucherFact> group : groups.values()) {
+            group.sort(Comparator
+                    .comparing((VoucherFact f) -> f.voucher().getVoucherDate(),
+                            Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(f -> f.voucher().getVoucherNumber() == null
+                            ? "" : f.voucher().getVoucherNumber()));
+            TdsSectionConfig cfg = input.configsBySection().get(group.get(0).section());
+            if (cfg == null) {
+                continue;
+            }
+            BigDecimal aggregate = BigDecimal.ZERO;
+            VoucherFact crossing = null;
+            List<VoucherFact> priorUndeducted = new ArrayList<>();
+            List<VoucherFact> postCrossing = new ArrayList<>();
+            for (VoucherFact f : group) {
+                aggregate = aggregate.add(f.base());
+                if (crossing == null) {
+                    if (aggregate.compareTo(cfg.getThresholdAnnual()) > 0) {
+                        crossing = f;
+                    } else if (f.deducted().signum() == 0) {
+                        priorUndeducted.add(f);
+                    }
+                } else {
+                    postCrossing.add(f);
+                }
+            }
+            if (crossing != null && isInPeriod(crossing.voucher().getVoucherDate(), input)
+                    && (crossing.deducted().signum() == 0 || !priorUndeducted.isEmpty())) {
+                BigDecimal bases = BigDecimal.ZERO;
+                List<String> relatedIds = new ArrayList<>();
+                for (VoucherFact f : priorUndeducted) {
+                    bases = bases.add(f.base());
+                    relatedIds.add("\"" + f.voucher().getId() + "\"");
+                }
+                if (crossing.deducted().signum() == 0) {
+                    bases = bases.add(crossing.base());
+                }
+                BigDecimal expected = bases.multiply(crossing.rate())
+                        .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+                findings.add(finding(input, crossing.voucher(), TdsFindingType.THRESHOLD_CROSSED,
+                        FindingSeverity.HIGH, crossing.section(), expected,
+                        new BigDecimal("0.00"),
+                        "Aggregate payments of " + bases + " to '" + crossing.partyName() + "' under "
+                                + crossing.section() + " crossed the annual threshold of "
+                                + cfg.getThresholdAnnual() + "; TDS was not deducted.",
+                        "Deduct " + expected + " and record the TDS entry in Tally."));
+                findings.get(findings.size() - 1)
+                        .setRelatedVoucherIds(relatedIds.isEmpty() ? "[]" : "[" + String.join(",", relatedIds) + "]");
+            }
+            List<VoucherFact> notDeductedCandidates = new ArrayList<>();
+            for (VoucherFact f : priorUndeducted) {
+                if (cfg.getThresholdPerTransaction() != null
+                        && f.base().compareTo(cfg.getThresholdPerTransaction()) > 0) {
+                    notDeductedCandidates.add(f);
+                }
+            }
+            notDeductedCandidates.addAll(postCrossing);
+            for (VoucherFact f : notDeductedCandidates) {
+                if (f.deducted().signum() == 0 && isInPeriod(f.voucher().getVoucherDate(), input)) {
+                    BigDecimal expected = f.base().multiply(f.rate())
+                            .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+                    findings.add(finding(input, f.voucher(), TdsFindingType.NOT_DEDUCTED,
+                            FindingSeverity.HIGH, f.section(), expected, new BigDecimal("0.00"),
+                            "No TDS deducted on liable payment of " + f.base() + " under " + f.section() + ".",
+                            "Deduct " + expected + " and record the TDS entry in Tally."));
+                }
+            }
+        }
+    }
+
+    static boolean liable(String partyKey, String section, BigDecimal amount, LocalDate asOf,
+                          List<VoucherFact> facts, TdsSectionConfig cfg) {
+        if (cfg.getThresholdPerTransaction() != null
+                && amount.compareTo(cfg.getThresholdPerTransaction()) > 0) {
+            return true;
+        }
+        BigDecimal aggregate = BigDecimal.ZERO;
+        for (VoucherFact f : facts) {
+            if (partyKey != null && partyKey.equals(f.partyKey()) && section.equals(f.section())
+                    && f.voucher().getVoucherDate() != null && !f.voucher().getVoucherDate().isAfter(asOf)) {
+                aggregate = aggregate.add(f.base());
+            }
+        }
+        return aggregate.add(amount).compareTo(cfg.getThresholdAnnual()) > 0;
     }
 
     private BigDecimal rateFor(String partyKey, TdsSectionConfig cfg, TdsAnalysisInput in) {
