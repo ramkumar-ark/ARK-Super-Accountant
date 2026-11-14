@@ -84,6 +84,7 @@ public class TamperComparisonService {
         Optional<LocalDate> throughDate = frozenThrough.of(orgId);
         List<Workflow> activeWorkflows = workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId)
                 .stream().filter(Workflow::isActive).toList();
+        Map<String, TamperChange> changesByKey = new HashMap<>();
 
         for (Map.Entry<String, FrozenVoucher> e : frozenByKey.entrySet()) {
             FrozenVoucher frozen = e.getValue();
@@ -113,7 +114,7 @@ public class TamperComparisonService {
                 change.setPartyLedgerName(oldPayload == null ? null : oldPayload.party());
                 change.setTouchedScopes(touched(oldPayload, null, ledgersByName));
             }
-            saveChangeAndFinding(change, activeWorkflows, orgId);
+            saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
         }
 
         for (Map.Entry<String, ParsedVoucher> e : uploadedByKey.entrySet()) {
@@ -129,7 +130,34 @@ public class TamperComparisonService {
                     null, uploaded.getContentHash(), null, date,
                     uploaded.getVoucherTypeName(), uploaded.getVoucherNumber(), uploaded.getPartyLedgerName());
             change.setTouchedScopes(touched(null, VoucherPayload.of(uploaded), ledgersByName));
-            saveChangeAndFinding(change, activeWorkflows, orgId);
+            saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
+        }
+
+        reconcile(orgId, job, changesByKey);
+    }
+
+    /**
+     * Reconciles open findings against this upload: a finding whose change no
+     * longer appears (the voucher is back to its frozen form) and whose change
+     * date falls inside this upload's coverage is auto-resolved; one whose
+     * evidence moved is reset to OPEN with the new evidence.
+     */
+    private void reconcile(UUID orgId, DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
+        for (TamperFinding f : tamperFindingRepository.findByOrganizationIdAndResolveStatusNotIn(orgId,
+                EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED))) {
+            if (changesByKey.containsKey(f.getFindingKey())) {
+                continue;
+            }
+            LocalDate cd = f.getChangeDate();
+            if (cd == null || job.getCoverageFrom() == null || job.getCoverageTo() == null
+                    || cd.isBefore(job.getCoverageFrom()) || cd.isAfter(job.getCoverageTo())) {
+                continue;
+            }
+            f.setResolveStatus(ResolveStatus.RESOLVED);
+            f.setResolvedBy("system");
+            f.setResolvedAt(java.time.Instant.now());
+            f.setResolveNote("Restored: no longer found in upload " + job.getId());
+            tamperFindingRepository.save(f);
         }
     }
 
@@ -174,7 +202,8 @@ public class TamperComparisonService {
         return VoucherScopeClassifier.touchedScopesText(scopes);
     }
 
-    private void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId) {
+    private void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId,
+                                      DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
         List<Workflow> blockingWorkflows = blockingWorkflows(change, activeWorkflows);
         change.setBlocking(!blockingWorkflows.isEmpty());
         change.setBlockingWorkflowIds(blockingWorkflows.stream()
@@ -185,14 +214,21 @@ public class TamperComparisonService {
             return;
         }
         String findingKey = change.getChangeKind().name() + "|" + change.getVoucherKey();
+        changesByKey.put(findingKey, change);
         String evidenceHash = EvidenceHash.of("TAMPER_" + change.getChangeKind(), change.getVoucherKey(),
                 change.getOldHash(), change.getNewHash(),
                 change.getNewDate() == null ? null : change.getNewDate().toString());
         List<TamperFinding> existing = tamperFindingRepository
                 .findByOrganizationIdAndResolveStatusNotIn(orgId,
                         EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED));
-        boolean alreadyTracked = existing.stream().anyMatch(f -> findingKey.equals(f.getFindingKey()));
-        if (alreadyTracked) {
+        TamperFinding tracked = existing.stream()
+                .filter(f -> findingKey.equals(f.getFindingKey()))
+                .findFirst()
+                .orElse(null);
+        if (tracked != null) {
+            if (!evidenceHash.equals(tracked.getEvidenceHash())) {
+                updateEvidence(tracked, change, evidenceHash);
+            }
             return;
         }
 
@@ -218,6 +254,29 @@ public class TamperComparisonService {
         finding.setCreatedAt(java.time.Instant.now());
         finding.setResolveStatus(ResolveStatus.OPEN);
         tamperFindingRepository.save(finding);
+    }
+
+    private void updateEvidence(TamperFinding tracked, TamperChange change, String evidenceHash) {
+        tracked.setTamperChangeId(change.getId());
+        tracked.setOldHash(change.getOldHash());
+        tracked.setNewHash(change.getNewHash());
+        tracked.setOldDate(change.getOldDate());
+        tracked.setNewDate(change.getNewDate());
+        tracked.setChangeDate(changeDate(change.getOldDate(), change.getNewDate()));
+        tracked.setVoucherTypeName(change.getVoucherTypeName());
+        tracked.setVoucherNumber(change.getVoucherNumber());
+        tracked.setPartyLedgerName(change.getPartyLedgerName());
+        tracked.setDetectedInUploadJobId(change.getUploadJobId());
+        tracked.setEvidenceHash(evidenceHash);
+        tracked.setResolveStatus(ResolveStatus.OPEN);
+        tracked.setProposedValue(null);
+        tracked.setSubmittedBy(null);
+        tracked.setSubmittedAt(null);
+        tracked.setReviewedBy(null);
+        tracked.setReviewedAt(null);
+        tracked.setReviewNote(null);
+        tracked.setCarriedFromFindingId(null);
+        tamperFindingRepository.save(tracked);
     }
 
     private List<Workflow> blockingWorkflows(TamperChange change, List<Workflow> activeWorkflows) {

@@ -36,6 +36,9 @@ public class TamperFindingSource implements WorkflowFindingSource {
     @Autowired
     private TamperFindingRepository tamperFindingRepository;
 
+    @Autowired
+    private TamperAcceptApplier tamperAcceptApplier;
+
     @Override
     public String sourceCode() {
         return "TAMPER";
@@ -74,19 +77,7 @@ public class TamperFindingSource implements WorkflowFindingSource {
 
     @Override
     public FindingApplier<ReviewableFinding> applier(Workflow w) {
-        return new FindingApplier<ReviewableFinding>() {
-            @Override
-            public void validate(ReviewableFinding finding, String proposedValue, String note) {
-                if (note == null || note.isBlank()) {
-                    throw new FindingReviewException(400, "A note is required.");
-                }
-            }
-
-            @Override
-            public void apply(ReviewableFinding finding, String approver) {
-                throw new FindingReviewException(409, "Accepting a tamper change is not available yet.");
-            }
-        };
+        return tamperAcceptApplier;
     }
 
     @Override

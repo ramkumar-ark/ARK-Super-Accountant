@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public interface FrozenVoucherRepository extends JpaRepository<FrozenVoucher, UUID> {
 
+    List<FrozenVoucher> findByOrganizationId(UUID organizationId);
+
     List<FrozenVoucher> findByOrganizationIdAndReleasedAtIsNull(UUID organizationId);
 
     Optional<FrozenVoucher> findByOrganizationIdAndVoucherKeyAndReleasedAtIsNull(UUID organizationId, String voucherKey);
