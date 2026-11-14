@@ -266,6 +266,42 @@ class DayBookParserServiceTest {
         assertThat(saved.get(0).getEntries().get(0).getGstRate()).isEqualByComparingTo(new BigDecimal("9.00"));
     }
 
+    @Test
+    void persistVouchers_capturesPartyGstRegistrationType() {
+        LedgerEntry entryA = new LedgerEntry();
+        entryA.setLedgername("Test Purchases");
+        entryA.setAmount("-100");
+
+        LedgerEntry entryB = new LedgerEntry();
+        entryB.setLedgername("Test Purchases");
+        entryB.setAmount("-100");
+
+        Voucher voucherA = new Voucher();
+        voucherA.setVouchertypename("Purchase");
+        voucherA.setDate("20250401");
+        voucherA.setGstregistrationtype("Regular");
+        voucherA.setAllLedgerEntries(List.of(entryA));
+        voucherA.setLedgerEntries(List.of());
+
+        Voucher voucherB = new Voucher();
+        voucherB.setVouchertypename("Purchase");
+        voucherB.setDate("20250401");
+        voucherB.setAllLedgerEntries(List.of(entryB));
+        voucherB.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucherA, voucherB));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> result = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getPartyGstRegistrationType()).isEqualTo("Regular");
+        assertThat(result.get(1).getPartyGstRegistrationType()).isNull();
+    }
+
     private static GstRateDetail rate(String head, String rate) {
         GstRateDetail d = new GstRateDetail();
         d.setGstratedutyhead(head);

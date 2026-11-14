@@ -52,15 +52,6 @@ public class GstinPresenceRule implements ValidationRule {
         if (master.getGstApplicabilityType() == GstApplicabilityType.NOT_APPLICABLE) {
             return false; // the user marked GST not applicable through the override flow
         }
-        return LedgerGroups.inAny(master, LedgerGroups.GSTIN_PARTY_AND_LOAN_GROUPS) && isRegistered(master.getGstRegistrationType());
-    }
-
-    /** Anything but blank, Unregistered/Consumer or Unknown counts as registered. */
-    private static boolean isRegistered(String registrationType) {
-        if (registrationType == null || registrationType.isBlank()) {
-            return false;
-        }
-        String r = registrationType.trim().toLowerCase();
-        return !(r.contains("unregistered") || r.contains("consumer") || r.equals("unknown"));
+        return LedgerGroups.inAny(master, LedgerGroups.GSTIN_PARTY_AND_LOAN_GROUPS) && GstRegistrationTypes.isRegistered(master.getGstRegistrationType());
     }
 }
