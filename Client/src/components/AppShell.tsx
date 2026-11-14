@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/store/authStore'
 import { Link } from '@tanstack/react-router'
-import { LayoutDashboard, Database, BookOpen, Users } from 'lucide-react'
+import { LayoutDashboard, Database, BookOpen, Users, ListChecks } from 'lucide-react'
 import { Header } from './Header'
 
 interface AppShellProps {
@@ -35,6 +35,19 @@ export function AppShell({ children }: AppShellProps) {
             <LayoutDashboard size={20} />
             Dashboard
           </Link>
+          {user?.organizationId && (
+            <Link
+              to="/workflows"
+              className="h-11 px-4 flex items-center gap-3 text-sm text-[var(--color-sidebar-item)] hover:bg-[var(--color-sidebar-active-bg)]/50 transition-colors"
+              activeProps={{
+                className:
+                  'h-11 px-4 flex items-center gap-3 text-sm bg-[var(--color-sidebar-active-bg)] text-[var(--color-sidebar-active-text)] border-l-[3px] border-[var(--color-primary)] transition-colors',
+              }}
+            >
+              <ListChecks size={20} />
+              Workflows
+            </Link>
+          )}
           {canAccessAccountingFeatures && (
             <Link
               to="/day-book"
