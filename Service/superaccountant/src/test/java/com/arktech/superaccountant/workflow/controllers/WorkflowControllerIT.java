@@ -84,11 +84,8 @@ class WorkflowControllerIT {
     private String memberJwt(String ownerJwt, UUID orgId, String role,
                              String username, String email) throws Exception {
         MvcResult inviteResult = mockMvc.perform(post("/api/organizations/{id}/invites", orgId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .header("Authorization", "Bearer " + ownerJwt)
-                .content("""
-                    {"role":"%s"}
-                    """.formatted(role)))
+                .param("role", role)
+                .header("Authorization", "Bearer " + ownerJwt))
                 .andExpect(status().isOk())
                 .andReturn();
         String token = objectMapper
