@@ -81,6 +81,7 @@ class WorkflowUploadControllerIT {
                                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("DATA_UPLOADED"))
+                .andExpect(jsonPath("$.warnings").isArray())
                 .andReturn();
 
         Map<?, ?> body = objectMapper.readValue(result.getResponse().getContentAsString(), Map.class);
@@ -88,6 +89,24 @@ class WorkflowUploadControllerIT {
         assertThat(dayBookUploadJobRepository.findById(uploadJobId))
                 .hasValueSatisfying(job ->
                         assertThat(job.getCreatedForWorkflowId()).isEqualTo(workflowId));
+    }
+
+    @Test
+    void upload_lateFirstVoucher_returnsWarning() throws Exception {
+        String token = setupAccountantOrg();
+        UUID workflowId = startWorkflow(token);
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(
+                        multipart("/api/v1/workflows/" + workflowId + "/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-03-01")
+                                .param("coverageTo", "2025-04-30")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings[0]").value(
+                        org.hamcrest.Matchers.startsWith("First voucher is dated")));
     }
 
     @Test

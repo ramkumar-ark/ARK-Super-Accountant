@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.workflow.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.workflow.analysis.AnalyzerCatalog;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowEvent;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
@@ -10,6 +11,7 @@ import com.arktech.superaccountant.workflow.payload.request.StartWorkflowRequest
 import com.arktech.superaccountant.workflow.payload.request.UnfinalizeRequest;
 import com.arktech.superaccountant.workflow.payload.response.WorkflowDetailResponse;
 import com.arktech.superaccountant.workflow.payload.response.WorkflowResponse;
+import com.arktech.superaccountant.workflow.service.CoverageService;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import com.arktech.superaccountant.workflow.service.WorkflowService;
@@ -32,6 +34,12 @@ public class WorkflowController {
 
     @Autowired
     private WorkflowService workflowService;
+
+    @Autowired
+    private AnalyzerCatalog analyzerCatalog;
+
+    @Autowired
+    private CoverageService coverageService;
 
     @GetMapping
     public ResponseEntity<?> list(@AuthenticationPrincipal UserDetailsImpl principal,
@@ -82,7 +90,10 @@ public class WorkflowController {
                     workflowService.evaluateDependencies(w),
                     workflowService.blockingFindingCount(w.getId()),
                     w.getBaselineConfirmedAt() != null,
-                    w.getId()));
+                    w.getId(),
+                    analyzerCatalog.hasAnalyzer(w.getType()),
+                    coverageService.coverageStart(orgId),
+                    w.getPeriodEnd()));
         } catch (WorkflowBadRequestException e) {
             return ResponseEntity.notFound().build();
         }

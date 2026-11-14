@@ -54,7 +54,7 @@ public class UploadBindingService {
      * intake, so a rejected request writes no job row.
      */
     @Transactional(noRollbackFor = DayBookIntakeException.class)
-    public Workflow uploadAndBind(UUID orgId, UUID workflowId, MultipartFile file,
+    public UploadBindResult uploadAndBind(UUID orgId, UUID workflowId, MultipartFile file,
                                   LocalDate coverageFrom, LocalDate coverageTo, String actor) {
         Workflow w = loadWorkflow(orgId, workflowId);
         assertChangeable(w);
@@ -66,7 +66,7 @@ public class UploadBindingService {
         }
         DayBookIntakeResult result = dayBookIntakeService.intake(
                 file, coverageFrom, coverageTo, orgId, actor, workflowId);
-        return bind(w, result.job().getId(), actor);
+        return new UploadBindResult(bind(w, result.job().getId(), actor), result.warnings());
     }
 
     /**
