@@ -84,6 +84,15 @@ class WorkflowControllerIT {
                         .get("id").asText());
     }
 
+    private String selectOrg(String jwt, UUID orgId) throws Exception {
+        MvcResult selected = mockMvc.perform(post("/api/organizations/{id}/select", orgId)
+                .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(selected.getResponse().getContentAsString())
+                .get("token").asText();
+    }
+
     /** Invites a fresh signup into the org, selects it and re-logs in. */
     private String memberJwt(String ownerJwt, UUID orgId, String role,
                              String username, String email) throws Exception {
@@ -100,17 +109,14 @@ class WorkflowControllerIT {
         mockMvc.perform(post("/api/organizations/invites/{token}/accept", token)
                 .header("Authorization", "Bearer " + login(username)))
                 .andExpect(status().isOk());
-        String joined = login(username);
-        mockMvc.perform(post("/api/organizations/{id}/select", orgId)
-                .header("Authorization", "Bearer " + joined))
-                .andExpect(status().isOk());
-        return login(username);
+        return selectOrg(login(username), orgId);
     }
 
     @Test
     void start_asOperator_returns200AndListVisibleToOwner() throws Exception {
         String ownerJwt = signupAndLogin("wfowner", "wfowner@test.com");
         UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
         String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
                 "wfoperator", "wfoperator@test.com");
 
@@ -148,6 +154,7 @@ class WorkflowControllerIT {
     void start_duplicateActivePeriod_returns409() throws Exception {
         String ownerJwt = signupAndLogin("wfowner3", "wfowner3@test.com");
         UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
         String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
                 "wfoperator3", "wfoperator3@test.com");
 
@@ -172,6 +179,7 @@ class WorkflowControllerIT {
     void accountantOnlyTransitions_operatorGets403_accountantGets409ForBadStage() throws Exception {
         String ownerJwt = signupAndLogin("wfowner4", "wfowner4@test.com");
         UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
         String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
                 "wfoperator4", "wfoperator4@test.com");
         String accountantJwt = memberJwt(ownerJwt, orgId, "accountant",
@@ -210,6 +218,7 @@ class WorkflowControllerIT {
     void get_detail_showsStageChecklist() throws Exception {
         String ownerJwt = signupAndLogin("wfowner5", "wfowner5@test.com");
         UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
         String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
                 "wfoperator5", "wfoperator5@test.com");
 
