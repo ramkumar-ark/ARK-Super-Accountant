@@ -57,6 +57,10 @@ public class ParsedVoucher {
     @Column(name = "party_gstin")
     private String partyGstin;
 
+    // Raw Tally GSTREGISTRATIONTYPE of the party, stored unnormalised
+    @Column(name = "party_gst_registration_type")
+    private String partyGstRegistrationType;
+
     @Column(name = "narration", columnDefinition = "TEXT")
     private String narration;
 

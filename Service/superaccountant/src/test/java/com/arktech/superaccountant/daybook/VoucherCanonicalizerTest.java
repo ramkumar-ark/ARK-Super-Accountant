@@ -63,6 +63,16 @@ class VoucherCanonicalizerTest {
     }
 
     @Test
+    void registrationTypeChange_doesNotChangeHash() {
+        Voucher a = voucher(entry("Test Purchases", "-100", null, "18"));
+        Voucher b = voucher(entry("Test Purchases", "-100", null, "18"));
+        a.setGstregistrationtype("Regular");
+        b.setGstregistrationtype("Unregistered");
+        assertThat(VoucherCanonicalizer.contentHash(a))
+                .isEqualTo(VoucherCanonicalizer.contentHash(b));
+    }
+
+    @Test
     void narrationChange_doesNotChangeHash() {
         Voucher a = voucher(entry("Test Purchases", "-100.00", null, "9"));
         Voucher b = voucher(entry("Test Purchases", "-100.00", null, "9"));

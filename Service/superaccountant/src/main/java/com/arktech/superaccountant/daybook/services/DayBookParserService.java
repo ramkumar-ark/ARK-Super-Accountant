@@ -61,6 +61,7 @@ public class DayBookParserService {
             pv.setVoucherDate(parseTallyDate(v.getDate()));
             pv.setPartyLedgerName(v.getPartyledgername());
             pv.setPartyGstin(v.getPartygstin());
+            pv.setPartyGstRegistrationType(v.getGstregistrationtype());
             pv.setNarration(v.getNarration());
             pv.setInvoice(v.isIsinvoice());
             pv.setReverseChargeApplicable(v.isIsreversechargeapplicable());
