@@ -10,11 +10,16 @@ interface WorkflowFinding extends ReviewFinding {
   severity: string
   blocking: boolean
   message: string
+  expectedValue: string | null
+  actualValue: string | null
   voucherNumber: string | null
   voucherDate: string | null
   ledgerName: string | null
   carriedFromFindingId: string | null
 }
+
+// Mirrors MastersPage: rules whose corrected value is typed in by the user in Masters.
+const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
 
 /**
  * The findings tab of a workflow: every module's findings for the workflow, blocking first,
@@ -95,6 +100,22 @@ export function WorkflowFindingsTab({
                   <p className="text-sm font-semibold text-[var(--color-text-primary)]">{f.ledgerName}</p>
                 )}
                 <p className="text-sm text-[var(--color-text-secondary)]">{f.message}</p>
+                {f.source === 'MASTERS' && (
+                  <p className="mt-1 text-sm">
+                    <a
+                      href="/masters"
+                      aria-label={`Open ${f.ledgerName ?? f.id} in Masters`}
+                      className="text-[var(--color-primary)] underline"
+                    >
+                      Open in Masters
+                    </a>
+                    {f.resolveStatus === 'OPEN' && TYPED_INPUT_RULES.includes(f.findingType) && (
+                      <span className="ml-2 text-[var(--color-text-secondary)]">
+                        Enter the corrected value in Masters.
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
               <Panel finding={f} role={role} onAction={act} />
             </div>
@@ -118,12 +139,30 @@ function Panel({
     body: { value?: string; note?: string },
   ) => Promise<void>
 }): ReactNode {
+  const isMasters = finding.source === 'MASTERS'
+  const isTyped = TYPED_INPUT_RULES.includes(finding.findingType)
+  const valueInput =
+    isMasters && !isTyped && finding.resolveStatus === 'OPEN' ? (
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        {finding.findingType === 'MISSING_IN_CONFIGURATION'
+          ? `${finding.ledgerName ?? finding.id} will be added to the approved masters.`
+          : `The master will be updated to: ${finding.actualValue ?? '—'}`}
+      </p>
+    ) : undefined
   return (
     <FindingReviewPanel
       finding={finding}
       role={role}
       label={finding.id}
-      onAction={(action, body) => onAction(finding, action, body)}
+      valueInput={valueInput}
+      onAction={(action, body) =>
+        onAction(finding, action, {
+          ...body,
+          ...(isMasters && !isTyped && action === 'ACKNOWLEDGE' && finding.actualValue != null
+            ? { value: finding.actualValue }
+            : {}),
+        })
+      }
     />
   )
 }
