@@ -270,7 +270,9 @@ public class WorkflowService {
 
         List<Workflow> laterFinalized = workflowRepository
                 .findAllByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
-                .filter(o -> o.getType() == w.getType() && !o.getId().equals(w.getId())
+                .filter(o -> o.isActive() && o.getType() == w.getType()
+                        && !o.getId().equals(w.getId())
+                        && o.getPeriodStart().isAfter(w.getPeriodStart())
                         && (o.getStage() == WorkflowStage.FINALIZED || o.getStage() == WorkflowStage.FILED))
                 .toList();
         if (!laterFinalized.isEmpty()) {
@@ -280,8 +282,8 @@ public class WorkflowService {
 
         List<Workflow> finalizedDependents = workflowRepository
                 .findAllByOrganizationIdOrderByCreatedAtDesc(organizationId).stream()
-                .filter(o -> o.getStage() == WorkflowStage.FINALIZED
-                        || o.getStage() == WorkflowStage.FILED)
+                .filter(o -> o.isActive() && (o.getStage() == WorkflowStage.FINALIZED
+                        || o.getStage() == WorkflowStage.FILED))
                 .filter(o -> dependsOn(workflowRepository.findById(o.getId()).orElse(o), w))
                 .toList();
         if (!finalizedDependents.isEmpty()) {
@@ -334,13 +336,13 @@ public class WorkflowService {
 
         if (w.getType() == WorkflowType.GSTR3B) {
             deps.add(new DependencyStatus(WorkflowType.GSTR1.name(), w.getPeriodKey(),
-                    isFinalizedFor(orgId, WorkflowType.GSTR1, w.getPeriodKey(), closedFys)));
+                    isFinalizedFor(orgId, WorkflowType.GSTR1, w.getPeriodKey())));
         }
 
         if (w.getType() == WorkflowType.TDS_26Q) {
             for (String month : PeriodCalendar.quarterMonths(w.getPeriodKey(), fyStartMonth)) {
                 deps.add(new DependencyStatus(WorkflowType.TDS_PAYMENT.name(), month,
-                        isFinalizedFor(orgId, WorkflowType.TDS_PAYMENT, month, closedFys)));
+                        isFinalizedFor(orgId, WorkflowType.TDS_PAYMENT, month)));
             }
         }
 
@@ -349,7 +351,7 @@ public class WorkflowService {
             boolean prevFyClosed = financialYearOfKey(w, previousKey, fyStartMonth) != null
                     && closedFys.contains(financialYearOfKey(w, previousKey, fyStartMonth));
             deps.add(new DependencyStatus(w.getType().name(), previousKey,
-                    prevFyClosed || isFinalizedFor(orgId, w.getType(), previousKey, closedFys)));
+                    prevFyClosed || isFinalizedFor(orgId, w.getType(), previousKey)));
         }
 
         return deps;
@@ -366,11 +368,12 @@ public class WorkflowService {
 
     private String previousPeriodKey(Workflow w, int fyStartMonth) {
         boolean quarterly = isQuarterlyPeriodKey(w.getPeriodKey());
-        if (!quarterly) {
-            return PeriodCalendar.previousMonthlyKey(w.getPeriodKey());
-        }
-        String prev = PeriodCalendar.previousQuarterKey(w.getPeriodKey());
-        LocalDate prevStart = PeriodCalendar.resolveQuarter(prev, fyStartMonth).start();
+        String prev = quarterly
+                ? PeriodCalendar.previousQuarterKey(w.getPeriodKey())
+                : PeriodCalendar.previousMonthlyKey(w.getPeriodKey());
+        LocalDate prevStart = quarterly
+                ? PeriodCalendar.resolveQuarter(prev, fyStartMonth).start()
+                : PeriodCalendar.resolveMonthly(prev, fyStartMonth).start();
         LocalDate coverageStart = coverageService.coverageStart(w.getOrganizationId());
         if (prevStart.isBefore(coverageStart)) {
             return null;
@@ -393,8 +396,7 @@ public class WorkflowService {
         return key != null && key.contains("-Q");
     }
 
-    private boolean isFinalizedFor(UUID orgId, WorkflowType type, String periodKey,
-                                   Set<Integer> closedFys) {
+    private boolean isFinalizedFor(UUID orgId, WorkflowType type, String periodKey) {
         return workflowRepository.existsFinalized(orgId, type.name(), periodKey);
     }
 

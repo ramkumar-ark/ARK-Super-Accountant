@@ -268,11 +268,9 @@ class WorkflowServiceTest {
                 .findAllByOrganizationIdOrderByFinancialYearAsc(orgId))
                 .thenReturn(List.of(close));
 
-        // 2026-03 belongs to FY2025, which is closed → satisfied even without a workflow
+        // 2026-03 is before coverage start (FY2025 closed) → no previous-period dependency
         Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-04");
-        when(workflowRepository.existsFinalized(orgId, "GSTR1", "2026-03")).thenReturn(false);
-        var deps = service.evaluateDependencies(w);
-        assertTrue(deps.get(deps.size() - 1).satisfied());
+        assertTrue(service.evaluateDependencies(w).isEmpty());
 
         // a period inside the open FY with no finalized workflow is not satisfied
         Workflow w2 = prepareWorkflow(WorkflowType.GSTR1, "2026-07");
@@ -314,6 +312,24 @@ class WorkflowServiceTest {
 
         assertThrows(WorkflowConflictException.class,
                 () -> service.unfinalize(orgId, actor, w.getId(), "fix"));
+    }
+
+    @Test
+    void unfinalize_ignoresEarlierPeriodsAndSupersededRevisions() {
+        Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-05");
+        w.setStage(WorkflowStage.FINALIZED);
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+
+        Workflow earlier = prepareWorkflow(WorkflowType.GSTR1, "2026-04");
+        earlier.setStage(WorkflowStage.FINALIZED);
+        Workflow superseded = prepareWorkflow(WorkflowType.GSTR1, "2026-06");
+        superseded.setStage(WorkflowStage.FILED);
+        superseded.setActive(false);
+        when(workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId))
+                .thenReturn(List.of(w, earlier, superseded));
+
+        assertEquals(WorkflowStage.PREPARE,
+                service.unfinalize(orgId, actor, w.getId(), "fix").getStage());
     }
 
     @Test
