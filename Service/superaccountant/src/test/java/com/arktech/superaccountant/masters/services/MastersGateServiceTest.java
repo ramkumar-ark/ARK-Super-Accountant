@@ -103,4 +103,36 @@ class MastersGateServiceTest {
         assertThat(result.gated()).isTrue();
         assertThat(result.unresolvedCount()).isEqualTo(0);
     }
+
+    // ── mastersValidated (worker B) ──────────────────────────────────────────
+
+    @Test
+    void mastersValidated_trueWithOpenErrorFindings() {
+        UploadJob job = new UploadJob();
+        job.setId(UUID.randomUUID());
+        job.setTotalLedgersParsed(5);
+        when(uploadJobRepository.findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(
+                any(UUID.class), eq(COMPLETED_STATUSES))).thenReturn(Optional.of(job));
+
+        assertThat(gateService.mastersValidated(UUID.randomUUID())).isTrue();
+    }
+
+    @Test
+    void mastersValidated_falseWhenNoJob() {
+        when(uploadJobRepository.findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(
+                any(UUID.class), eq(COMPLETED_STATUSES))).thenReturn(Optional.empty());
+
+        assertThat(gateService.mastersValidated(UUID.randomUUID())).isFalse();
+    }
+
+    @Test
+    void mastersValidated_falseWhenZeroLedgers() {
+        UploadJob job = new UploadJob();
+        job.setId(UUID.randomUUID());
+        job.setTotalLedgersParsed(0);
+        when(uploadJobRepository.findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(
+                any(UUID.class), eq(COMPLETED_STATUSES))).thenReturn(Optional.of(job));
+
+        assertThat(gateService.mastersValidated(UUID.randomUUID())).isFalse();
+    }
 }

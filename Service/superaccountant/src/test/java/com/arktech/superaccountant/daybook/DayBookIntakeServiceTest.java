@@ -7,7 +7,6 @@ import com.arktech.superaccountant.daybook.services.DayBookIntakeResult;
 import com.arktech.superaccountant.daybook.services.DayBookIntakeService;
 import com.arktech.superaccountant.daybook.services.DayBookMasterValidationService;
 import com.arktech.superaccountant.daybook.services.VoucherCanonicalizer;
-import com.arktech.superaccountant.masters.models.GateResult;
 import com.arktech.superaccountant.masters.services.MastersGateService;
 import com.arktech.superaccountant.tally.models.TallyMessage;
 import com.arktech.superaccountant.tally.models.Voucher;
@@ -52,7 +51,7 @@ class DayBookIntakeServiceTest {
 
     @Test
     void intake_nullDateVoucher_ignoredForCoverage() throws java.io.IOException {
-        when(mastersGateService.checkGate(any(UUID.class))).thenReturn(GateResult.open());
+        when(mastersGateService.mastersValidated(any(UUID.class))).thenReturn(true);
         TallyMessage tallyMessage = new TallyMessage();
         tallyMessage.setTallymessage(List.of(voucher(null), voucher("20250401")));
         when(tallyParserService.parseJson(any())).thenReturn(tallyMessage);

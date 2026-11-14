@@ -69,14 +69,11 @@ public class DayBookIntakeService {
             throw new DayBookIntakeException(400, Map.of("error", "coverageFrom must not be after coverageTo"));
         }
 
-        // Masters precondition: keep the existing checkGate behaviour (Task 3 swaps this check)
-        var gate = mastersGateService.checkGate(orgId);
-        if (gate.gated()) {
+        // Masters-validated precondition: unresolved findings no longer block; the
+        // unknown-ledger check below still guards against masters gaps.
+        if (!mastersGateService.mastersValidated(orgId)) {
             throw new DayBookIntakeException(422, Map.of(
-                    "error", gate.unresolvedCount() == 0
-                            ? "Masters have not been validated. Upload and validate masters first."
-                            : gate.unresolvedCount() + " unresolved finding(s) must be approved before uploading the daybook.",
-                    "unresolvedCount", gate.unresolvedCount()));
+                    "error", "Upload and validate masters before uploading the day book."));
         }
 
         // Security: file extension check — prevent file extension spoofing (T-4-03)

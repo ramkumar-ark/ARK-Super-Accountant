@@ -51,6 +51,8 @@ class DayBookControllerIT {
     @Autowired private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
     @Autowired private com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository dayBookUploadJobRepository;
     @Autowired private com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository parsedVoucherRepository;
+    @Autowired private com.arktech.superaccountant.masters.repository.ValidationFindingRepository validationFindingRepository;
+    private java.util.UUID validatedMastersJobId;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ── Test 1: TALLY-01, TALLY-06 ───────────────────────────────────────────
@@ -367,6 +369,39 @@ class DayBookControllerIT {
                 .andReturn();
     }
 
+    // ── Masters-validated precondition tests ────────────────────────────────
+
+    @Test
+    void upload_withUnresolvedMastersFindings_returns201() throws Exception {
+        String token = setupOrgScopedTokenWithUnresolvedMastersFinding();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-04-01")
+                                .param("coverageTo", "2025-05-31")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void upload_withoutMastersUpload_returns422() throws Exception {
+        String token = setupOrgScopedTokenNoMasters();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-04-01")
+                                .param("coverageTo", "2025-05-31")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("Upload and validate masters before uploading the day book."));
+    }
+
     /**
      * Masters gate (MastersGateService) blocks day book uploads until the org has a completed
      * masters upload with no unresolved findings, and DayBookMasterValidationService rejects
@@ -380,6 +415,7 @@ class DayBookControllerIT {
         masters.setStatus(UploadJobStatus.COMPLETED);
         masters.setTotalLedgersParsed(FIXTURE_LEDGER_NAMES.size());
         masters = uploadJobRepository.saveAndFlush(masters);
+        validatedMastersJobId = masters.getId();
 
         for (String name : FIXTURE_LEDGER_NAMES) {
             UploadLedgerSnapshot snapshot = new UploadLedgerSnapshot();
@@ -400,7 +436,19 @@ class DayBookControllerIT {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private String setupOrgScopedTokenNoMasters() throws Exception {
+        return setupOrgScopedToken(false, false);
+    }
+
+    private String setupOrgScopedTokenWithUnresolvedMastersFinding() throws Exception {
+        return setupOrgScopedToken(true, true);
+    }
+
     private String setupOrgScopedToken() throws Exception {
+        return setupOrgScopedToken(true, false);
+    }
+
+    private String setupOrgScopedToken(boolean seedMasters, boolean addUnresolvedFinding) throws Exception {
         String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
         String username = "it_" + suffix;
 
@@ -430,7 +478,20 @@ class DayBookControllerIT {
                 createOrgResult.getResponse().getContentAsString(), java.util.Map.class);
         String orgId = orgBody.get("id").toString();
 
-        seedValidatedMasters(java.util.UUID.fromString(orgId));
+        if (seedMasters) {
+            seedValidatedMasters(java.util.UUID.fromString(orgId));
+            if (addUnresolvedFinding) {
+                com.arktech.superaccountant.masters.models.ValidationFinding finding =
+                        new com.arktech.superaccountant.masters.models.ValidationFinding();
+                finding.setUploadJobId(validatedMastersJobId);
+                finding.setRuleCode("MISMATCH_TEST");
+                finding.setLedgerName("Test Purchases");
+                finding.setSeverity(com.arktech.superaccountant.masters.models.FindingSeverity.ERROR);
+                finding.setResolveStatus(com.arktech.superaccountant.masters.models.ResolveStatus.OPEN);
+                finding.setMessage("unresolved test finding");
+                validationFindingRepository.save(finding);
+            }
+        }
 
         MvcResult selectResult = mockMvc.perform(post("/api/organizations/" + orgId + "/select")
                         .header("Authorization", "Bearer " + token))
