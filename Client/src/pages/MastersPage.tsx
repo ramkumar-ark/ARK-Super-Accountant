@@ -6,6 +6,8 @@ import { LedgerMappingPanel } from '@/components/LedgerMappingPanel'
 import { AppShell } from '@/components/AppShell'
 import { useAuthStore } from '@/store/authStore'
 import { ValidationSettingsPanel } from '@/components/ValidationSettingsPanel'
+import { apiErrorMessage } from '@/lib/apiError'
+import { FindingReviewPanel, type ReviewRole } from '@/components/review/FindingReviewPanel'
 
 interface PreconfiguredMaster {
   id: string
@@ -79,11 +81,6 @@ const VALUE_LABELS: Record<string, string> = {
   HSN_SAC_CODE: 'HSN/SAC code',
   TDS_SECTION_MAPPING: 'TDS section',
   GST_APPLICABILITY: 'GST applicability',
-}
-
-function apiErrorMessage(err: unknown, fallback: string): string {
-  const data = (err as { response?: { data?: { error?: string } } })?.response?.data
-  return data?.error || fallback
 }
 
 export function MastersPage() {
@@ -630,12 +627,7 @@ function FindingsTab({
   onSeverityFilterChange: (v: string) => void
   onFindingResolved: () => void
 }) {
-  const [overridingId, setOverridingId] = useState<string | null>(null)
-  const [overrideNote, setOverrideNote] = useState('')
   const [overrideValue, setOverrideValue] = useState('')
-  const [rejectingId, setRejectingId] = useState<string | null>(null)
-  const [rejectNote, setRejectNote] = useState('')
-  const [busyId, setBusyId] = useState<string | null>(null)
   const role = useAuthStore((st) => st.user?.role)
   // Server is the authority; these only decide which buttons to show.
   const isAccountant = role === 'ROLE_ACCOUNTANT'
@@ -679,61 +671,88 @@ function FindingsTab({
 
   const actionUrl = (f: ValidationFinding) => `/v1/uploads/${f.uploadJobId}/findings/${f.id}/action`
 
-  function openOverride(finding: ValidationFinding) {
-    if (overridingId === finding.id) {
-      setOverridingId(null)
-      return
-    }
-    // A rejected proposal comes back pre-filled so it can be corrected and resubmitted.
-    setOverrideValue(finding.proposedValue ?? '')
-    setOverrideNote(finding.resolveNote ?? '')
-    setRejectingId(null)
-    setOverridingId(finding.id)
-  }
+  // The module-specific override value input; the shared review panel renders it inside its form.
+  const overrideValueForm = (finding: ValidationFinding) =>
+    TYPED_INPUT_RULES.includes(finding.ruleCode) ? (
+      <div className="mb-2">
+        <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+          {VALUE_LABELS[finding.ruleCode]} (required)
+          {finding.ruleCode === 'TDS_SECTION_MAPPING' ? (
+            <TdsSectionSelect
+              value={overrideValue}
+              onChange={setOverrideValue}
+              className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
+            />
+          ) : finding.ruleCode === 'GST_APPLICABILITY' ? (
+            <select
+              value={overrideValue}
+              onChange={(e) => setOverrideValue(e.target.value)}
+              className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
+            >
+              <option value="">Select…</option>
+              {GST_APPLICABILITY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={overrideValue}
+              disabled={overrideValue === GST_NOT_APPLICABLE}
+              onChange={(e) => setOverrideValue(e.target.value)}
+              className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
+            />
+          )}
+        </label>
+        {finding.ruleCode === 'GSTIN_PRESENCE' && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+            <input
+              type="checkbox"
+              checked={overrideValue === GST_NOT_APPLICABLE}
+              onChange={(e) => setOverrideValue(e.target.checked ? GST_NOT_APPLICABLE : '')}
+            />
+            GST not applicable for this ledger
+          </label>
+        )}
+      </div>
+    ) : finding.mismatchType === 'MISSING_IN_CONFIGURATION' ? (
+      <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+        <span className="font-mono">{finding.ledgerName}</span> will be added to the approved masters.
+      </p>
+    ) : (
+      <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+        The master will be updated to: <span className="font-mono">{finding.actualValue ?? '—'}</span>
+      </p>
+    )
 
-  async function runAction(
+  async function runPanelAction(
     finding: ValidationFinding,
-    body: Record<string, string>,
-    fallbackError: string,
-  ): Promise<boolean> {
-    setBusyId(finding.id)
+    action: 'ACKNOWLEDGE' | 'APPROVE' | 'REJECT',
+    body: { value?: string; note?: string },
+  ) {
+    const fallback =
+      action === 'APPROVE'
+        ? 'Could not approve this finding. Try again.'
+        : action === 'REJECT'
+          ? 'Could not reject this finding. Try again.'
+          : 'Could not resolve this finding. Try again.'
+    const payload: Record<string, string> = { action }
+    if (action === 'ACKNOWLEDGE') {
+      payload.note = body.note ?? ''
+      if (TYPED_INPUT_RULES.includes(finding.ruleCode)) payload.value = overrideValue.trim()
+    } else if (action === 'REJECT') {
+      payload.note = body.note ?? ''
+    }
     setFindingErrors((prev) => ({ ...prev, [finding.id]: '' }))
     try {
-      await api.post(actionUrl(finding), body)
+      await api.post(actionUrl(finding), payload)
       onFindingResolved()
-      return true
-    } catch (err) {
-      setFindingErrors((prev) => ({ ...prev, [finding.id]: apiErrorMessage(err, fallbackError) }))
-      return false
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function handleOverride(finding: ValidationFinding) {
-    const body: Record<string, string> = { action: 'ACKNOWLEDGE', note: overrideNote }
-    if (TYPED_INPUT_RULES.includes(finding.ruleCode)) body.value = overrideValue.trim()
-    const ok = await runAction(finding, body, 'Could not resolve this finding. Try again.')
-    if (ok) {
-      setOverridingId(null)
-      setOverrideNote('')
       setOverrideValue('')
-    }
-  }
-
-  async function handleApprove(finding: ValidationFinding) {
-    await runAction(finding, { action: 'APPROVE' }, 'Could not approve this finding. Try again.')
-  }
-
-  async function handleReject(finding: ValidationFinding) {
-    const ok = await runAction(
-      finding,
-      { action: 'REJECT', note: rejectNote.trim() },
-      'Could not reject this finding. Try again.',
-    )
-    if (ok) {
-      setRejectingId(null)
-      setRejectNote('')
+    } catch (err) {
+      setFindingErrors((prev) => ({ ...prev, [finding.id]: apiErrorMessage(err, fallback) }))
+      throw err
     }
   }
 
@@ -1251,191 +1270,29 @@ function FindingsTab({
                     Suggested: {finding.suggestedFix}
                   </p>
                 )}
-                {isResolved(finding) && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <CheckCircle2 size={14} className="text-[var(--color-success)]" />
-                    <span className="text-xs text-[var(--color-text-muted)]">
-                      Resolved
-                      {finding.resolveNote && ` — ${finding.resolveNote}`}
-                    </span>
-                  </div>
-                )}
-                {finding.resolveStatus === 'ACKNOWLEDGED' && (
-                  <div className="mt-2 text-xs text-[var(--color-text-secondary)]">
-                    <span className="inline-block px-2 py-0.5 rounded-full bg-[var(--color-warning-bg)] text-[var(--color-warning)]">
-                      Pending accountant review
-                    </span>
-                    <p className="mt-1">
-                      Proposed value: <span className="font-mono">{proposedDisplay(finding) ?? '—'}</span>
-                      {finding.submittedBy && ` · submitted by ${finding.submittedBy}`}
-                    </p>
-                    {finding.resolveNote && <p>Note: {finding.resolveNote}</p>}
-                  </div>
-                )}
-                {finding.resolveStatus === 'OPEN' && finding.reviewNote && (
-                  <p className="mt-2 text-xs text-[var(--color-danger)]">
-                    Rejected{finding.reviewedBy ? ` by ${finding.reviewedBy}` : ''}: {finding.reviewNote}
-                  </p>
-                )}
                 {findingErrors[finding.id] && (
                   <p className="text-xs text-[var(--color-danger)] mt-1">
                     {findingErrors[finding.id]}
                   </p>
                 )}
               </div>
-              {finding.resolveStatus === 'OPEN' && canSubmit && (
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => openOverride(finding)}
-                    aria-expanded={overridingId === finding.id}
-                    aria-label={`Override Value for ${finding.ledgerName}`}
-                    className="h-9 px-3 rounded-[var(--radius-md)] text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)]"
-                  >
-                    Override Value
-                  </button>
-                </div>
-              )}
-              {finding.resolveStatus === 'ACKNOWLEDGED' && isAccountant && (
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => handleApprove(finding)}
-                    disabled={busyId === finding.id || bulkBusy}
-                    aria-label={`Approve ${finding.ledgerName}`}
-                    className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => {
-                      setRejectingId(rejectingId === finding.id ? null : finding.id)
-                      setRejectNote('')
-                    }}
-                    aria-expanded={rejectingId === finding.id}
-                    aria-label={`Reject ${finding.ledgerName}`}
-                    className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)]"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
             </div>
-            {overridingId === finding.id && finding.resolveStatus === 'OPEN' && (
-              <div className="mt-3 bg-[var(--color-surface-raised)] rounded-[var(--radius-md)] p-4">
-                {TYPED_INPUT_RULES.includes(finding.ruleCode) ? (
-                  <div className="mb-2">
-                    <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                      {VALUE_LABELS[finding.ruleCode]} (required)
-                      {finding.ruleCode === 'TDS_SECTION_MAPPING' ? (
-                        <TdsSectionSelect
-                          value={overrideValue}
-                          onChange={setOverrideValue}
-                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
-                        />
-                      ) : finding.ruleCode === 'GST_APPLICABILITY' ? (
-                        <select
-                          value={overrideValue}
-                          onChange={(e) => setOverrideValue(e.target.value)}
-                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]"
-                        >
-                          <option value="">Select…</option>
-                          {GST_APPLICABILITY_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={overrideValue}
-                          disabled={overrideValue === GST_NOT_APPLICABLE}
-                          onChange={(e) => setOverrideValue(e.target.value)}
-                          className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
-                        />
-                      )}
-                    </label>
-                    {finding.ruleCode === 'GSTIN_PRESENCE' && (
-                      <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                        <input
-                          type="checkbox"
-                          checked={overrideValue === GST_NOT_APPLICABLE}
-                          onChange={(e) => setOverrideValue(e.target.checked ? GST_NOT_APPLICABLE : '')}
-                        />
-                        GST not applicable for this ledger
-                      </label>
-                    )}
-                  </div>
-                ) : finding.mismatchType === 'MISSING_IN_CONFIGURATION' ? (
-                  <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
-                    <span className="font-mono">{finding.ledgerName}</span> will be added to the approved masters.
-                  </p>
-                ) : (
-                  <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
-                    The master will be updated to:{' '}
-                    <span className="font-mono">{finding.actualValue ?? '—'}</span>
-                  </p>
-                )}
-                <textarea
-                  rows={2}
-                  value={overrideNote}
-                  onChange={(e) => setOverrideNote(e.target.value)}
-                  placeholder="Add a note explaining the override (optional)…"
-                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] resize-none focus:outline-none focus:border-[var(--color-primary)]"
-                />
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => handleOverride(finding)}
-                    disabled={
-                      busyId === finding.id ||
-                      bulkBusy ||
-                      (TYPED_INPUT_RULES.includes(finding.ruleCode) && overrideValue.trim() === '')
-                    }
-                    className="h-9 px-3 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
-                  >
-                    {isAccountant ? 'Confirm Override' : 'Submit for Review'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setOverridingId(null)
-                      setOverrideNote('')
-                      setOverrideValue('')
-                    }}
-                    className="h-9 px-3 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] rounded-[var(--radius-md)]"
-                  >
-                    Cancel Changes
-                  </button>
-                </div>
-              </div>
-            )}
-            {rejectingId === finding.id && finding.resolveStatus === 'ACKNOWLEDGED' && isAccountant && (
-              <div className="mt-3 bg-[var(--color-surface-raised)] rounded-[var(--radius-md)] p-4">
-                <textarea
-                  rows={2}
-                  value={rejectNote}
-                  onChange={(e) => setRejectNote(e.target.value)}
-                  placeholder="Explain why this is rejected (required)…"
-                  className="w-full px-3 py-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] resize-none focus:outline-none focus:border-[var(--color-primary)]"
-                />
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => handleReject(finding)}
-                    disabled={busyId === finding.id || bulkBusy || rejectNote.trim() === ''}
-                    className="h-9 px-3 bg-[var(--color-danger)] text-white rounded-[var(--radius-md)] text-sm disabled:opacity-50"
-                  >
-                    Confirm Reject
-                  </button>
-                  <button
-                    onClick={() => {
-                      setRejectingId(null)
-                      setRejectNote('')
-                    }}
-                    className="h-9 px-3 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] rounded-[var(--radius-md)]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            <FindingReviewPanel
+                finding={finding}
+                role={role as ReviewRole}
+                label={finding.ledgerName}
+                proposedDisplay={proposedDisplay(finding)}
+                valueInput={overrideValueForm(finding)}
+                submitDisabled={TYPED_INPUT_RULES.includes(finding.ruleCode) && overrideValue.trim() === ''}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setOverrideValue(finding.proposedValue ?? '')
+                  } else {
+                    setOverrideValue('')
+                  }
+                }}
+                onAction={(action, body) => runPanelAction(finding, action, body)}
+              />
           </div>
         ))}
       </div>

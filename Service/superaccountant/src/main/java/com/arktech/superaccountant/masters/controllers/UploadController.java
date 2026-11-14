@@ -1,6 +1,10 @@
 package com.arktech.superaccountant.masters.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.services.MastersFindingApplier;
+import com.arktech.superaccountant.review.FindingReviewException;
+import com.arktech.superaccountant.review.FindingReviewService;
+import com.arktech.superaccountant.review.ReviewActor;
 import com.arktech.superaccountant.masters.classifier.LedgerCategoryClassifier;
 import com.arktech.superaccountant.masters.classifier.ParsedLedger;
 import com.arktech.superaccountant.masters.models.*;
@@ -79,6 +83,9 @@ public class UploadController {
 
     @Autowired
     private FindingOverrideMasterService findingOverrideMasterService;
+
+    @Autowired
+    private FindingReviewService findingReviewService;
 
     @Transactional
     @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
@@ -546,56 +553,13 @@ public class UploadController {
         }
         ValidationFinding finding = findingOpt.get();
 
-        // 3. Role + state machine enforcement
-        Set<String> roles = principal.getAuthorities().stream()
-                .map(a -> a.getAuthority()).collect(java.util.stream.Collectors.toSet());
-        boolean isAccountant = roles.contains("ROLE_ACCOUNTANT");
-        boolean isOperatorOrAccountant = roles.contains("ROLE_OPERATOR") || isAccountant;
-
-        String action = request.getAction();
-        Instant now = Instant.now();
-        String username = principal.getUsername();
-
-        switch (action) {
-            case "ACKNOWLEDGE" -> {
-                if (!isOperatorOrAccountant) {
-                    return ResponseEntity.status(403).body(Map.of("error", "Only OPERATOR or ACCOUNTANT can resolve findings."));
-                }
-                if (finding.getResolveStatus() != ResolveStatus.OPEN) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only OPEN findings can be resolved."));
-                }
-                submit(finding, request.getValue(), request.getNote(), orgId, username, isAccountant, now, null, null);
-            }
-            case "APPROVE" -> {
-                if (!isAccountant) {
-                    return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT can approve findings."));
-                }
-                if (finding.getResolveStatus() != ResolveStatus.ACKNOWLEDGED) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only findings pending review can be approved."));
-                }
-                approve(finding, orgId, username, now, null);
-            }
-            case "REJECT" -> {
-                if (!isAccountant) {
-                    return ResponseEntity.status(403).body(Map.of("error", "Only ACCOUNTANT can reject findings."));
-                }
-                if (finding.getResolveStatus() != ResolveStatus.ACKNOWLEDGED) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only findings pending review can be rejected."));
-                }
-                if (request.getNote() == null || request.getNote().isBlank()) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "A note is required to reject a finding."));
-                }
-                // Back to OPEN; the proposal and the submitter's note stay visible, the master is untouched.
-                finding.setResolveStatus(ResolveStatus.OPEN);
-                finding.setReviewedBy(username);
-                finding.setReviewedAt(now);
-                finding.setReviewNote(request.getNote());
-                finding.setResolvedBy(null);
-                finding.setResolvedAt(null);
-            }
-            default -> {
-                return ResponseEntity.badRequest().body(Map.of("error", "Unknown action. Must be ACKNOWLEDGE, APPROVE, or REJECT."));
-            }
+        // 3. Role + state machine enforcement lives in the shared review service
+        try {
+            findingReviewService.act(finding, request.getAction(), request.getValue(), request.getNote(),
+                    ReviewActor.of(principal), Instant.now(),
+                    new MastersFindingApplier(findingOverrideMasterService, orgId, null, null));
+        } catch (FindingReviewException e) {
+            return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
         }
 
         findingRepository.save(finding);
@@ -609,19 +573,6 @@ public class UploadController {
     @ExceptionHandler(FindingOverrideException.class)
     public ResponseEntity<?> handleFindingOverride(FindingOverrideException e) {
         return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
-    }
-
-    /**
-     * Records an override proposal on an OPEN finding (a resubmission clears any earlier review). An accountant's
-     * own submission is approved in the same step (D4). Must run inside the caller's transaction.
-     */
-    private void submit(ValidationFinding finding, String value, String note, UUID orgId, String username,
-                        boolean isAccountant, Instant now, Map<String, PreconfiguredMaster> masters,
-                        Map<String, UploadLedgerSnapshot> snapshots) {
-        findingOverrideMasterService.submit(finding, value, note, orgId, username, now, snapshots);
-        if (isAccountant) {
-            approve(finding, orgId, username, now, masters, snapshots);
-        }
     }
 
     /**
@@ -716,6 +667,8 @@ public class UploadController {
                 }
             }
         }
+        MastersFindingApplier applier = new MastersFindingApplier(findingOverrideMasterService, orgId, masters, snapshots);
+        ReviewActor actor = ReviewActor.of(principal);
         for (ValidationFinding f : targets) {
             if (f.getResolveStatus() != requiredStatus) {
                 failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(),
@@ -729,11 +682,11 @@ public class UploadController {
             }
             try {
                 if (approving) {
-                    approve(f, orgId, username, now, masters, snapshots);
+                    findingReviewService.approve(f, actor, now, applier);
                 } else {
-                    submit(f, typedValue, request.getNote(), orgId, username, isAccountant, now, masters, snapshots);
+                    findingReviewService.submit(f, typedValue, request.getNote(), actor, now, applier);
                 }
-            } catch (FindingOverrideException e) {
+            } catch (FindingOverrideException | FindingReviewException e) {
                 failures.add(new BulkFindingActionException.Failure(f.getId(), f.getLedgerName(), e.getMessage()));
             }
         }
@@ -771,26 +724,6 @@ public class UploadController {
     @ExceptionHandler(BulkFindingActionException.class)
     public ResponseEntity<?> handleBulkFailure(BulkFindingActionException e) {
         return ResponseEntity.status(409).body(Map.of("error", e.getMessage(), "failures", e.getFailures()));
-    }
-
-    /** Writes the proposal to the master and marks the finding APPROVED. Must run inside the caller's transaction. */
-    private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now,
-                         Map<String, PreconfiguredMaster> masters) {
-        approve(finding, orgId, approver, now, masters, null);
-    }
-
-    private void approve(ValidationFinding finding, UUID orgId, String approver, Instant now,
-                         Map<String, PreconfiguredMaster> masters, Map<String, UploadLedgerSnapshot> snapshots) {
-        if (masters == null) {
-            findingOverrideMasterService.apply(finding, orgId, approver);
-        } else {
-            findingOverrideMasterService.apply(finding, orgId, approver, masters, snapshots);
-        }
-        finding.setResolveStatus(ResolveStatus.APPROVED);
-        finding.setReviewedBy(approver);
-        finding.setReviewedAt(now);
-        finding.setResolvedBy(approver);
-        finding.setResolvedAt(now);
     }
 
     // --- helpers ---
