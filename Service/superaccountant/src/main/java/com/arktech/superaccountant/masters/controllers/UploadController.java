@@ -154,6 +154,7 @@ public class UploadController {
             snap.setOrganizationId(orgId);
             snap.setLedgerName(pl.getName());
             snap.setParentGroup(pl.getParentGroup());
+            snap.setCategory(pl.getCategory());
             snap.setGstApplicable(pl.getGstApplicable());
             snap.setTdsApplicable(pl.getTdsApplicable());
             snap.setGstin(pl.getGstin());
