@@ -46,7 +46,8 @@ Service/superaccountant/          # Spring Boot backend
         jwt/                               # JwtUtils, AuthTokenFilter, AuthEntryPointJwt
         services/                          # UserDetailsImpl, UserDetailsServiceImpl
       config/DataInitializer.java          # Seed data
-    gst/                                   # GST module
+    config/DatabasePasswordValidator.java  # Fails startup without DB_PASSWORD
+    gst/ daybook/ masters/ tally/ tds/ review/ workflow/   # Feature modules (controllers/models/payload/repository/services); list the dir for contents
   src/main/resources/
     application.properties                 # DB + JWT config
 
@@ -82,7 +83,7 @@ Client/                             # React + Vite frontend
 
 ## Roles
 
-Four user roles defined in `ERole`: `ROLE_CASHIER`, `ROLE_ACCOUNTANT`, `ROLE_DATA_ENTRY_OPERATOR`, `ROLE_OWNER`. Default role on signup is `ROLE_CASHIER`.
+Four user roles defined in `ERole`: `ROLE_OWNER`, `ROLE_ACCOUNTANT`, `ROLE_OPERATOR`, `ROLE_AUDITOR_CA`. Check `AuthController` for the signup default.
 
 ## API Endpoints
 
@@ -96,7 +97,7 @@ Public endpoints: `/api/auth/**`, `/api/test/**`, `/error`. All others require a
 ### Backend
 
 ```bash
-cd Service/superaccountant
+cd Service/superaccountant    # ./mvnw lives here, not at the repo root
 ./mvnw spring-boot:run        # Run the application
 ./mvnw test                   # Unit tests only (Surefire)
 ./mvnw verify                 # Unit + *IT integration tests (Failsafe/Testcontainers, needs Docker) — what CI runs
@@ -144,6 +145,8 @@ npm run test:run              # Vitest (single run)
 PostgreSQL must be running locally on port 5432. Schema is auto-managed by Hibernate (`ddl-auto: update`).
 
 The datasource password comes from the `DB_PASSWORD` environment variable and the app refuses to start without it (`config/DatabasePasswordValidator`). For `DB_URL`/`DB_USERNAME` defaults see `application.properties` and the README Quick start.
+
+Local DB credentials are in `~/.config/super-accountant/db.env` (holds `DB_PASSWORD`). Load it with `set -a; . ~/.config/super-accountant/db.env; set +a` before starting the app or running backend tests, so context and Testcontainers/local-DB ITs run locally. Never print, copy or commit its value.
 
 ## .gitignore Rules
 
