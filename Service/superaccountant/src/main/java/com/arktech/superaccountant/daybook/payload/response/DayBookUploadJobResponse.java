@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,5 +24,11 @@ public class DayBookUploadJobResponse {
     private Instant createdAt;
     private Instant completedAt;
     private String errorMessage;
+    private LocalDate coverageFrom;
+    private LocalDate coverageTo;
+    private LocalDate minVoucherDate;
+    private LocalDate maxVoucherDate;
+    private UUID createdForWorkflowId;
+    private List<String> warnings;
     private List<VoucherTypeSummaryResponse> voucherSummary;
 }

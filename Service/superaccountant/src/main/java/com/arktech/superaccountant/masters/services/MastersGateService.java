@@ -8,6 +8,7 @@ import com.arktech.superaccountant.masters.repository.ValidationFindingRepositor
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -62,5 +63,20 @@ public class MastersGateService {
         return count > 0
                 ? GateResult.gated((int) count)
                 : GateResult.open();
+    }
+
+    /**
+     * Masters-validated precondition (worker B): true iff the latest completed
+     * masters upload exists and parsed more than 0 ledger snapshots. Unlike
+     * {@link #checkGate}, unresolved findings do not block; the day-book intake
+     * keeps the unknown-ledger check instead.
+     */
+    public boolean mastersValidated(UUID orgId) {
+        Optional<UploadJob> latestJob = uploadJobRepository
+                .findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(orgId,
+                        List.of(UploadJobStatus.COMPLETED, UploadJobStatus.COMPLETED_WITH_MISMATCHES));
+        return latestJob.isPresent()
+                && latestJob.get().getTotalLedgersParsed() != null
+                && latestJob.get().getTotalLedgersParsed() > 0;
     }
 }

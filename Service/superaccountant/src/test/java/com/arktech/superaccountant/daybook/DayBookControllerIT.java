@@ -49,6 +49,10 @@ class DayBookControllerIT {
     @Autowired private MockMvc mockMvc;
     @Autowired private UploadJobRepository uploadJobRepository;
     @Autowired private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
+    @Autowired private com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository dayBookUploadJobRepository;
+    @Autowired private com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository parsedVoucherRepository;
+    @Autowired private com.arktech.superaccountant.masters.repository.ValidationFindingRepository validationFindingRepository;
+    private java.util.UUID validatedMastersJobId;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // ── Test 1: TALLY-01, TALLY-06 ───────────────────────────────────────────
@@ -60,6 +64,7 @@ class DayBookControllerIT {
 
         MvcResult result = mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-minimal.json",
                                         "application/json", fixture))
                                 .header("Authorization", "Bearer " + token))
@@ -85,6 +90,7 @@ class DayBookControllerIT {
 
         MvcResult result = mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-multi-type.json",
                                         "application/json", fixture))
                                 .header("Authorization", "Bearer " + token))
@@ -117,6 +123,7 @@ class DayBookControllerIT {
 
         MvcResult result = mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-malformed.json",
                                         "application/json", fixture))
                                 .header("Authorization", "Bearer " + token))
@@ -141,6 +148,7 @@ class DayBookControllerIT {
 
         MvcResult uploadResult = mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-multi-type.json",
                                         "application/json", fixture))
                                 .header("Authorization", "Bearer " + token))
@@ -177,6 +185,7 @@ class DayBookControllerIT {
 
         MvcResult uploadResult = mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-minimal.json",
                                         "application/json", fixture))
                                 .header("Authorization", "Bearer " + token1))
@@ -227,6 +236,7 @@ class DayBookControllerIT {
 
         mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook.xml",
                                         "application/xml", "<xml/>".getBytes()))
                                 .header("Authorization", "Bearer " + token))
@@ -241,6 +251,7 @@ class DayBookControllerIT {
 
         mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-minimal.json",
                                         "application/json", fixture)))
                 .andExpect(status().isUnauthorized());
@@ -255,6 +266,7 @@ class DayBookControllerIT {
 
         MvcResult result = mockMvc.perform(
                         multipart("/api/v1/day-book/upload")
+                                .param("coverageFrom","2025-04-01").param("coverageTo","2025-05-31")
                                 .file(new MockMultipartFile("file", "daybook-utf16le.json",
                                         "application/json", fixture))
                                 .header("Authorization", "Bearer " + token))
@@ -270,6 +282,193 @@ class DayBookControllerIT {
         assertThat(body.get("errorMessage")).isNull();
     }
 
+    // ── Coverage tests ────────────────────────────────────────────────────────
+
+    @Test
+    void upload_withoutCoverage_returns400() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void upload_voucherOutsideCoverage_returns422AndPersistsNoVouchers() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-multi-type.json").readAllBytes();
+
+        MvcResult result = mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-multi-type.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-04-01")
+                                .param("coverageTo", "2025-04-30")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.outOfRangeCount").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andReturn();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = objectMapper.readValue(
+                result.getResponse().getContentAsString(), Map.class);
+        String jobId = body.get("uploadId").toString();
+
+        assertThat(dayBookUploadJobRepository.findById(java.util.UUID.fromString(jobId)))
+                .hasValueSatisfying(job -> {
+                    assertThat(job.getStatus()).isEqualTo(UploadJobStatus.FAILED);
+                    assertThat(job.getErrorMessage()).isNotBlank();
+                });
+        assertThat(parsedVoucherRepository.findByUploadJobId(java.util.UUID.fromString(jobId))).isEmpty();
+    }
+
+    @Test
+    void upload_lateFirstVoucher_returns201WithWarning() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        MvcResult result = mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-03-01")
+                                .param("coverageTo", "2025-04-30")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = objectMapper.readValue(
+                result.getResponse().getContentAsString(), Map.class);
+        assertThat((List<?>) body.get("warnings")).isNotEmpty();
+        assertThat(((List<?>) body.get("warnings")).get(0).toString()).isEqualTo(
+                "First voucher is dated 2025-04-01, more than 15 days after the declared start 2025-03-01.");
+    }
+
+    @Test
+    void upload_persistsCoverageAndVoucherRange() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-multi-type.json").readAllBytes();
+
+        MvcResult result = mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-multi-type.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-04-01")
+                                .param("coverageTo", "2025-05-31")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.coverageFrom").value("2025-04-01"))
+                .andExpect(jsonPath("$.coverageTo").value("2025-05-31"))
+                .andExpect(jsonPath("$.minVoucherDate").value("2025-04-01"))
+                .andExpect(jsonPath("$.maxVoucherDate").value("2025-05-01"))
+                .andReturn();
+    }
+
+    // ── Upload history tests (worker B) ─────────────────────────────────────
+
+    @Test
+    void listUploads_returnsNewestFirstWithCoverage() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "first.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-04-30")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "second.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-05-31")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/day-book/uploads")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].fileName").value("second.json"))
+                .andExpect(jsonPath("$.content[0].coverageFrom").value("2025-04-01"))
+                .andExpect(jsonPath("$.content[0].coverageTo").value("2025-05-31"))
+                .andExpect(jsonPath("$.content[1].fileName").value("first.json"));
+    }
+
+    @Test
+    void listUploads_invalidPaging_isClampedNotServerError() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "a.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-04-30")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/day-book/uploads").param("size", "0").param("page", "-1")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.size").value(1));
+
+        mockMvc.perform(get("/api/v1/day-book/uploads").param("size", "100000")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+    }
+
+    @Test
+    void listUploads_otherOrgSeesNothing() throws Exception {
+        String token1 = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "mine.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-05-31")
+                        .header("Authorization", "Bearer " + token1))
+                .andExpect(status().isCreated());
+
+        String token2 = setupOrgScopedTokenNoMasters();
+        mockMvc.perform(get("/api/v1/day-book/uploads")
+                        .header("Authorization", "Bearer " + token2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    // ── Masters-validated precondition tests ────────────────────────────────
+
+    @Test
+    void upload_withUnresolvedMastersFindings_returns201() throws Exception {
+        String token = setupOrgScopedTokenWithUnresolvedMastersFinding();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-04-01")
+                                .param("coverageTo", "2025-05-31")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void upload_withoutMastersUpload_returns422() throws Exception {
+        String token = setupOrgScopedTokenNoMasters();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(
+                        multipart("/api/v1/day-book/upload")
+                                .file(new MockMultipartFile("file", "daybook-minimal.json",
+                                        "application/json", fixture))
+                                .param("coverageFrom", "2025-04-01")
+                                .param("coverageTo", "2025-05-31")
+                                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("Upload and validate masters before uploading the day book."));
+    }
+
     /**
      * Masters gate (MastersGateService) blocks day book uploads until the org has a completed
      * masters upload with no unresolved findings, and DayBookMasterValidationService rejects
@@ -283,6 +482,7 @@ class DayBookControllerIT {
         masters.setStatus(UploadJobStatus.COMPLETED);
         masters.setTotalLedgersParsed(FIXTURE_LEDGER_NAMES.size());
         masters = uploadJobRepository.saveAndFlush(masters);
+        validatedMastersJobId = masters.getId();
 
         for (String name : FIXTURE_LEDGER_NAMES) {
             UploadLedgerSnapshot snapshot = new UploadLedgerSnapshot();
@@ -303,7 +503,19 @@ class DayBookControllerIT {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    private String setupOrgScopedTokenNoMasters() throws Exception {
+        return setupOrgScopedToken(false, false);
+    }
+
+    private String setupOrgScopedTokenWithUnresolvedMastersFinding() throws Exception {
+        return setupOrgScopedToken(true, true);
+    }
+
     private String setupOrgScopedToken() throws Exception {
+        return setupOrgScopedToken(true, false);
+    }
+
+    private String setupOrgScopedToken(boolean seedMasters, boolean addUnresolvedFinding) throws Exception {
         String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
         String username = "it_" + suffix;
 
@@ -333,7 +545,20 @@ class DayBookControllerIT {
                 createOrgResult.getResponse().getContentAsString(), java.util.Map.class);
         String orgId = orgBody.get("id").toString();
 
-        seedValidatedMasters(java.util.UUID.fromString(orgId));
+        if (seedMasters) {
+            seedValidatedMasters(java.util.UUID.fromString(orgId));
+            if (addUnresolvedFinding) {
+                com.arktech.superaccountant.masters.models.ValidationFinding finding =
+                        new com.arktech.superaccountant.masters.models.ValidationFinding();
+                finding.setUploadJobId(validatedMastersJobId);
+                finding.setRuleCode("MISMATCH_TEST");
+                finding.setLedgerName("Test Purchases");
+                finding.setSeverity(com.arktech.superaccountant.masters.models.FindingSeverity.ERROR);
+                finding.setResolveStatus(com.arktech.superaccountant.masters.models.ResolveStatus.OPEN);
+                finding.setMessage("unresolved test finding");
+                validationFindingRepository.save(finding);
+            }
+        }
 
         MvcResult selectResult = mockMvc.perform(post("/api/organizations/" + orgId + "/select")
                         .header("Authorization", "Bearer " + token))

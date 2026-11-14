@@ -5,6 +5,9 @@ import com.arktech.superaccountant.daybook.payload.response.DayBookUploadJobResp
 import com.arktech.superaccountant.daybook.payload.response.VoucherTypeSummaryResponse;
 import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
+import com.arktech.superaccountant.daybook.services.DayBookIntakeException;
+import com.arktech.superaccountant.daybook.services.DayBookIntakeResult;
+import com.arktech.superaccountant.daybook.services.DayBookIntakeService;
 import com.arktech.superaccountant.daybook.services.DayBookMasterValidationService;
 import com.arktech.superaccountant.daybook.services.DayBookParserService;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
@@ -18,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -50,7 +54,7 @@ public class DayBookController {
     private TallyParserService tallyParserService;
 
     @Autowired
-    private DayBookParserService dayBookParserService;
+    private DayBookIntakeService dayBookIntakeService;
 
     @Autowired
     private DayBookUploadJobRepository dayBookUploadJobRepository;
@@ -67,16 +71,19 @@ public class DayBookController {
     /**
      * POST /api/v1/day-book/upload
      *
-     * Accepts a .json multipart file, creates a DayBookUploadJob scoped to the caller's org,
-     * parses and persists all vouchers synchronously, then returns the job result.
+     * Accepts a .json multipart file with a declared coverage range, creates a
+     * DayBookUploadJob scoped to the caller's org, parses and persists all vouchers
+     * synchronously, then returns the job result. Validation lives in DayBookIntakeService.
      *
-     * On parse failure: job is saved with status=FAILED, returns HTTP 400 with error body.
      * On success: job is saved with status=COMPLETED, returns HTTP 201 with DayBookUploadJobResponse.
+     * Rejections map DayBookIntakeException to its own status and body.
      */
     @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/day-book/upload")
     public ResponseEntity<?> uploadDayBook(
             @RequestParam("file") MultipartFile file,
+            @RequestParam("coverageFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate coverageFrom,
+            @RequestParam("coverageTo") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate coverageTo,
             @AuthenticationPrincipal UserDetailsImpl principal) {
 
         UUID orgId = principal.getOrganizationId();
@@ -85,101 +92,37 @@ public class DayBookController {
                     .body(Map.of("error", "User is not linked to an organization. Call POST /api/organizations first."));
         }
 
-        // Gate check: block daybook uploads when masters are not validated
-        GateResult gate = mastersGateService.checkGate(orgId);
-        if (gate.gated()) {
-            return ResponseEntity.unprocessableEntity().body(Map.of(
-                "error", gate.unresolvedCount() == 0
-                    ? "Masters have not been validated. Upload and validate masters first."
-                    : gate.unresolvedCount() + " unresolved finding(s) must be approved before uploading the daybook.",
-                "unresolvedCount", gate.unresolvedCount()
-            ));
-        }
-
-        // Security: file extension check — prevent file extension spoofing (T-4-03)
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".json")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Only JSON files are accepted."));
-        }
-
-        // Create job record with default FAILED status — updated to COMPLETED after success
-        DayBookUploadJob job = new DayBookUploadJob();
-        job.setOrganizationId(orgId);
-        job.setFileName(originalFilename);
-        job.setUploadedBy(principal.getUsername());
-        job.setStatus(UploadJobStatus.FAILED);
-        job = dayBookUploadJobRepository.save(job);
-
-        TallyMessage tallyMessage;
         try {
-            tallyMessage = tallyParserService.parseJson(file);
-        } catch (IllegalArgumentException e) {
-            job.setErrorMessage(e.getMessage());
-            job.setCompletedAt(Instant.now());
-            dayBookUploadJobRepository.save(job);
+            DayBookIntakeResult result = dayBookIntakeService.intake(
+                    file, coverageFrom, coverageTo, orgId, principal.getUsername(), null);
+            return ResponseEntity.status(201).body(dayBookIntakeService.toResponse(result.job(), result.warnings()));
+        } catch (DayBookIntakeException e) {
+            return ResponseEntity.status(e.getStatus()).body(e.getBody());
+        }
+    }
+    /**
+     * GET /api/v1/day-book/uploads?page=0&size=20
+     *
+     * Paged upload history for the caller's organization, newest first.
+     * Voucher summaries are omitted in list items.
+     */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/day-book/uploads")
+    public ResponseEntity<?> listUploads(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", e.getMessage(), "uploadId", job.getId()));
-        } catch (IOException e) {
-            job.setErrorMessage("Failed to read file: " + e.getMessage());
-            job.setCompletedAt(Instant.now());
-            dayBookUploadJobRepository.save(job);
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "File parsing failed.", "uploadId", job.getId()));
+                    .body(Map.of("error", "User is not linked to an organization."));
         }
-
-        // Service-level envelope validation: null tallymessage → FAILED job (T-4-02)
-        if (tallyMessage.getTallymessage() == null) {
-            String msg = "Tally message contains no vouchers. Check that the file is a valid Tally day book export.";
-            job.setErrorMessage(msg);
-            job.setCompletedAt(Instant.now());
-            dayBookUploadJobRepository.save(job);
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", msg, "uploadId", job.getId()));
-        }
-
-        // Extract unique ledger names from all voucher entries in the parsed message
-        Set<String> daybookLedgers = tallyMessage.getTallymessage().stream()
-                .flatMap(v -> v.getAllLedgerEntriesCombined() != null
-                        ? v.getAllLedgerEntriesCombined().stream()
-                        : Stream.empty())
-                .map(entry -> entry.getLedgername())
-                .filter(name -> name != null && !name.isBlank())
-                .collect(Collectors.toSet());
-
-        if (!daybookLedgers.isEmpty()) {
-            List<String> unknownLedgers = dayBookMasterValidationService.findUnknownLedgers(orgId, daybookLedgers);
-            if (!unknownLedgers.isEmpty()) {
-                job.setStatus(UploadJobStatus.FAILED);
-                job.setErrorMessage("Unknown ledgers: " + unknownLedgers);
-                job.setCompletedAt(Instant.now());
-                dayBookUploadJobRepository.save(job);
-                return ResponseEntity.unprocessableEntity().body(Map.of(
-                    "error", "Daybook contains ledgers not found in validated masters.",
-                    "unknownLedgers", unknownLedgers
-                ));
-            }
-        }
-
-        var persistedVouchers = dayBookParserService.persistVouchers(tallyMessage, job.getId(), orgId);
-        job.setTotalVouchersParsed(persistedVouchers.size());
-        job.setStatus(UploadJobStatus.COMPLETED);
-        job.setCompletedAt(Instant.now());
-        job = dayBookUploadJobRepository.save(job);
-
-        // Build summary from persisted vouchers
-        List<Object[]> summaryRows = parsedVoucherRepository.findVoucherTypeSummary(job.getId());
-        List<VoucherTypeSummaryResponse> summary = toSummaryList(summaryRows);
-
-        return ResponseEntity.status(201).body(DayBookUploadJobResponse.builder()
-                .id(job.getId())
-                .fileName(job.getFileName())
-                .status(job.getStatus())
-                .totalVouchersParsed(job.getTotalVouchersParsed())
-                .uploadedBy(job.getUploadedBy())
-                .createdAt(job.getCreatedAt())
-                .completedAt(job.getCompletedAt())
-                .voucherSummary(summary)
-                .build());
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        var jobs = dayBookUploadJobRepository.findByOrganizationId(orgId, pageable);
+        return ResponseEntity.ok(jobs.map(job ->
+                com.arktech.superaccountant.daybook.payload.response.DayBookUploadJobResponseMapper
+                        .toResponse(job, null, null)));
     }
 
     /**

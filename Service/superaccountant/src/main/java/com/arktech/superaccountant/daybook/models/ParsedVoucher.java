@@ -32,6 +32,17 @@ public class ParsedVoucher {
     @Column(name = "voucher_number")
     private String voucherNumber;
 
+    // Tally master identity for re-upload matching (worker R)
+    @Column(name = "tally_master_id", length = 64)
+    private String tallyMasterId;
+
+    @Column(name = "tally_alter_id", length = 64)
+    private String tallyAlterId;
+
+    // SHA-256 hex (64 chars) of the canonical voucher form (VoucherCanonicalizer)
+    @Column(name = "content_hash", length = 64)
+    private String contentHash;
+
     @Column(name = "voucher_type_name", nullable = false)
     private String voucherTypeName;
 

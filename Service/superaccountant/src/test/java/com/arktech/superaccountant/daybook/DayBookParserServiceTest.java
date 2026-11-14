@@ -4,6 +4,7 @@ import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.daybook.services.DayBookParserService;
+import com.arktech.superaccountant.daybook.services.VoucherCanonicalizer;
 import com.arktech.superaccountant.tally.models.GstRateDetail;
 import com.arktech.superaccountant.tally.models.LedgerEntry;
 import com.arktech.superaccountant.tally.models.TallyMessage;
@@ -331,5 +332,36 @@ class DayBookParserServiceTest {
                 .isEqualByComparingTo(new BigDecimal("18"));
         assertThat(parsedRateFor(rate("Integrated Tax", "18"), rate("Cess", "12")))
                 .isEqualByComparingTo(new BigDecimal("18"));
+    }
+
+    @Test
+    void persistVouchers_setsTallyIdsAndContentHash() {
+        LedgerEntry entry = new LedgerEntry();
+        entry.setLedgername("Test Purchases");
+        entry.setAmount("-100.00");
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setVouchernumber("101");
+        voucher.setDate("20250401");
+        voucher.setMasterid("123");
+        voucher.setAlterid("456");
+        voucher.setAllLedgerEntries(List.of(entry));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> result = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(result).hasSize(1);
+        ParsedVoucher persisted = result.get(0);
+        assertThat(persisted.getTallyMasterId()).isEqualTo("123");
+        assertThat(persisted.getTallyAlterId()).isEqualTo("456");
+        assertThat(persisted.getContentHash())
+                .isEqualTo(VoucherCanonicalizer.contentHash(voucher));
     }
 }

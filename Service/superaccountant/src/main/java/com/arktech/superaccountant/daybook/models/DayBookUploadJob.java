@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -42,4 +43,22 @@ public class DayBookUploadJob {
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
+
+    // Declared coverage range (required for every upload, N2)
+    @Column(name = "coverage_from")
+    private LocalDate coverageFrom;
+
+    @Column(name = "coverage_to")
+    private LocalDate coverageTo;
+
+    // Actual voucher date range observed in the file (null/unparseable dates ignored)
+    @Column(name = "min_voucher_date")
+    private LocalDate minVoucherDate;
+
+    @Column(name = "max_voucher_date")
+    private LocalDate maxVoucherDate;
+
+    // Workflow this upload was made for, or null for a legacy upload
+    @Column(name = "created_for_workflow_id")
+    private UUID createdForWorkflowId;
 }
