@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { AppShell } from '@/components/AppShell'
-import { GateLockedBanner } from '@/components/GateLocked'
 import { api } from '@/lib/api'
 import { UploadCloud, FileJson, X, CheckCircle2, AlertCircle } from 'lucide-react'
 
@@ -20,12 +19,17 @@ interface UploadResult {
   totalVouchersParsed: number
   errorMessage: string | null
   voucherSummary: VoucherTypeSummaryRow[]
+  warnings?: string[]
 }
 
-interface GateStatus {
-  gated: boolean
-  reason?: string
-  unresolvedCount?: number
+interface UploadHistoryRow {
+  id: string
+  fileName: string
+  status: 'COMPLETED' | 'FAILED'
+  totalVouchersParsed: number
+  coverageFrom: string | null
+  coverageTo: string | null
+  createdAt: string
 }
 
 const VOUCHER_TYPE_ORDER = [
@@ -46,27 +50,24 @@ export function DayBookPage() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [uploadError, setUploadError] = useState('')
   const [dropZoneError, setDropZoneError] = useState('')
-  const [gateStatus, setGateStatus] = useState<GateStatus | null>(null)
-  const [gateLoading, setGateLoading] = useState(true)
+  const [coverageFrom, setCoverageFrom] = useState('')
+  const [coverageTo, setCoverageTo] = useState('')
+  const [history, setHistory] = useState<UploadHistoryRow[]>([])
 
   useEffect(() => {
-    const loadGateStatus = async () => {
-      setGateLoading(true)
+    const loadHistory = async () => {
       try {
-        const res = await api.get('/v1/masters/gate-status')
-        setGateStatus(res.data)
+        const res = await api.get('/v1/day-book/uploads', { params: { page: 0, size: 20 } })
+        setHistory(res.data.content ?? [])
       } catch {
-        // Fail open — gate check error does not block the page
-      } finally {
-        setGateLoading(false)
+        // History is informational; a load failure does not block uploads
       }
     }
-    loadGateStatus()
+    loadHistory()
   }, [])
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
-    if (gateStatus?.gated) return
     setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (!file) return
@@ -100,6 +101,8 @@ export function DayBookPage() {
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
+      formData.append('coverageFrom', coverageFrom)
+      formData.append('coverageTo', coverageTo)
       const res = await api.post('/v1/day-book/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
@@ -119,17 +122,6 @@ export function DayBookPage() {
   return (
     <AppShell>
       <main className="flex-1 overflow-y-auto p-6">
-        {gateLoading && (
-          <div className="h-12 bg-[var(--color-surface-raised)] rounded-[var(--radius-md)] animate-pulse mb-6" />
-        )}
-
-        {!gateLoading && gateStatus?.gated && (
-          <GateLockedBanner
-            unresolvedCount={gateStatus.unresolvedCount ?? 0}
-            reason={gateStatus.reason ?? 'Unresolved masters findings must be resolved before uploading the day book.'}
-          />
-        )}
-
         <div className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] p-6 shadow-[var(--shadow-sm)] mb-6">
           <div
             role="button"
@@ -142,18 +134,16 @@ export function DayBookPage() {
             onDrop={handleDrop}
             onDragOver={(e) => {
               e.preventDefault()
-              if (!gateStatus?.gated) setDragOver(true)
+              setDragOver(true)
             }}
             onDragLeave={() => setDragOver(false)}
             onKeyDown={(e) => {
-              if (gateStatus?.gated) return
               if (e.key === 'Enter' || e.key === ' ')
                 document.getElementById('file-input')?.click()
             }}
             className={[
               'min-h-[160px] flex flex-col items-center justify-center gap-3 py-10 px-6',
               'rounded-[var(--radius-md)] transition-colors cursor-pointer',
-              gateStatus?.gated ? 'cursor-not-allowed opacity-75' : '',
               dropZoneError ? 'border-2 border-[var(--color-danger)]' : '',
               !dropZoneError && !selectedFile && !dragOver
                 ? 'border-2 border-dashed border-[var(--color-border)] bg-[var(--color-bg)]'
@@ -163,7 +153,7 @@ export function DayBookPage() {
                 ? 'border border-[var(--color-border-strong)] bg-[var(--color-surface)]'
                 : '',
             ].join(' ')}
-            onClick={() => !selectedFile && !gateStatus?.gated && document.getElementById('file-input')?.click()}
+            onClick={() => !selectedFile && document.getElementById('file-input')?.click()}
           >
             {uploading ? (
               <p className="text-sm text-[var(--color-text-secondary)]">Uploading…</p>
@@ -200,13 +190,8 @@ export function DayBookPage() {
                 <p className="text-xs text-[var(--color-text-muted)]">or</p>
                 <button
                   aria-label="Browse for Tally JSON file"
-                  disabled={gateStatus?.gated}
                   onClick={(e) => {
                     e.stopPropagation()
-                    if (gateStatus?.gated) {
-
-                      return
-                    }
                     document.getElementById('file-input')?.click()
                   }}
                   className="h-9 px-4 text-sm border border-[var(--color-border)] rounded-[var(--radius-md)] hover:bg-[var(--color-surface-raised)] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -222,16 +207,40 @@ export function DayBookPage() {
 
           <input
             id="file-input"
+            data-testid="file-input"
             type="file"
             accept=".json"
             className="hidden"
             onChange={handleFileInput}
           />
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              Coverage from
+              <input
+                type="date"
+                aria-label="Coverage from"
+                value={coverageFrom}
+                onChange={(e) => setCoverageFrom(e.target.value)}
+                className="mt-1 block w-full h-10 px-3 bg-[var(--color-bg)] text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-[var(--radius-sm)]"
+              />
+            </label>
+            <label className="text-sm text-[var(--color-text-secondary)]">
+              Coverage to
+              <input
+                type="date"
+                aria-label="Coverage to"
+                value={coverageTo}
+                onChange={(e) => setCoverageTo(e.target.value)}
+                className="mt-1 block w-full h-10 px-3 bg-[var(--color-bg)] text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-[var(--radius-sm)]"
+              />
+            </label>
+          </div>
+
           <div className="flex justify-end mt-4">
             <button
               aria-label={uploading ? 'Uploading Day Book file, please wait' : 'Upload Day Book'}
-              disabled={!selectedFile || uploading || !!gateStatus?.gated}
+              disabled={!selectedFile || uploading || !coverageFrom || !coverageTo}
               onClick={handleUpload}
               className="h-11 px-6 bg-[var(--color-primary)] text-white rounded-[var(--radius-md)] hover:bg-[var(--color-primary-hover)] text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -257,6 +266,16 @@ export function DayBookPage() {
             </div>
           )}
 
+          {uploadResult?.status === 'COMPLETED' && uploadResult.warnings?.length ? (
+            <div className="mt-4 bg-[var(--color-warning-bg,transparent)] border border-[var(--color-border)] rounded-[var(--radius-md)] p-4">
+              {uploadResult.warnings.map((w) => (
+                <p key={w} role="status" className="text-sm text-[var(--color-text-secondary)]">
+                  {w}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
           {(uploadResult?.status === 'FAILED' || uploadError) && (
             <div className="mt-4 bg-[var(--color-danger-bg)] border border-[var(--color-danger)]/20 rounded-[var(--radius-md)] p-4 flex items-start gap-3">
               <AlertCircle size={18} className="text-[var(--color-danger)] flex-shrink-0 mt-0.5" />
@@ -279,6 +298,49 @@ export function DayBookPage() {
             </div>
           )}
         </div>
+
+        <section className="mt-8">
+          <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-4">
+            Previous Uploads
+          </h2>
+          <div className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  {['File', 'Uploaded', 'Coverage', 'Vouchers', 'Status'].map((col) => (
+                    <th
+                      key={col}
+                      scope="col"
+                      className="px-4 py-3 text-left text-[0.75rem] font-semibold uppercase tracking-[0.05em] text-[var(--color-text-secondary)]"
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="h-12 border-t border-[var(--color-surface-raised)] hover:bg-[var(--color-surface-raised)]"
+                  >
+                    <td className="px-4 py-2 text-sm text-[var(--color-text-primary)]">{row.fileName}</td>
+                    <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+                      {new Date(row.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-sm font-mono text-[var(--color-text-secondary)]">
+                      {row.coverageFrom && row.coverageTo ? `${row.coverageFrom} – ${row.coverageTo}` : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-sm font-mono text-[var(--color-text-primary)] text-right">
+                      {row.totalVouchersParsed ?? 0}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">{row.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {uploadResult?.status === 'COMPLETED' && (
           <section>

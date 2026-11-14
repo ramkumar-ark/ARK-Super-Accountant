@@ -148,6 +148,7 @@ public class DayBookIntakeService {
             dayBookUploadJobRepository.save(job);
             throw new DayBookIntakeException(422, Map.of(
                     "error", msg,
+                    "uploadId", job.getId(),
                     "outOfRangeCount", outOfRangeCount,
                     "firstOutOfRangeDate", firstOutOfRangeDate.toString()));
         }

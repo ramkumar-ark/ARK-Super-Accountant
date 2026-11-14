@@ -369,6 +369,51 @@ class DayBookControllerIT {
                 .andReturn();
     }
 
+    // ── Upload history tests (worker B) ─────────────────────────────────────
+
+    @Test
+    void listUploads_returnsNewestFirstWithCoverage() throws Exception {
+        String token = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "first.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-04-30")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "second.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-05-31")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/day-book/uploads")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].fileName").value("second.json"))
+                .andExpect(jsonPath("$.content[0].coverageFrom").value("2025-04-01"))
+                .andExpect(jsonPath("$.content[0].coverageTo").value("2025-05-31"))
+                .andExpect(jsonPath("$.content[1].fileName").value("first.json"));
+    }
+
+    @Test
+    void listUploads_otherOrgSeesNothing() throws Exception {
+        String token1 = setupOrgScopedToken();
+        byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
+        mockMvc.perform(multipart("/api/v1/day-book/upload")
+                        .file(new MockMultipartFile("file", "mine.json", "application/json", fixture))
+                        .param("coverageFrom", "2025-04-01").param("coverageTo", "2025-05-31")
+                        .header("Authorization", "Bearer " + token1))
+                .andExpect(status().isCreated());
+
+        String token2 = setupOrgScopedTokenNoMasters();
+        mockMvc.perform(get("/api/v1/day-book/uploads")
+                        .header("Authorization", "Bearer " + token2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
     // ── Masters-validated precondition tests ────────────────────────────────
 
     @Test

@@ -54,7 +54,7 @@ class WorkflowUploadControllerIT {
     }
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
     @Autowired private OrganizationRepository organizationRepository;
     @Autowired private UploadJobRepository uploadJobRepository;
     @Autowired private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
@@ -135,12 +135,13 @@ class WorkflowUploadControllerIT {
 
     @Test
     void upload_byOwner_returns403() throws Exception {
+        // WorkflowController.start is ACCOUNTANT/OPERATOR-only, so an owner cannot
+        // even create a workflow; the upload endpoint must refuse owners too.
         String ownerToken = setupOwnerOrg();
-        UUID workflowId = startWorkflow(ownerToken);
         byte[] fixture = getClass().getResourceAsStream("/fixtures/daybook-minimal.json").readAllBytes();
 
         mockMvc.perform(
-                        multipart("/api/v1/workflows/" + workflowId + "/upload")
+                        multipart("/api/v1/workflows/" + UUID.randomUUID() + "/upload")
                                 .file(new MockMultipartFile("file", "daybook-minimal.json",
                                         "application/json", fixture))
                                 .param("coverageFrom", "2025-04-01")
@@ -177,7 +178,7 @@ class WorkflowUploadControllerIT {
     }
 
     private String setupOwnerOrg() throws Exception {
-        return setupOrg("owner", true);
+        return setupOrg("owner", false);
     }
 
     private String setupOrg(String role, boolean seedMasters) throws Exception {

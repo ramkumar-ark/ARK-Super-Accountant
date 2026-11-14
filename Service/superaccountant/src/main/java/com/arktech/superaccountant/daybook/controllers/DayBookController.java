@@ -101,6 +101,31 @@ public class DayBookController {
         }
     }
     /**
+     * GET /api/v1/day-book/uploads?page=0&size=20
+     *
+     * Paged upload history for the caller's organization, newest first.
+     * Voucher summaries are omitted in list items.
+     */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/day-book/uploads")
+    public ResponseEntity<?> listUploads(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "User is not linked to an organization."));
+        }
+        var pageable = org.springframework.data.domain.PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+        var jobs = dayBookUploadJobRepository.findByOrganizationId(orgId, pageable);
+        return ResponseEntity.ok(jobs.map(job ->
+                com.arktech.superaccountant.daybook.payload.response.DayBookUploadJobResponseMapper
+                        .toResponse(job, null, null)));
+    }
+
+    /**
      * GET /api/v1/day-book/summary/{jobId}
      *
      * Returns voucher type breakdown for a specific upload job.

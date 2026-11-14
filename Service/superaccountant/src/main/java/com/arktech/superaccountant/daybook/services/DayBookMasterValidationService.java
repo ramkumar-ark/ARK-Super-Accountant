@@ -4,7 +4,6 @@ import com.arktech.superaccountant.masters.models.UploadJob;
 import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
-import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,9 +21,6 @@ public class DayBookMasterValidationService {
 
     @Autowired
     private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
-
-    @Autowired
-    private ValidationFindingRepository findingRepository;
 
     /**
      * Returns list of ledger names from the daybook that don't exist in the org's
@@ -46,13 +42,6 @@ public class DayBookMasterValidationService {
         }
 
         UploadJob validatedJob = validatedJobOpt.get();
-
-        // Verify this job is actually fully validated
-        long unresolvedCount = findingRepository.countUnresolvedForGate(validatedJob.getId());
-        if (unresolvedCount > 0) {
-            // Gate should have blocked this upload; defensively treat all as unknown
-            return List.copyOf(daybookLedgers);
-        }
 
         // Fetch all known ledger names from the validated job's snapshots
         List<String> knownLedgerNames = uploadLedgerSnapshotRepository
