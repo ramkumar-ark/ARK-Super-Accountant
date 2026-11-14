@@ -64,24 +64,65 @@ class WorkflowGateTest {
         org.mockito.Mockito.verify(source, org.mockito.Mockito.never()).blockingCount(any());
     }
 
+    private com.arktech.superaccountant.masters.models.ValidationFinding finding(String ruleCode,
+            com.arktech.superaccountant.masters.models.FindingSeverity severity,
+            com.arktech.superaccountant.masters.models.ResolveStatus status) {
+        com.arktech.superaccountant.masters.models.ValidationFinding f =
+                new com.arktech.superaccountant.masters.models.ValidationFinding();
+        f.setRuleCode(ruleCode);
+        f.setSeverity(severity);
+        f.setResolveStatus(status);
+        f.setUploadJobId(workflow.getMastersJobId());
+        return f;
+    }
+
     @Test
-    void mastersSource_nullMastersJob_zero() {
-        MastersBlockingSource source = new MastersBlockingSource(findingRepository);
+    void scopedSource_nullMastersJob_zeroEmptyNoRepoCalls() {
+        ScopedMastersFindingSource source = new ScopedMastersFindingSource();
+        source.findingRepository = findingRepository;
+        source.scopeService = org.mockito.Mockito.mock(com.arktech.superaccountant.masters.scope.MastersScopeService.class);
         workflow.setMastersJobId(null);
 
         assertThat(source.appliesTo(workflow)).isTrue();
         assertThat(source.blockingCount(workflow)).isZero();
-        org.mockito.Mockito.verifyNoInteractions(findingRepository);
+        assertThat(source.list(workflow)).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(findingRepository, source.scopeService);
     }
 
     @Test
-    void mastersSource_countsAllSeveritiesExceptTerminal() {
-        MastersBlockingSource source = new MastersBlockingSource(findingRepository);
+    void scopedSource_countsAllSeveritiesInScopeOnly() {
+        com.arktech.superaccountant.masters.scope.MastersScopeService scopeService =
+                org.mockito.Mockito.mock(com.arktech.superaccountant.masters.scope.MastersScopeService.class);
+        ScopedMastersFindingSource source = new ScopedMastersFindingSource();
+        source.findingRepository = findingRepository;
+        source.scopeService = scopeService;
         workflow.setMastersJobId(UUID.randomUUID());
+        var ctx = new com.arktech.superaccountant.masters.scope.MastersScopeService.ScopeContext(
+                java.util.Map.of(), java.util.Map.of());
+        org.mockito.Mockito.when(scopeService.contextFor(workflow.getMastersJobId())).thenReturn(ctx);
+        org.mockito.Mockito.when(scopeService.inScope(
+                        org.mockito.ArgumentMatchers.any(com.arktech.superaccountant.masters.models.ValidationFinding.class),
+                        org.mockito.ArgumentMatchers.eq(WorkflowType.GSTR1),
+                        org.mockito.ArgumentMatchers.eq(ctx)))
+                .thenAnswer(inv -> {
+                    com.arktech.superaccountant.masters.models.ValidationFinding f = inv.getArgument(0);
+                    return "HSN_SAC_CODE".equals(f.getRuleCode());
+                });
+        org.mockito.Mockito.when(findingRepository.findByUploadJobId(workflow.getMastersJobId()))
+                .thenReturn(java.util.List.of(
+                        finding("HSN_SAC_CODE", com.arktech.superaccountant.masters.models.FindingSeverity.INFO,
+                                ResolveStatus.OPEN),
+                        finding("HSN_SAC_CODE", com.arktech.superaccountant.masters.models.FindingSeverity.ERROR,
+                                ResolveStatus.ACKNOWLEDGED),
+                        finding("TDS_SECTION_MAPPING", com.arktech.superaccountant.masters.models.FindingSeverity.ERROR,
+                                ResolveStatus.OPEN),
+                        finding("HSN_SAC_CODE", com.arktech.superaccountant.masters.models.FindingSeverity.ERROR,
+                                ResolveStatus.APPROVED),
+                        finding("HSN_SAC_CODE", com.arktech.superaccountant.masters.models.FindingSeverity.ERROR,
+                                ResolveStatus.RESOLVED),
+                        finding("HSN_SAC_CODE", com.arktech.superaccountant.masters.models.FindingSeverity.ERROR,
+                                ResolveStatus.DISCARDED)));
 
-        assertThat(source.blockingCount(workflow)).isEqualTo(1);
-        org.mockito.Mockito.verify(findingRepository).countByUploadJobIdAndResolveStatusNotIn(
-                workflow.getMastersJobId(), java.util.EnumSet.of(ResolveStatus.APPROVED,
-                        ResolveStatus.RESOLVED, ResolveStatus.DISCARDED));
+        assertThat(source.blockingCount(workflow)).isEqualTo(2);
     }
 }
