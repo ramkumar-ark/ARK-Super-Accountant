@@ -39,6 +39,21 @@ public class Organization {
     @Column(name = "books_start_date")
     private LocalDate booksStartDate;
 
+    public static final String TAN_PATTERN = "[A-Z]{4}[0-9]{5}[A-Z]";
+
+    @Column(name = "tan", length = 10)
+    private String tan;
+
+    // NSDL deductor/collector category code, e.g. "K" = Company, "P" = Individual/HUF
+    @Column(name = "deductor_type", length = 2)
+    private String deductorType;
+
+    @Column(name = "responsible_person_name")
+    private String responsiblePersonName;
+
+    @Column(name = "responsible_person_designation")
+    private String responsiblePersonDesignation;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 

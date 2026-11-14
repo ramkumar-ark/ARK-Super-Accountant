@@ -10,6 +10,7 @@ import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.OrganizationInvite;
 import com.arktech.superaccountant.masters.models.UserOrganization;
 import com.arktech.superaccountant.masters.payload.request.CreateOrganizationRequest;
+import com.arktech.superaccountant.masters.payload.request.UpdateDeductorDetailsRequest;
 import com.arktech.superaccountant.masters.repository.OrganizationInviteRepository;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
@@ -100,6 +101,38 @@ public class OrganizationController {
                         "createdAt", org.getCreatedAt()
                 )))
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    @PatchMapping("/{id}/deductor")
+    public ResponseEntity<?> updateDeductorDetails(
+            @PathVariable UUID id,
+            @RequestBody UpdateDeductorDetailsRequest request,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+
+        Optional<UserOrganization> membership = userOrganizationRepository
+                .findByUserIdAndOrganizationId(principal.getId(), id);
+        if (membership.isEmpty()) {
+            return ResponseEntity.status(403).body(new MessageResponse("Access denied to this organization"));
+        }
+
+        Optional<Organization> orgOpt = organizationRepository.findById(id);
+        if (orgOpt.isEmpty()) return ResponseEntity.notFound().build();
+        Organization org = orgOpt.get();
+
+        if (request.getTan() != null) {
+            String tan = request.getTan().trim().toUpperCase();
+            if (!tan.matches(Organization.TAN_PATTERN)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid TAN format. Expected AAAA99999A."));
+            }
+            org.setTan(tan);
+        }
+        if (request.getDeductorType() != null) org.setDeductorType(request.getDeductorType());
+        if (request.getResponsiblePersonName() != null) org.setResponsiblePersonName(request.getResponsiblePersonName());
+        if (request.getResponsiblePersonDesignation() != null) org.setResponsiblePersonDesignation(request.getResponsiblePersonDesignation());
+
+        organizationRepository.save(org);
+        return ResponseEntity.ok(org);
     }
 
     @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
