@@ -45,11 +45,15 @@ class WorkflowControllerIT {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String signupAndLogin(String username, String email) throws Exception {
+        return signupAndLogin(username, email, "owner");
+    }
+
+    private String signupAndLogin(String username, String email, String role) throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"username":"%s","email":"%s","password":"pass1234","role":"owner"}
-                    """.formatted(username, email)))
+                    {"username":"%s","email":"%s","password":"pass1234","role":"%s"}
+                    """.formatted(username, email, role)))
                 .andExpect(status().isOk());
         return login(username);
     }
@@ -92,7 +96,7 @@ class WorkflowControllerIT {
                 .readTree(inviteResult.getResponse().getContentAsString())
                 .get("token").asText();
 
-        signupAndLogin(username, email);
+        signupAndLogin(username, email, role);
         mockMvc.perform(post("/api/organizations/invites/{token}/accept", token)
                 .header("Authorization", "Bearer " + login(username)))
                 .andExpect(status().isOk());
