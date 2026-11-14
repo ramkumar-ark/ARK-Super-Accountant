@@ -29,6 +29,10 @@ public class UploadLedgerSnapshot {
     @Column(name = "parent_group")
     private String parentGroup;
 
+    /** Classified ledger category; null on snapshots uploaded before this column existed. */
+    @Enumerated(EnumType.STRING)
+    private LedgerCategory category;
+
     @Column(name = "gst_applicable")
     private Boolean gstApplicable;
 

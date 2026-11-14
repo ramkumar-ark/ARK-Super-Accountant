@@ -85,6 +85,8 @@ public class DayBookParserService {
                 // Tally convention: positive amount = debit side; negative = credit side
                 pve.setDebit(amount.compareTo(BigDecimal.ZERO) > 0);
                 pve.setGstClass(le.getGstclass());
+                pve.setGstTaxability(le.getGstovrdntaxability());
+                pve.setGstRate(sumRateDetails(le));
                 pve.setPartyLedger(le.isIspartyledger());
 
                 // totalDebit = sum of positive amounts; totalCredit = sum of abs(negative amounts)
@@ -128,5 +130,32 @@ public class DayBookParserService {
         } catch (NumberFormatException e) {
             return BigDecimal.ZERO;
         }
+    }
+
+    /**
+     * Item GST rate from Tally ratedetails: the Integrated Tax rate when present and non-zero,
+     * otherwise Central Tax + State/UT Tax. Cess and unknown heads are excluded.
+     * Returns null when the resulting rate is zero or nothing parsed.
+     */
+    private BigDecimal sumRateDetails(LedgerEntry le) {
+        if (le.getRatedetails() == null || le.getRatedetails().isEmpty()) return null;
+        BigDecimal igst = BigDecimal.ZERO;
+        BigDecimal central = BigDecimal.ZERO;
+        BigDecimal state = BigDecimal.ZERO;
+        for (var rd : le.getRatedetails()) {
+            if (rd.getGstratedutyhead() == null || rd.getGstrate() == null || rd.getGstrate().isBlank()) continue;
+            BigDecimal rate;
+            try {
+                rate = new BigDecimal(rd.getGstrate().trim().replace(",", ""));
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            String head = rd.getGstratedutyhead().toLowerCase();
+            if (head.contains("integrated")) igst = igst.add(rate);
+            else if (head.contains("central")) central = central.add(rate);
+            else if (head.contains("state") || head.contains("ut tax") || head.contains("union")) state = state.add(rate);
+        }
+        BigDecimal total = igst.signum() > 0 ? igst : central.add(state);
+        return total.signum() > 0 ? total : null;
     }
 }

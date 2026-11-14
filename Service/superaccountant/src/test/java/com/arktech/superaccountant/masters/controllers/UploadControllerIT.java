@@ -6,6 +6,10 @@ import com.arktech.superaccountant.login.models.User;
 import com.arktech.superaccountant.login.repository.RoleRepository;
 import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
+import com.arktech.superaccountant.masters.models.Organization;
+import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +25,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -200,5 +207,44 @@ class UploadControllerIT {
         mockMvc.perform(multipart("/api/v1/uploads")
                         .file(fakeFile))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private UploadLedgerSnapshotRepository snapshotRepository;
+
+    // Masters upload snapshots carry the classified ledger category.
+    @Test
+    void upload_snapshotsCarryLedgerCategory() throws Exception {
+        Organization org = organizationRepository.save(new Organization("Category Org " + java.util.UUID.randomUUID()));
+        String accountantJwt = jwtUtils.generateJwtTokenForUser("upload_accountant", org.getId());
+
+        String masters = """
+                {"tallymessage": [
+                  {"group": {"name": "Indirect Expenses", "parent": ""}},
+                  {"ledger": {"name": "Office Rent", "guid": "g4", "parent": "Indirect Expenses"}}
+                ]}
+                """;
+        MockMultipartFile file = new MockMultipartFile("file", "masters.json",
+                "application/json", masters.getBytes());
+        String body = mockMvc.perform(multipart("/api/v1/uploads")
+                        .file(file)
+                        .header("Authorization", "Bearer " + accountantJwt))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("\"id\"\\s*:\\s*\"([0-9a-f-]{36})\"").matcher(body);
+        String last = null;
+        while (m.find()) last = m.group(1);
+        UUID jobId = java.util.UUID.fromString(last);
+
+        java.util.List<UploadLedgerSnapshot> snapshots = snapshotRepository
+                .findByUploadJobId(jobId);
+        assertThat(snapshots).isNotEmpty();
+        snapshots.forEach(s ->
+                assertThat(s.getCategory()).isNotNull());
     }
 }
