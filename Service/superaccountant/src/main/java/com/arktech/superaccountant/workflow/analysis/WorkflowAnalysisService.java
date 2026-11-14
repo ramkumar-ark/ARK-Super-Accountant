@@ -12,6 +12,8 @@ import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -53,6 +55,9 @@ public class WorkflowAnalysisService {
         this.analyzers = analyzers == null ? List.of() : analyzers;
     }
 
+    // REQUIRES_NEW: the AFTER_COMMIT upload-bound listener fires while the binding transaction is
+    // completing, so a REQUIRED join would find no active transaction.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Workflow run(UUID organizationId, UUID workflowId, String actor) {
         Workflow workflow = workflowRepository.findByIdForUpdate(workflowId)
                 .orElseThrow(() -> new WorkflowBadRequestException("Workflow not found"));

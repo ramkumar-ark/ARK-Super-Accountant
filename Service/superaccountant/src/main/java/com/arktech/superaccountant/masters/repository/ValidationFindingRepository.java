@@ -116,6 +116,10 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
            "com.arktech.superaccountant.masters.models.ResolveStatus.DISCARDED)")
     long countUnresolvedForGate(@Param("jobId") UUID jobId);
 
+    /** The C2 blocking rule: every non-terminal finding of the job, at any severity. */
+    long countByUploadJobIdAndResolveStatusNotIn(java.util.UUID uploadJobId,
+            java.util.Collection<com.arktech.superaccountant.masters.models.ResolveStatus> statuses);
+
     @Modifying
     @Transactional
     @Query("UPDATE ValidationFinding f SET f.resolveStatus = " +
