@@ -89,6 +89,19 @@ class GstRcmRulesTest {
         assertEquals(VoucherSide.OTHER, f.get(0).getVoucherSide());
         assertEquals("Freight Charges, Job Work", f.get(0).getActualValue());
     }
+    @Test void rule9_silentWhenRepeatedLinesHitSameLedger() {
+        ParsedVoucher v = selfInvoice(D, "GTA Transport");
+        entryWithRate(v, "Freight Charges", "20000.00", "5", "Taxable");
+        entryWithRate(v, "freight charges", "3000.00", "5", "Taxable");
+        assertTrue(rule9.execute(context(), List.of(v)).isEmpty());
+    }
+    @Test void rule9_listsEachDistinctLedgerOnce() {
+        ParsedVoucher v = selfInvoice(D, "GTA Transport");
+        entryWithRate(v, "Freight Charges", "20000.00", "5", "Taxable");
+        entryWithRate(v, "Job Work", "5000.00", "18", "Taxable");
+        entryWithRate(v, "freight charges", "3000.00", "5", "Taxable");
+        assertEquals("Freight Charges, Job Work", rule9.execute(context(), List.of(v)).get(0).getActualValue());
+    }
     @Test void rule9_silentWithSingleTaxableEntryOrNonRcmVoucher() {
         ParsedVoucher single = selfInvoice(D, "GTA Transport");
         entryWithRate(single, "Freight Charges", "20000.00", "5", "Taxable");

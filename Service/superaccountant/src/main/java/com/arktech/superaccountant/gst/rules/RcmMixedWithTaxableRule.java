@@ -10,8 +10,10 @@ import com.arktech.superaccountant.masters.models.LedgerCategory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Locale;
+import java.util.Map;
 
 @Component
 public class RcmMixedWithTaxableRule implements GstDaybookRule {
@@ -22,12 +24,14 @@ public class RcmMixedWithTaxableRule implements GstDaybookRule {
         if (vouchers == null) return findings;
         for (ParsedVoucher v : vouchers) {
             if (v == null || v.isCancelled() || !v.isReverseChargeApplicable() || v.getEntries() == null) continue;
-            List<String> names = v.getEntries().stream()
+            Map<String, String> distinct = new LinkedHashMap<>();
+            v.getEntries().stream()
                     .filter(e -> !e.isPartyLedger())
                     .filter(e -> ctx.category(e.getLedgerName()) != LedgerCategory.GST)
                     .filter(e -> taxable(e, ctx))
                     .map(ParsedVoucherEntry::getLedgerName)
-                    .collect(Collectors.toList());
+                    .forEach(n -> distinct.putIfAbsent(n == null ? "" : n.trim().toLowerCase(Locale.ROOT), n));
+            List<String> names = new ArrayList<>(distinct.values());
             if (names.size() <= 1) continue;
             findings.add(GstRuleSupport.finding(ctx, v, GstFindingType.RCM_MIXED_WITH_TAXABLE,
                     FindingSeverity.LOW, null,
