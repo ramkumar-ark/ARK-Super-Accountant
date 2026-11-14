@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Component
 public class TdsEngine {
@@ -39,6 +40,7 @@ public class TdsEngine {
         List<VoucherFact> facts = new ArrayList<>();
         runPerVoucherPass(input, facts, findings, entries);
         runThresholdPass(facts, input, findings);
+        runAdvancePass(input, facts, findings);
         return new TdsAnalysisResult(findings, entries);
     }
 
@@ -270,6 +272,183 @@ public class TdsEngine {
                 }
             }
         }
+    }
+
+    private void runAdvancePass(TdsAnalysisInput input, List<VoucherFact> facts, List<TdsFinding> findings) {
+        record Movement(LocalDate date, BigDecimal amount, ParsedVoucher voucher, boolean voucherHasTds) {
+        }
+        record OpenPayment(ParsedVoucher voucher, BigDecimal remaining, boolean voucherHasTds) {
+        }
+        Map<String, List<Movement>> movementsByCreditor = new LinkedHashMap<>();
+        Map<String, String> creditorNames = new LinkedHashMap<>();
+        Map<String, UploadLedgerSnapshot> creditorSnaps = new LinkedHashMap<>();
+        for (ParsedVoucher v : input.vouchers()) {
+            if (v == null || v.isCancelled() || v.getVoucherDate() == null || v.getEntries() == null
+                    || v.getVoucherDate().isBefore(input.fyStart())
+                    || v.getVoucherDate().isAfter(input.periodEnd())) {
+                continue;
+            }
+            boolean voucherHasTds = false;
+            for (ParsedVoucherEntry e : v.getEntries()) {
+                if (e == null || e.getLedgerName() == null || e.getAmount() == null) {
+                    continue;
+                }
+                UploadLedgerSnapshot snapshot = input.snapshotsByName().get(key(e.getLedgerName()));
+                LedgerCategory category = snapshot != null && snapshot.getCategory() != null
+                        ? snapshot.getCategory() : LedgerCategory.OTHER;
+                if (category == LedgerCategory.TDS) {
+                    voucherHasTds = true;
+                }
+            }
+            for (ParsedVoucherEntry e : v.getEntries()) {
+                if (e == null || e.getLedgerName() == null || e.getAmount() == null
+                        || e.getAmount().signum() == 0) {
+                    continue;
+                }
+                UploadLedgerSnapshot snapshot = input.snapshotsByName().get(key(e.getLedgerName()));
+                if (snapshot == null || snapshot.getCategory() != LedgerCategory.CREDITOR) {
+                    continue;
+                }
+                String creditorKey = key(e.getLedgerName());
+                movementsByCreditor.computeIfAbsent(creditorKey, k -> new ArrayList<>())
+                        .add(new Movement(v.getVoucherDate(), e.getAmount(), v, voucherHasTds));
+                creditorNames.putIfAbsent(creditorKey, e.getLedgerName());
+                creditorSnaps.putIfAbsent(creditorKey, snapshot);
+            }
+        }
+        for (Map.Entry<String, List<Movement>> creditorEntry : movementsByCreditor.entrySet()) {
+            String creditorKey = creditorEntry.getKey();
+            List<Movement> movements = new ArrayList<>(creditorEntry.getValue());
+            movements.sort(Comparator.comparing(Movement::date));
+            BigDecimal opening = BigDecimal.ZERO;
+            UploadLedgerSnapshot creditorSnapshot = creditorSnaps.get(creditorKey);
+            if (creditorSnapshot != null && creditorSnapshot.getOpeningBalance() != null) {
+                opening = creditorSnapshot.getOpeningBalance();
+            }
+            BigDecimal available = opening.signum() < 0 ? opening.abs() : BigDecimal.ZERO;
+            java.util.ArrayDeque<OpenPayment> openPayments = new java.util.ArrayDeque<>();
+            Set<UUID> flagged = new HashSet<>();
+            List<LocalDate> monthEnds = monthEnds(input.periodStart(), input.periodEnd());
+            int i = 0;
+            for (LocalDate monthEnd : monthEnds) {
+                while (i < movements.size() && !movements.get(i).date().isAfter(monthEnd)) {
+                    Movement m = movements.get(i++);
+                    if (m.amount().signum() < 0) {
+                        available = available.add(m.amount().abs());
+                        while (available.signum() > 0 && !openPayments.isEmpty()) {
+                            OpenPayment op = openPayments.peek();
+                            BigDecimal absorbed = available.min(op.remaining());
+                            available = available.subtract(absorbed);
+                            BigDecimal left = op.remaining().subtract(absorbed);
+                            openPayments.poll();
+                            if (left.signum() > 0) {
+                                openPayments.addFirst(new OpenPayment(op.voucher(), left, op.voucherHasTds()));
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        BigDecimal remaining = m.amount();
+                        if (available.signum() > 0) {
+                            BigDecimal consumed = available.min(remaining);
+                            available = available.subtract(consumed);
+                            remaining = remaining.subtract(consumed);
+                        }
+                        if (remaining.signum() > 0) {
+                            openPayments.addLast(new OpenPayment(m.voucher(), remaining, m.voucherHasTds()));
+                        }
+                    }
+                }
+                for (OpenPayment op : openPayments) {
+                    if (op.remaining().signum() <= 0 || op.voucherHasTds()
+                            || !isInPeriod(op.voucher().getVoucherDate(), input)
+                            || !flagged.add(op.voucher().getId())) {
+                        continue;
+                    }
+                    String section = inferSection(creditorKey, input);
+                    String creditorName = creditorNames.get(creditorKey);
+                    if (section == null) {
+                        findings.add(finding(input, op.voucher(), TdsFindingType.ADVANCE_PAYMENT,
+                                FindingSeverity.MEDIUM, null, null, null,
+                                "Advance of " + op.remaining() + " outstanding at " + monthEnd
+                                        + " — no bill history to infer the nature of expense.",
+                                "Identify the expense nature/TDS section for this advance."));
+                    } else {
+                        TdsSectionConfig cfg = input.configsBySection().get(section);
+                        if (cfg != null && liable(creditorKey, section, op.remaining(),
+                                op.voucher().getVoucherDate(), facts, cfg)) {
+                            BigDecimal rate = rateFor(creditorKey, cfg, input);
+                            BigDecimal expected = op.remaining().multiply(rate)
+                                    .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+                            findings.add(finding(input, op.voucher(), TdsFindingType.ADVANCE_PAYMENT,
+                                    FindingSeverity.MEDIUM, section, expected, null,
+                                    "Advance of " + op.remaining() + " to '" + creditorName
+                                            + "' outstanding at " + monthEnd
+                                            + " — TDS deductible on payment under " + section + ".",
+                                    "Deduct TDS on the advance or verify this is a bill settlement."));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static List<LocalDate> monthEnds(LocalDate periodStart, LocalDate periodEnd) {
+        List<LocalDate> ends = new ArrayList<>();
+        java.time.YearMonth month = java.time.YearMonth.from(periodStart);
+        java.time.YearMonth last = java.time.YearMonth.from(periodEnd);
+        while (!month.isAfter(last)) {
+            ends.add(min(month.atEndOfMonth(), periodEnd));
+            month = month.plusMonths(1);
+        }
+        return ends;
+    }
+
+    private static LocalDate min(LocalDate a, LocalDate b) {
+        return a.isBefore(b) ? a : b;
+    }
+
+    private String inferSection(String creditorKey, TdsAnalysisInput input) {
+        Set<String> sections = new HashSet<>();
+        for (ParsedVoucher v : input.vouchers()) {
+            if (v == null || v.isCancelled() || v.getVoucherDate() == null || v.getEntries() == null
+                    || v.getVoucherDate().isBefore(input.fyStart())
+                    || v.getVoucherDate().isAfter(input.periodEnd())) {
+                continue;
+            }
+            boolean creditsCreditor = false;
+            for (ParsedVoucherEntry e : v.getEntries()) {
+                if (e == null || e.getLedgerName() == null || e.getAmount() == null) {
+                    continue;
+                }
+                UploadLedgerSnapshot snapshot = input.snapshotsByName().get(key(e.getLedgerName()));
+                if (snapshot != null && snapshot.getCategory() == LedgerCategory.CREDITOR
+                        && creditorKey.equals(key(e.getLedgerName())) && e.getAmount().signum() < 0) {
+                    creditsCreditor = true;
+                }
+            }
+            if (!creditsCreditor) {
+                continue;
+            }
+            for (ParsedVoucherEntry e : v.getEntries()) {
+                if (e == null || e.getLedgerName() == null || e.getAmount() == null
+                        || e.getAmount().signum() <= 0) {
+                    continue;
+                }
+                UploadLedgerSnapshot snapshot = input.snapshotsByName().get(key(e.getLedgerName()));
+                if (snapshot == null
+                        || !(snapshot.getCategory() == LedgerCategory.EXPENSE
+                        || snapshot.getCategory() == LedgerCategory.PURCHASE)
+                        || !Boolean.TRUE.equals(snapshot.getTdsApplicable())) {
+                    continue;
+                }
+                String section = snapshot.getTdsSection() == null ? null : snapshot.getTdsSection().trim();
+                if (section != null && !section.isBlank()) {
+                    sections.add(section);
+                }
+            }
+        }
+        return sections.size() == 1 ? sections.iterator().next() : null;
     }
 
     static boolean liable(String partyKey, String section, BigDecimal amount, LocalDate asOf,
