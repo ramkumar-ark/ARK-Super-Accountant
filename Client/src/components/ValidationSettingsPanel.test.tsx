@@ -36,17 +36,20 @@ describe('ValidationSettingsPanel', () => {
     expect(screen.getByText(/Last changed by acc/)).toBeInTheDocument()
   })
 
-  it('lets an owner change it', async () => {
+  it('owner sees the setting read-only', async () => {
     setRole('ROLE_OWNER')
     render(<ValidationSettingsPanel />)
-    expect(await screen.findByRole('checkbox', { name: LABEL })).toBeEnabled()
+    const box = await screen.findByRole('checkbox', { name: LABEL })
+    expect(box).toBeDisabled()
+    expect(screen.getByText('Only an accountant can change this.')).toBeInTheDocument()
+    expect(mockPut).not.toHaveBeenCalled()
   })
 
   it.each(['ROLE_OPERATOR', 'ROLE_AUDITOR_CA'])('is read-only for %s', async (role) => {
     setRole(role)
     render(<ValidationSettingsPanel />)
     expect(await screen.findByRole('checkbox', { name: LABEL })).toBeDisabled()
-    expect(screen.getByText(/Only an accountant or owner/)).toBeInTheDocument()
+    expect(screen.getByText('Only an accountant can change this.')).toBeInTheDocument()
     expect(mockPut).not.toHaveBeenCalled()
   })
 

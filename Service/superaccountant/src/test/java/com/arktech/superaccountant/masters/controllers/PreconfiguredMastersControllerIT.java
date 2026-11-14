@@ -16,6 +16,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,6 +43,15 @@ class PreconfiguredMastersControllerIT {
     private MockMvc mockMvc;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private com.arktech.superaccountant.login.repository.RoleRepository roleRepository;
+    @Autowired
+    private com.arktech.superaccountant.login.repository.UserRepository userRepository;
+    @Autowired
+    private com.arktech.superaccountant.login.security.jwt.JwtUtils jwtUtils;
+
+    private UUID lastOrgId;
 
     @Test
     void onboard_standardTemplate_copies60PlusMasters() throws Exception {
@@ -91,7 +102,7 @@ class PreconfiguredMastersControllerIT {
 
     @Test
     void onboard_calledTwice_returns400OnSecondCall() throws Exception {
-        String orgToken = setupOrgScopedToken();
+        String orgToken = setupOrgScopedToken("accountant");
 
         // First call: success
         mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
@@ -108,18 +119,71 @@ class PreconfiguredMastersControllerIT {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void owner_allWrites_403_operatorCreateStillAllowed() throws Exception {
+        String ownerToken = setupOrgScopedToken("owner");
+        String operatorToken = operatorJwt();
+        java.util.UUID randomId = java.util.UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/preconfigured-masters")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ledgerName\":\"Owner Ledger\",\"category\":\"EXPENSE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/preconfigured-masters/" + randomId)
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/v1/preconfigured-masters/" + randomId)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/preconfigured-masters/bulk")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"masters\":[]}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/preconfigured-masters")
+                        .header("Authorization", "Bearer " + operatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ledgerName\":\"Operator Ledger " + randomId + "\",\"category\":\"EXPENSE\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void owner_canStillList() throws Exception {
+        String ownerToken = setupOrgScopedToken("owner");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/v1/preconfigured-masters")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk());
+    }
+
     /**
      * Creates a unique test user (accountant), creates an org, and returns
      * an org-scoped JWT so onboard endpoint can access getOrganizationId().
      */
     private String setupOrgScopedToken() throws Exception {
+        return setupOrgScopedToken("accountant");
+    }
+
+    private String setupOrgScopedToken(String role) throws Exception {
         String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
         String username = "it_" + suffix;
 
         // 1. Sign up
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"" + username + "\",\"email\":\"" + username + "@test.com\",\"password\":\"TestPass1!\",\"role\":\"accountant\"}"))
+                        .content("{\"username\":\"" + username + "\",\"email\":\"" + username + "@test.com\",\"password\":\"TestPass1!\",\"role\":\"" + role + "\"}"))
                 .andExpect(status().isOk());
 
         // 2. Sign in → get token (no org scope)
@@ -144,6 +208,7 @@ class PreconfiguredMastersControllerIT {
         java.util.Map<String, Object> orgBody = objectMapper.readValue(
                 createOrgResult.getResponse().getContentAsString(), java.util.Map.class);
         String orgId = orgBody.get("id").toString();
+        lastOrgId = UUID.fromString(orgId);
 
         // 4. Select org → get org-scoped JWT
         MvcResult selectResult = mockMvc.perform(post("/api/organizations/" + orgId + "/select")
@@ -154,5 +219,17 @@ class PreconfiguredMastersControllerIT {
         java.util.Map<String, Object> selectBody = objectMapper.readValue(
                 selectResult.getResponse().getContentAsString(), java.util.Map.class);
         return (String) selectBody.get("token");
+    }
+
+    /** Org-scoped operator JWT for the org created by the last setupOrgScopedToken call. */
+    private String operatorJwt() {
+        String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        com.arktech.superaccountant.login.models.Role role = roleRepository
+                .findByName(com.arktech.superaccountant.login.models.ERole.ROLE_OPERATOR).orElseThrow();
+        com.arktech.superaccountant.login.models.User u = new com.arktech.superaccountant.login.models.User(
+                "it_op_" + suffix, "it_op_" + suffix + "@test.com", "pass");
+        u.setRole(role);
+        userRepository.save(u);
+        return jwtUtils.generateJwtTokenForUser(u.getUsername(), lastOrgId);
     }
 }

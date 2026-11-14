@@ -10,10 +10,10 @@ interface ValidationSettings {
 
 const URL = '/v1/validation-settings'
 
-/** Per-organization validation switches. Everyone can read; only accountants and owners can change. */
+/** Per-organization validation switches. Everyone can read; only accountants can change. */
 export function ValidationSettingsPanel() {
   const role = useAuthStore((s) => s.user?.role)
-  const canEdit = role === 'ROLE_ACCOUNTANT' || role === 'ROLE_OWNER'
+  const canEdit = role === 'ROLE_ACCOUNTANT'
   const [settings, setSettings] = useState<ValidationSettings | null>(null)
   const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -80,7 +80,7 @@ export function ValidationSettingsPanel() {
       </label>
       {!canEdit && (
         <p className="mt-3 text-xs text-[var(--color-text-secondary)]">
-          Only an accountant or owner can change this setting.
+          Only an accountant can change this.
         </p>
       )}
       {settings.updatedBy && (
