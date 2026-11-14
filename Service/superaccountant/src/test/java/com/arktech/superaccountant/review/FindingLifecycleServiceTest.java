@@ -132,7 +132,7 @@ class FindingLifecycleServiceTest {
         assertThat(dup2.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
         assertThat(dup1.getCarriedFromFindingId()).isNull();
         assertThat(dup2.getCarriedFromFindingId()).isNull();
-        assertThat(prev.getResolveStatus()).isEqualTo(ResolveStatus.ACKNOWLEDGED); // untouched: no match
-        assertThat(outcome).usingRecursiveComparison().isEqualTo(new LifecycleOutcome(0, 0, 0, 0, 0));
+        assertThat(prev.getResolveStatus()).isEqualTo(ResolveStatus.DISCARDED);
+        assertThat(outcome).usingRecursiveComparison().isEqualTo(new LifecycleOutcome(0, 0, 0, 0, 1));
     }
 }

@@ -46,10 +46,14 @@ public class FindingLifecycleService {
         }
 
         for (F p : previous) {
-            F match = duplicateKeys.contains(p.getFindingKey()) ? null : byKey.get(p.getFindingKey());
             if (duplicateKeys.contains(p.getFindingKey())) {
-                continue; // ambiguous: carry nothing, auto-resolve nothing
+                if (!isTerminal(p)) {
+                    p.setResolveStatus(ResolveStatus.DISCARDED);
+                    discarded++;
+                }
+                continue;
             }
+            F match = byKey.get(p.getFindingKey());
             if (match == null) {
                 if (!isTerminal(p)) {
                     p.setResolveStatus(ResolveStatus.RESOLVED);

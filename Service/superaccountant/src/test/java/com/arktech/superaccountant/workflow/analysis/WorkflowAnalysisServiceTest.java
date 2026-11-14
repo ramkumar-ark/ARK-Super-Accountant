@@ -91,6 +91,17 @@ class WorkflowAnalysisServiceTest {
     }
 
     @Test
+    void run_otherOrganization_rejectedWithoutMutation() {
+        assertThatThrownBy(() -> service.run(UUID.randomUUID(), workflow.getId(), "acct"))
+                .isInstanceOf(com.arktech.superaccountant.workflow.service.WorkflowBadRequestException.class);
+
+        assertThat(workflow.getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
+        verify(gstrAnalyzer, never()).analyze(any(AnalysisContext.class));
+        verify(runRepository, never()).save(any());
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
     void run_onlyAnalyzersForWorkflowTypeRun() {
         service.run(workflow.getOrganizationId(), workflow.getId(), "acct");
 

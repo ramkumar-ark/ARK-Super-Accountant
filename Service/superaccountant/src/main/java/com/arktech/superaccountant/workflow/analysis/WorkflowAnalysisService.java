@@ -61,6 +61,9 @@ public class WorkflowAnalysisService {
     public Workflow run(UUID organizationId, UUID workflowId, String actor) {
         Workflow workflow = workflowRepository.findByIdForUpdate(workflowId)
                 .orElseThrow(() -> new WorkflowBadRequestException("Workflow not found"));
+        if (!organizationId.equals(workflow.getOrganizationId())) {
+            throw new WorkflowBadRequestException("Workflow not found");
+        }
         if (workflow.getStage() != WorkflowStage.DATA_UPLOADED || workflow.getUploadJobId() == null) {
             throw new WorkflowConflictException("Workflow has no bound upload awaiting analysis");
         }
