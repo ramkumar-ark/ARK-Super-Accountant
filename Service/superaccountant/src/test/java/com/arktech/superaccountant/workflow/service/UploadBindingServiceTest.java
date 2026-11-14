@@ -87,13 +87,13 @@ class UploadBindingServiceTest {
         when(dayBookIntakeService.intake(any(), any(), any(), eq(orgId), eq("op1"), eq(wfId)))
                 .thenReturn(new DayBookIntakeResult(job(), List.of()));
 
-        Workflow result = service.uploadAndBind(orgId, wfId,
+        UploadBindResult result = service.uploadAndBind(orgId, wfId,
                 new MockMultipartFile("file", "daybook.json", "application/json", "{}".getBytes()),
                 LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30), "op1");
 
-        assertThat(result.getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
-        assertThat(result.getUploadJobId()).isEqualTo(jobId);
-        assertThat(result.getMastersJobId()).isNull();
+        assertThat(result.workflow().getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
+        assertThat(result.workflow().getUploadJobId()).isEqualTo(jobId);
+        assertThat(result.workflow().getMastersJobId()).isNull();
         ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
         verify(publisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue())
@@ -111,13 +111,13 @@ class UploadBindingServiceTest {
         when(dayBookIntakeService.intake(any(), any(), any(), eq(orgId), eq("op1"), eq(wfId)))
                 .thenReturn(new DayBookIntakeResult(job(), List.of()));
 
-        Workflow result = service.uploadAndBind(orgId, wfId,
+        UploadBindResult result = service.uploadAndBind(orgId, wfId,
                 new MockMultipartFile("file", "daybook.json", "application/json", "{}".getBytes()),
                 LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30), "op1");
 
-        assertThat(result.getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
-        assertThat(result.getUploadJobId()).isEqualTo(jobId);
-        assertThat(result.getMastersJobId()).isNull();
+        assertThat(result.workflow().getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
+        assertThat(result.workflow().getUploadJobId()).isEqualTo(jobId);
+        assertThat(result.workflow().getMastersJobId()).isNull();
     }
 
     @Test

@@ -15,8 +15,12 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { OrganizationSetupPage } from '@/pages/OrganizationSetupPage'
 import { MastersPage } from '@/pages/MastersPage'
 import { DayBookPage } from '@/pages/DayBookPage'
+import { WorkflowListPage } from '@/pages/workflows/WorkflowListPage'
+import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
 import { TeamPage } from '@/pages/TeamPage'
 import { useAuthStore } from '@/store/authStore'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '@/lib/queryClient'
 
 const rootRoute = createRootRoute()
 
@@ -111,6 +115,28 @@ const dayBookRoute = createRoute({
   component: DayBookPage,
 })
 
+const workflowsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/workflows',
+  beforeLoad: () => {
+    const { isAuthenticated, user } = useAuthStore.getState()
+    if (!isAuthenticated) throw redirect({ to: '/login' })
+    if (!user?.organizationId) throw redirect({ to: '/organization/setup' })
+  },
+  component: WorkflowListPage,
+})
+
+const workflowDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/workflows/$workflowId',
+  beforeLoad: () => {
+    const { isAuthenticated, user } = useAuthStore.getState()
+    if (!isAuthenticated) throw redirect({ to: '/login' })
+    if (!user?.organizationId) throw redirect({ to: '/organization/setup' })
+  },
+  component: WorkflowDetailPage,
+})
+
 const teamRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/team',
@@ -131,6 +157,8 @@ const routeTree = rootRoute.addChildren([
   orgNewRoute,
   mastersRoute,
   dayBookRoute,
+  workflowsRoute,
+  workflowDetailRoute,
   teamRoute,
 ])
 
@@ -144,6 +172,8 @@ declare module '@tanstack/react-router' {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   </StrictMode>,
 )

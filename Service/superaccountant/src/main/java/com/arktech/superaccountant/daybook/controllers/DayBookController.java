@@ -5,9 +5,6 @@ import com.arktech.superaccountant.daybook.payload.response.DayBookUploadJobResp
 import com.arktech.superaccountant.daybook.payload.response.VoucherTypeSummaryResponse;
 import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
-import com.arktech.superaccountant.daybook.services.DayBookIntakeException;
-import com.arktech.superaccountant.daybook.services.DayBookIntakeResult;
-import com.arktech.superaccountant.daybook.services.DayBookIntakeService;
 import com.arktech.superaccountant.daybook.services.DayBookMasterValidationService;
 import com.arktech.superaccountant.daybook.services.DayBookParserService;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
@@ -21,8 +18,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -38,7 +33,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * REST controller for day book upload, summary retrieval, and masters gate status.
+ * REST controller for day book upload history, summary retrieval, and masters gate status.
+ *
+ * Uploads happen through the workflow endpoints; this controller exposes history only.
  *
  * Security model:
  * - orgId is ALWAYS sourced from JWT principal — never from client-supplied parameters (T-4-01, T-4-05)
@@ -54,9 +51,6 @@ public class DayBookController {
     private TallyParserService tallyParserService;
 
     @Autowired
-    private DayBookIntakeService dayBookIntakeService;
-
-    @Autowired
     private DayBookUploadJobRepository dayBookUploadJobRepository;
 
     @Autowired
@@ -68,38 +62,6 @@ public class DayBookController {
     @Autowired
     private DayBookMasterValidationService dayBookMasterValidationService;
 
-    /**
-     * POST /api/v1/day-book/upload
-     *
-     * Accepts a .json multipart file with a declared coverage range, creates a
-     * DayBookUploadJob scoped to the caller's org, parses and persists all vouchers
-     * synchronously, then returns the job result. Validation lives in DayBookIntakeService.
-     *
-     * On success: job is saved with status=COMPLETED, returns HTTP 201 with DayBookUploadJobResponse.
-     * Rejections map DayBookIntakeException to its own status and body.
-     */
-    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
-    @PostMapping("/day-book/upload")
-    public ResponseEntity<?> uploadDayBook(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("coverageFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate coverageFrom,
-            @RequestParam("coverageTo") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate coverageTo,
-            @AuthenticationPrincipal UserDetailsImpl principal) {
-
-        UUID orgId = principal.getOrganizationId();
-        if (orgId == null) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "User is not linked to an organization. Call POST /api/organizations first."));
-        }
-
-        try {
-            DayBookIntakeResult result = dayBookIntakeService.intake(
-                    file, coverageFrom, coverageTo, orgId, principal.getUsername(), null);
-            return ResponseEntity.status(201).body(dayBookIntakeService.toResponse(result.job(), result.warnings()));
-        } catch (DayBookIntakeException e) {
-            return ResponseEntity.status(e.getStatus()).body(e.getBody());
-        }
-    }
     /**
      * GET /api/v1/day-book/uploads?page=0&size=20
      *

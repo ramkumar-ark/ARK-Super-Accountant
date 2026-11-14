@@ -4,6 +4,8 @@ import com.arktech.superaccountant.daybook.services.DayBookIntakeException;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.workflow.payload.request.UseUploadRequest;
 import com.arktech.superaccountant.workflow.payload.response.WorkflowResponse;
+import com.arktech.superaccountant.workflow.payload.response.WorkflowUploadResponse;
+import com.arktech.superaccountant.workflow.service.UploadBindResult;
 import com.arktech.superaccountant.workflow.service.UploadBindingService;
 import com.arktech.superaccountant.workflow.service.UploadCoverageException;
 import com.arktech.superaccountant.workflow.service.UploadNotFoundException;
@@ -42,9 +44,10 @@ public class WorkflowUploadController {
             return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
         }
         try {
-            return ResponseEntity.ok(WorkflowResponse.from(
-                    uploadBindingService.uploadAndBind(orgId, id, file, coverageFrom, coverageTo,
-                            principal.getUsername())));
+            UploadBindResult result = uploadBindingService.uploadAndBind(orgId, id, file,
+                    coverageFrom, coverageTo, principal.getUsername());
+            return ResponseEntity.ok(new WorkflowUploadResponse(
+                    WorkflowResponse.from(result.workflow()), result.warnings()));
         } catch (WorkflowBadRequestException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (WorkflowConflictException e) {

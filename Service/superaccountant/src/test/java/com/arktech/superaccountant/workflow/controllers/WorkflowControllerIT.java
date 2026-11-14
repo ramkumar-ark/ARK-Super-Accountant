@@ -238,7 +238,10 @@ class WorkflowControllerIT {
                 .header("Authorization", "Bearer " + ownerJwt))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.baselineConfirmed").value(false))
-                .andExpect(jsonPath("$.dependencies").isArray());
+                .andExpect(jsonPath("$.dependencies").isArray())
+                .andExpect(jsonPath("$.analysisAvailable").value(false))
+                .andExpect(jsonPath("$.requiredCoverageTo").value("2026-04-30"))
+                .andExpect(jsonPath("$.requiredCoverageFrom").isNotEmpty());
 
         mockMvc.perform(get("/api/v1/workflows/{id}/events", workflowId)
                 .header("Authorization", "Bearer " + ownerJwt))
