@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +35,9 @@ public class Organization {
 
     @Column(name = "financial_year_start", nullable = false)
     private int financialYearStart = 4;
+
+    @Column(name = "books_start_date")
+    private LocalDate booksStartDate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
