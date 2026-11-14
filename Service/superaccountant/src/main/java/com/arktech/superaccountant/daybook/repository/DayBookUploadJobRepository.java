@@ -17,6 +17,9 @@ public interface DayBookUploadJobRepository extends JpaRepository<DayBookUploadJ
 
     Optional<DayBookUploadJob> findTopByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
+    Optional<DayBookUploadJob> findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(
+            UUID organizationId, UploadJobStatus status);
+
     /**
      * Tenant-scoped lookup: verifies both ID and organization ownership before returning job.
      * Use this method on all read endpoints to prevent cross-tenant data access (T-4-01).
