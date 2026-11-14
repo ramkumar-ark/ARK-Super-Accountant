@@ -85,6 +85,8 @@ public class DayBookParserService {
                 // Tally convention: positive amount = debit side; negative = credit side
                 pve.setDebit(amount.compareTo(BigDecimal.ZERO) > 0);
                 pve.setGstClass(le.getGstclass());
+                pve.setGstTaxability(le.getGstovrdntaxability());
+                pve.setGstRate(sumRateDetails(le));
                 pve.setPartyLedger(le.isIspartyledger());
 
                 // totalDebit = sum of positive amounts; totalCredit = sum of abs(negative amounts)
@@ -128,5 +130,23 @@ public class DayBookParserService {
         } catch (NumberFormatException e) {
             return BigDecimal.ZERO;
         }
+    }
+
+    /**
+     * Sums duty-head rates from Tally ratedetails (CGST 9 + SGST 9 -> 18; IGST 18 -> 18).
+     * Skips null, blank or non-numeric rates; returns null when nothing parsed or the sum is zero.
+     */
+    private BigDecimal sumRateDetails(LedgerEntry le) {
+        if (le.getRatedetails() == null || le.getRatedetails().isEmpty()) return null;
+        BigDecimal total = BigDecimal.ZERO;
+        for (var rd : le.getRatedetails()) {
+            if (rd.getGstrate() == null || rd.getGstrate().isBlank()) continue;
+            try {
+                total = total.add(new BigDecimal(rd.getGstrate().trim().replace(",", "")));
+            } catch (NumberFormatException e) {
+                // skip non-numeric rate ("NA", etc.)
+            }
+        }
+        return total.compareTo(BigDecimal.ZERO) > 0 ? total : null;
     }
 }

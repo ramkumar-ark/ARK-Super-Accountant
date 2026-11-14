@@ -43,6 +43,15 @@ public class ParsedVoucherEntry {
     @Column(name = "gst_class")
     private String gstClass;
 
+    // Total GST rate from Tally ratedetails — populated on TAXABLE entries only
+    // (Tally puts ratedetails on the taxable entry, not the GST-head entries)
+    @Column(name = "gst_rate", precision = 7, scale = 2)
+    private BigDecimal gstRate;
+
+    // From gstovrdntaxability ("Taxable"/"Exempt"/...) — used by GST validation rules
+    @Column(name = "gst_taxability")
+    private String gstTaxability;
+
     @Column(name = "is_party_ledger")
     private boolean isPartyLedger;
 }

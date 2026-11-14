@@ -4,6 +4,7 @@ import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.daybook.services.DayBookParserService;
+import com.arktech.superaccountant.tally.models.GstRateDetail;
 import com.arktech.superaccountant.tally.models.LedgerEntry;
 import com.arktech.superaccountant.tally.models.TallyMessage;
 import com.arktech.superaccountant.tally.models.Voucher;
@@ -171,5 +172,96 @@ class DayBookParserServiceTest {
         assertThat(result).hasSize(1);
         // Both entries from allledgerentries must be persisted
         assertThat(result.get(0).getEntries()).hasSize(2);
+    }
+
+    @Test
+    void persistsGstRateSummedFromRateDetails() {
+        LedgerEntry expense = new LedgerEntry();
+        expense.setLedgername("Job Work Charges");
+        expense.setAmount("10000.00");
+        expense.setGstovrdntaxability("Taxable");
+        GstRateDetail cgst = new GstRateDetail();
+        cgst.setGstratedutyhead("Central Tax");
+        cgst.setGstrate("9");
+        GstRateDetail sgst = new GstRateDetail();
+        sgst.setGstratedutyhead("State Tax");
+        sgst.setGstrate("9");
+        expense.setRatedetails(List.of(cgst, sgst));
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setDate("20250401");
+        voucher.setAllLedgerEntries(List.of(expense));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> saved = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        ParsedVoucherEntry pve = saved.get(0).getEntries().get(0);
+        assertThat(pve.getGstRate()).isEqualByComparingTo(new BigDecimal("18"));
+        assertThat(pve.getGstTaxability()).isEqualTo("Taxable");
+    }
+
+    @Test
+    void gstRateNullWhenNoRateDetails() {
+        LedgerEntry entry = new LedgerEntry();
+        entry.setLedgername("Input CGST");
+        entry.setAmount("-900.00");
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setDate("20250401");
+        voucher.setAllLedgerEntries(List.of(entry));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> saved = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(saved.get(0).getEntries().get(0).getGstRate()).isNull();
+        assertThat(saved.get(0).getEntries().get(0).getGstTaxability()).isNull();
+    }
+
+    @Test
+    void gstRateIgnoresNonNumericRateDetail() {
+        LedgerEntry expense = new LedgerEntry();
+        expense.setLedgername("Job Work Charges");
+        expense.setAmount("10000.00");
+        expense.setGstovrdntaxability("Taxable");
+        GstRateDetail cgst = new GstRateDetail();
+        cgst.setGstratedutyhead("Central Tax");
+        cgst.setGstrate("9");
+        GstRateDetail sgst = new GstRateDetail();
+        sgst.setGstratedutyhead("State Tax");
+        sgst.setGstrate("NA");
+        GstRateDetail cess = new GstRateDetail();
+        cess.setGstratedutyhead("Cess");
+        cess.setGstrate("  ");
+        expense.setRatedetails(List.of(cgst, sgst, cess));
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setDate("20250401");
+        voucher.setAllLedgerEntries(List.of(expense));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> saved = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(saved.get(0).getEntries().get(0).getGstRate()).isEqualByComparingTo(new BigDecimal("9.00"));
     }
 }
