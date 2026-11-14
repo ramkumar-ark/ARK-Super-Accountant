@@ -264,4 +264,72 @@ class DayBookParserServiceTest {
 
         assertThat(saved.get(0).getEntries().get(0).getGstRate()).isEqualByComparingTo(new BigDecimal("9.00"));
     }
+
+    private static GstRateDetail rate(String head, String rate) {
+        GstRateDetail d = new GstRateDetail();
+        d.setGstratedutyhead(head);
+        d.setGstrate(rate);
+        return d;
+    }
+
+    private BigDecimal parsedRateFor(GstRateDetail... details) {
+        LedgerEntry expense = new LedgerEntry();
+        expense.setLedgername("Job Work Charges");
+        expense.setAmount("10000.00");
+        expense.setGstovrdntaxability("Taxable");
+        expense.setRatedetails(List.of(details));
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setDate("20250401");
+        voucher.setAllLedgerEntries(List.of(expense));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> saved = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+        return saved.get(0).getEntries().get(0).getGstRate();
+    }
+
+    @Test
+    void gstRateUsesIntegratedWhenAllHeadsListed() {
+        assertThat(parsedRateFor(rate("Central Tax", "9"), rate("State Tax", "9"),
+                rate("Integrated Tax", "18"), rate("Cess", "0")))
+                .isEqualByComparingTo(new BigDecimal("18"));
+    }
+
+    @Test
+    void gstRateIntegratedOnly() {
+        assertThat(parsedRateFor(rate("Integrated Tax", "18"))).isEqualByComparingTo(new BigDecimal("18"));
+    }
+
+    @Test
+    void gstRateCentralPlusStateOnly() {
+        assertThat(parsedRateFor(rate("Central Tax", "9"), rate("State Tax", "9")))
+                .isEqualByComparingTo(new BigDecimal("18"));
+    }
+
+    @Test
+    void gstRateCentralPlusUtTax() {
+        assertThat(parsedRateFor(rate("Central Tax", "9"), rate("UT Tax", "9")))
+                .isEqualByComparingTo(new BigDecimal("18"));
+    }
+
+    @Test
+    void gstRateFallsBackToCentralStateWhenIntegratedZero() {
+        assertThat(parsedRateFor(rate("Central Tax", "9"), rate("State Tax", "9"), rate("Integrated Tax", "0")))
+                .isEqualByComparingTo(new BigDecimal("18"));
+    }
+
+    @Test
+    void gstRateExcludesNonZeroCess() {
+        assertThat(parsedRateFor(rate("Central Tax", "9"), rate("State Tax", "9"), rate("Cess", "12")))
+                .isEqualByComparingTo(new BigDecimal("18"));
+        assertThat(parsedRateFor(rate("Integrated Tax", "18"), rate("Cess", "12")))
+                .isEqualByComparingTo(new BigDecimal("18"));
+    }
 }

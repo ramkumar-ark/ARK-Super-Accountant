@@ -133,20 +133,29 @@ public class DayBookParserService {
     }
 
     /**
-     * Sums duty-head rates from Tally ratedetails (CGST 9 + SGST 9 -> 18; IGST 18 -> 18).
-     * Skips null, blank or non-numeric rates; returns null when nothing parsed or the sum is zero.
+     * Item GST rate from Tally ratedetails: the Integrated Tax rate when present and non-zero,
+     * otherwise Central Tax + State/UT Tax. Cess and unknown heads are excluded.
+     * Returns null when the resulting rate is zero or nothing parsed.
      */
     private BigDecimal sumRateDetails(LedgerEntry le) {
         if (le.getRatedetails() == null || le.getRatedetails().isEmpty()) return null;
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal igst = BigDecimal.ZERO;
+        BigDecimal central = BigDecimal.ZERO;
+        BigDecimal state = BigDecimal.ZERO;
         for (var rd : le.getRatedetails()) {
-            if (rd.getGstrate() == null || rd.getGstrate().isBlank()) continue;
+            if (rd.getGstratedutyhead() == null || rd.getGstrate() == null || rd.getGstrate().isBlank()) continue;
+            BigDecimal rate;
             try {
-                total = total.add(new BigDecimal(rd.getGstrate().trim().replace(",", "")));
+                rate = new BigDecimal(rd.getGstrate().trim().replace(",", ""));
             } catch (NumberFormatException e) {
-                // skip non-numeric rate ("NA", etc.)
+                continue;
             }
+            String head = rd.getGstratedutyhead().toLowerCase();
+            if (head.contains("integrated")) igst = igst.add(rate);
+            else if (head.contains("central")) central = central.add(rate);
+            else if (head.contains("state") || head.contains("ut tax") || head.contains("union")) state = state.add(rate);
         }
-        return total.compareTo(BigDecimal.ZERO) > 0 ? total : null;
+        BigDecimal total = igst.signum() > 0 ? igst : central.add(state);
+        return total.signum() > 0 ? total : null;
     }
 }
