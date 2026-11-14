@@ -4,6 +4,7 @@ import com.arktech.superaccountant.daybook.models.DayBookUploadJob;
 import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
 import com.arktech.superaccountant.daybook.services.DayBookIntakeResult;
 import com.arktech.superaccountant.daybook.services.DayBookIntakeService;
+import com.arktech.superaccountant.daybook.services.DayBookIntakeException;
 import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import com.arktech.superaccountant.workflow.events.WorkflowUploadBoundEvent;
 import com.arktech.superaccountant.workflow.models.Workflow;
@@ -52,7 +53,7 @@ public class UploadBindingService {
      * coverage range is checked against the workflow's required range BEFORE
      * intake, so a rejected request writes no job row.
      */
-    @Transactional
+    @Transactional(noRollbackFor = DayBookIntakeException.class)
     public Workflow uploadAndBind(UUID orgId, UUID workflowId, MultipartFile file,
                                   LocalDate coverageFrom, LocalDate coverageTo, String actor) {
         Workflow w = loadWorkflow(orgId, workflowId);

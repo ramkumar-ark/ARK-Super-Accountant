@@ -117,7 +117,7 @@ public class DayBookController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "User is not linked to an organization."));
         }
-        var pageable = org.springframework.data.domain.PageRequest.of(page, size,
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
         var jobs = dayBookUploadJobRepository.findByOrganizationId(orgId, pageable);
         return ResponseEntity.ok(jobs.map(job ->
