@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +65,9 @@ public class DayBookParserService {
             pv.setInvoice(v.isIsinvoice());
             pv.setReverseChargeApplicable(v.isIsreversechargeapplicable());
             pv.setCancelled(v.isIscancelled());
+            pv.setTallyMasterId(v.getMasterid());
+            pv.setTallyAlterId(v.getAlterid());
+            pv.setContentHash(VoucherCanonicalizer.contentHash(v));
 
             List<ParsedVoucherEntry> entries = new ArrayList<>();
             BigDecimal totalDebit = BigDecimal.ZERO;
@@ -110,12 +112,7 @@ public class DayBookParserService {
      * Returns null if the input is null or not exactly 8 characters.
      */
     private LocalDate parseTallyDate(String tallyDate) {
-        if (tallyDate == null || tallyDate.length() != 8) return null;
-        try {
-            return LocalDate.parse(tallyDate, DateTimeFormatter.BASIC_ISO_DATE);
-        } catch (Exception e) {
-            return null;
-        }
+        return VoucherCanonicalizer.parseDate(tallyDate);
     }
 
     /**
@@ -124,12 +121,7 @@ public class DayBookParserService {
      * Returns ZERO for null, blank, or unparseable input.
      */
     private BigDecimal parseAmount(String amount) {
-        if (amount == null || amount.isBlank()) return BigDecimal.ZERO;
-        try {
-            return new BigDecimal(amount.trim().replace(",", ""));
-        } catch (NumberFormatException e) {
-            return BigDecimal.ZERO;
-        }
+        return VoucherCanonicalizer.parseAmount(amount);
     }
 
     /**
