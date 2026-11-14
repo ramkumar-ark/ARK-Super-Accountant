@@ -6,6 +6,8 @@ import com.arktech.superaccountant.login.repository.RoleRepository;
 import com.arktech.superaccountant.masters.models.*;
 import com.arktech.superaccountant.masters.repository.PreconfiguredMasterRepository;
 import com.arktech.superaccountant.masters.repository.ValidationRuleConfigRepository;
+import com.arktech.superaccountant.tds.models.TdsSectionConfig;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -28,6 +30,9 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     DataMigrationService dataMigrationService;
 
+    @Autowired
+    TdsSectionConfigRepository tdsSectionConfigRepository;
+
     @Override
     public void run(String... args) throws Exception {
         seedRoles();
@@ -42,6 +47,7 @@ public class DataInitializer implements CommandLineRunner {
         seedValidationRuleIfAbsent("GSTIN_PRESENCE", "GSTIN Presence",
                 "Flags purchase ledgers with no GSTIN for GSTR-2B reconciliation.", 5);
         seedConstructionTemplate();
+        seedTdsSectionConfigs();
         if (preconfiguredMasterRepository.findByTemplateTrueAndTemplateSlug("standard").isEmpty()) {
             seedStandardTemplate();
         }
@@ -53,6 +59,34 @@ public class DataInitializer implements CommandLineRunner {
         }
         int backfilled = dataMigrationService.backfillFindingSeverities();
         if (backfilled > 0) System.out.println("Backfilled " + backfilled + " finding severity values to HIGH/MEDIUM/LOW.");
+    }
+
+    private void seedTdsSectionConfigs() {
+        // Rates/thresholds per Income Tax Act as of FY 2026-27.
+        // VERIFY against the current Finance Act before release — these change yearly.
+        seedSection("194A", "Interest other than securities", "10.00", "10.00", null, "10000.00");
+        seedSection("194C", "Payments to contractors", "2.00", "1.00", "30000.00", "100000.00");
+        seedSection("194H", "Commission or brokerage", "2.00", "2.00", null, "20000.00");
+        seedSection("194I", "Rent", "10.00", "10.00", null, "240000.00");
+        seedSection("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00");
+        seedSection("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00");
+        seedSection("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00");
+        seedSection("194Q", "Purchase of goods", "0.10", "0.10", null, "5000000.00");
+    }
+
+    private void seedSection(String code, String desc, String rateCompany, String rateNonCompany,
+                             String perTxn, String annual) {
+        if (tdsSectionConfigRepository.existsBySectionCode(code)) return;
+        TdsSectionConfig c = new TdsSectionConfig();
+        c.setSectionCode(code);
+        c.setDescription(desc);
+        c.setRateCompany(new java.math.BigDecimal(rateCompany));
+        c.setRateNonCompany(new java.math.BigDecimal(rateNonCompany));
+        c.setThresholdPerTransaction(perTxn != null ? new java.math.BigDecimal(perTxn) : null);
+        c.setThresholdAnnual(new java.math.BigDecimal(annual));
+        c.setHigherRateIfNoPan(new java.math.BigDecimal("20.00"));
+        tdsSectionConfigRepository.save(c);
+        System.out.println("TDS section config seeded: " + code);
     }
 
     private void seedRoles() {

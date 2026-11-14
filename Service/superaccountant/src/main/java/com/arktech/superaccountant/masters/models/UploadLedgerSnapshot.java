@@ -56,6 +56,13 @@ public class UploadLedgerSnapshot {
     @Column(name = "gst_registration_type")
     private String gstRegistrationType;
 
+    @Column(name = "pan", length = 10)
+    private String pan;
+
+    // Sign convention matches voucher entries: negative = credit balance, positive = debit balance
+    @Column(name = "opening_balance", precision = 19, scale = 2)
+    private java.math.BigDecimal openingBalance;
+
     /** The ledger's parent-group chain from the uploaded Tally data, lower-case, nearest group first, joined by '|'. */
     @Column(name = "group_chain", columnDefinition = "TEXT")
     private String groupChain;
