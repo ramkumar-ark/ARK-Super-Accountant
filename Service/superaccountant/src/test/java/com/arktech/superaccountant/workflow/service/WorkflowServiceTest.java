@@ -82,7 +82,7 @@ class WorkflowServiceTest {
         inject("mastersJobGate", mastersJobGate);
         inject("uploadFreshnessGate", uploadFreshnessGate);
         inject("responsibilityStartService", responsibilityStartService);
-        inject("snapshotService", new SnapshotService());
+        inject("snapshotService", org.mockito.Mockito.mock(SnapshotService.class));
         inject("coverageService", coverageService);
 
         Organization org = new Organization("Test Org");
