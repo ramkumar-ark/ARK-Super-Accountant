@@ -39,17 +39,17 @@ public record RpuHeader(
 
     /**
      * Convenience constructor matching the plan's original interface. Optional detail is
-     * left null; the previous-statement flag is derived from the receipt number/quarter.
+     * left null; the previous-statement flag is supplied explicitly by the caller.
      */
     public RpuHeader(String tan, String deductorPan, String deductorName, String deductorAddress,
                      String deductorType, String responsiblePersonName, String responsiblePersonDesignation,
                      String originalReceiptNumber, int financialYearStart, int quarter,
-                     LocalDate fileCreationDate) {
+                     LocalDate fileCreationDate, boolean regularStatementFiledEarlier) {
         this(tan, deductorPan, deductorName, deductorAddress, deductorType,
                 responsiblePersonName, responsiblePersonDesignation, originalReceiptNumber,
                 financialYearStart, quarter, fileCreationDate,
                 null, null, null, null, null, null, null, null, null, null, null,
                 false, false,
-                originalReceiptNumber != null || quarter > 1);
+                regularStatementFiledEarlier);
     }
 }

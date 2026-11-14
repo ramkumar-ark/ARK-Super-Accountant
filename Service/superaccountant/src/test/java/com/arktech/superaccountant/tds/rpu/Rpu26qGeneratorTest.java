@@ -30,7 +30,7 @@ class Rpu26qGeneratorTest {
     private static RpuHeader header() {
         return new RpuHeader(
                 "CHEA12345B", "AAACA1234A", "Acme Traders", "12 MG Road, Mumbai", "K",
-                "Ravi Kumar", "Director", null, 2026, 1, LocalDate.of(2026, 7, 20));
+                "Ravi Kumar", "Director", null, 2026, 1, LocalDate.of(2026, 7, 20), false);
     }
 
     private static TdsChallan challan(UUID id) {
@@ -178,7 +178,7 @@ class Rpu26qGeneratorTest {
         UUID cid = UUID.randomUUID();
         RpuHeader revised = new RpuHeader(
                 "CHEA12345B", "AAACA1234A", "Acme Traders", "12 MG Road, Mumbai", "K",
-                "Ravi Kumar", "Director", "123456789012345", 2026, 1, LocalDate.of(2026, 7, 20));
+                "Ravi Kumar", "Director", "123456789012345", 2026, 1, LocalDate.of(2026, 7, 20), true);
 
         String out = gen.generate(revised, List.of(challan(cid)), List.of(entry(cid)));
 

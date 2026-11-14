@@ -21,7 +21,7 @@ class RpuFormatSpecTest {
     private static RpuHeader header() {
         return new RpuHeader(
                 "CHEA12345B", "AAACA1234A", "Acme Traders", "12 MG Road, Mumbai", "K",
-                "Ravi Kumar", "Director", null, 2026, 1, LocalDate.of(2026, 7, 20));
+                "Ravi Kumar", "Director", null, 2026, 1, LocalDate.of(2026, 7, 20), false);
     }
 
     @Test
