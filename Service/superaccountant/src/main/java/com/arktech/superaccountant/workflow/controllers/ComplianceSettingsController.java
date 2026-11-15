@@ -2,9 +2,12 @@ package com.arktech.superaccountant.workflow.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
+import com.arktech.superaccountant.workflow.payload.request.ConfirmBaselineRequest;
 import com.arktech.superaccountant.workflow.payload.request.ResponsibilityStartRequest;
+import com.arktech.superaccountant.workflow.service.UploadNotFoundException;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
+import com.arktech.superaccountant.workflow.service.compliance.BaselineConfirmationService;
 import com.arktech.superaccountant.workflow.service.compliance.ResponsibilityStartSettingsService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +27,9 @@ public class ComplianceSettingsController {
 
     @Autowired
     private ResponsibilityStartSettingsService responsibilityStartSettingsService;
+
+    @Autowired
+    private BaselineConfirmationService baselineConfirmationService;
 
     @GetMapping("/responsibility-start")
     public ResponseEntity<?> listResponsibilityStarts(@AuthenticationPrincipal UserDetailsImpl principal) {
@@ -50,6 +56,33 @@ public class ComplianceSettingsController {
             return ResponseEntity.badRequest().body(Map.of("error", "Unknown type: " + request.getType()));
         } catch (WorkflowBadRequestException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (WorkflowConflictException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/baseline")
+    public ResponseEntity<?> baselineStatus(@AuthenticationPrincipal UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        return ResponseEntity.ok(baselineConfirmationService.status(orgId));
+    }
+
+    @PostMapping("/baseline/confirm")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
+    public ResponseEntity<?> confirmBaseline(@AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestBody(required = false) ConfirmBaselineRequest request) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        try {
+            return ResponseEntity.ok(baselineConfirmationService.confirm(orgId, principal.getUsername(),
+                    request == null ? null : request.getUploadJobId()));
+        } catch (UploadNotFoundException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Upload not found"));
         } catch (WorkflowConflictException e) {
             return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
         }

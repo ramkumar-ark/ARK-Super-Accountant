@@ -49,6 +49,11 @@ public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
     List<Workflow> findAllByOrganizationIdAndTypeAndStageAndActiveTrue(
             UUID organizationId, WorkflowType type, WorkflowStage stage);
 
+    boolean existsByOrganizationIdAndStageAndActiveTrueAndBaselineConfirmedAtIsNull(
+            UUID organizationId, WorkflowStage stage);
+
+    List<Workflow> findAllByOrganizationIdAndStageAndActiveTrue(UUID organizationId, WorkflowStage stage);
+
     /** Row lock for the analysis run: serialize the stage transition against the upload binding. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select w from Workflow w where w.id = :id")

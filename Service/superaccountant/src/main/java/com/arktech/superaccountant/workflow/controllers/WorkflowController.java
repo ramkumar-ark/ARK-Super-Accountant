@@ -41,6 +41,9 @@ public class WorkflowController {
     @Autowired
     private CoverageService coverageService;
 
+    @Autowired
+    private com.arktech.superaccountant.workflow.seam.BaselineGate baselineGate;
+
     @GetMapping
     public ResponseEntity<?> list(@AuthenticationPrincipal UserDetailsImpl principal,
                                   @RequestParam(required = false) String type,
@@ -89,7 +92,7 @@ public class WorkflowController {
                     WorkflowResponse.from(w),
                     workflowService.evaluateDependencies(w),
                     workflowService.blockingFindingCount(w.getId()),
-                    w.getBaselineConfirmedAt() != null,
+                    baselineGate.isConfirmed(orgId),
                     w.getId(),
                     analyzerCatalog.hasAnalyzer(w.getType()),
                     coverageService.coverageStart(orgId),
