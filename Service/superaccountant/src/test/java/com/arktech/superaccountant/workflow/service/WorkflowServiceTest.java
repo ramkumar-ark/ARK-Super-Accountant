@@ -36,6 +36,7 @@ class WorkflowServiceTest {
 
     private WorkflowRepository workflowRepository;
     private WorkflowEventRepository workflowEventRepository;
+    private final SnapshotService snapshotService = org.mockito.Mockito.mock(SnapshotService.class);
     private FilerProfileRepository filerProfileRepository;
     private FinancialYearCloseRepository financialYearCloseRepository;
     private OrganizationRepository organizationRepository;
@@ -82,7 +83,7 @@ class WorkflowServiceTest {
         inject("mastersJobGate", mastersJobGate);
         inject("uploadFreshnessGate", uploadFreshnessGate);
         inject("responsibilityStartService", responsibilityStartService);
-        inject("snapshotService", new SnapshotService());
+        inject("snapshotService", snapshotService);
         inject("coverageService", coverageService);
 
         Organization org = new Organization("Test Org");
@@ -330,6 +331,18 @@ class WorkflowServiceTest {
 
         assertEquals(WorkflowStage.PREPARE,
                 service.unfinalize(orgId, actor, w.getId(), "fix").getStage());
+    }
+
+    @Test
+    void unfinalize_callsSnapshotRelease() {
+        Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-04");
+        w.setStage(WorkflowStage.FINALIZED);
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId))
+                .thenReturn(List.of(w));
+
+        service.unfinalize(orgId, actor, w.getId(), "fix something");
+        org.mockito.Mockito.verify(snapshotService).release(w.getId(), orgId, actor);
     }
 
     @Test

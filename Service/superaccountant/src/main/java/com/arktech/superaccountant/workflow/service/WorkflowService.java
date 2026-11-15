@@ -301,6 +301,7 @@ public class WorkflowService {
         w.setFinalizedBy(null);
         w.setFrozenThrough(null);
         workflowRepository.save(w);
+        snapshotService.release(w.getId(), organizationId, actor);
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.UNFINALIZED, reason, null));
         return w;
     }
