@@ -77,6 +77,43 @@ class WorkflowAnalysisServiceTest {
     }
 
     @Test
+    void run_oneOfTwoAnalyzersFails_staysDataUploaded() {
+        WorkflowAnalyzer gstr2 = mock(WorkflowAnalyzer.class);
+        when(gstr2.code()).thenReturn("GST_DAYBOOK_V2");
+        when(gstr2.types()).thenReturn(Set.of(WorkflowType.GSTR1));
+        org.mockito.Mockito.doThrow(new RuntimeException("boom2")).when(gstr2).analyze(any());
+        service = new WorkflowAnalysisService(workflowRepository, eventRepository, runRepository,
+                mastersJobGate, txManager, List.of(gstrAnalyzer, gstr2));
+
+        Workflow result = service.run(workflow.getOrganizationId(), workflow.getId(), "acct");
+
+        assertThat(result.getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
+        verify(eventRepository, never()).save(any());
+        ArgumentCaptor<WorkflowAnalysisRun> runs = ArgumentCaptor.forClass(WorkflowAnalysisRun.class);
+        verify(runRepository, org.mockito.Mockito.times(4)).save(runs.capture());
+        assertThat(runs.getAllValues()).extracting(WorkflowAnalysisRun::getStatus)
+                .contains(AnalysisRunStatus.DONE, AnalysisRunStatus.FAILED);
+        assertThat(runs.getAllValues().get(runs.getAllValues().size() - 1).getStatus())
+                .isEqualTo(AnalysisRunStatus.FAILED);
+    }
+
+    @Test
+    void run_twoAnalyzersBothDone_advances() {
+        WorkflowAnalyzer gstr2 = mock(WorkflowAnalyzer.class);
+        when(gstr2.code()).thenReturn("GST_DAYBOOK_V2");
+        when(gstr2.types()).thenReturn(Set.of(WorkflowType.GSTR1));
+        service = new WorkflowAnalysisService(workflowRepository, eventRepository, runRepository,
+                mastersJobGate, txManager, List.of(gstrAnalyzer, gstr2));
+
+        Workflow result = service.run(workflow.getOrganizationId(), workflow.getId(), "acct");
+
+        assertThat(result.getStage()).isEqualTo(WorkflowStage.FINDINGS_REVIEW);
+        ArgumentCaptor<WorkflowEvent> events = ArgumentCaptor.forClass(WorkflowEvent.class);
+        verify(eventRepository).save(events.capture());
+        assertThat(events.getValue().getKind()).isEqualTo(WorkflowEventKind.ANALYSIS_DONE);
+    }
+
+    @Test
     void run_noAnalyzers_advancesToFindingsReviewAndRecordsEvent() {
         service = new WorkflowAnalysisService(workflowRepository, eventRepository, runRepository,
                 mastersJobGate, txManager, List.of());

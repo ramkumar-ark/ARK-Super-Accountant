@@ -64,7 +64,7 @@ class FindingLifecycleServiceTest {
         assertThat(fresh.getSubmittedAt()).isEqualTo(NOW);
         assertThat(fresh.getCarriedFromFindingId()).isEqualTo(prev.getId());
         assertThat(prev.getResolveStatus()).isEqualTo(ResolveStatus.DISCARDED);
-        assertThat(new LifecycleOutcome(1, 0, 1, 0, 0)).usingRecursiveComparison().isEqualTo(outcome);
+        assertThat(new LifecycleOutcome(1, 0, 0, 0, 0)).usingRecursiveComparison().isEqualTo(outcome);
     }
 
     @Test
@@ -91,7 +91,7 @@ class FindingLifecycleServiceTest {
         assertThat(fresh.getProposedValue()).isNull();
         assertThat(fresh.getCarriedFromFindingId()).isEqualTo(prev.getId());
         assertThat(prev.getResolveStatus()).isEqualTo(ResolveStatus.DISCARDED);
-        assertThat(new LifecycleOutcome(0, 1, 1, 0, 0)).usingRecursiveComparison().isEqualTo(outcome);
+        assertThat(new LifecycleOutcome(0, 1, 0, 0, 0)).usingRecursiveComparison().isEqualTo(outcome);
     }
 
     @Test
@@ -118,6 +118,21 @@ class FindingLifecycleServiceTest {
         assertThat(prev.getResolveStatus()).isEqualTo(ResolveStatus.APPROVED);
         assertThat(prev.getResolvedBy()).isNull();
         assertThat(new LifecycleOutcome(0, 0, 1, 0, 0)).usingRecursiveComparison().isEqualTo(outcome);
+    }
+
+    @Test
+    void reconcile_freshCountExcludesCarriedAndReopened() {
+        FakeFinding prevA = finding(KEY_A, HASH_1, ResolveStatus.ACKNOWLEDGED);
+        FakeFinding prevB = finding(KEY_B, HASH_2, ResolveStatus.ACKNOWLEDGED);
+        FakeFinding freshA = finding(KEY_A, HASH_1, ResolveStatus.OPEN);
+        FakeFinding freshB = finding(KEY_B, "hash-9", ResolveStatus.OPEN);
+        FakeFinding freshC = finding("GST_DAYBOOK|v3", "hash-3", ResolveStatus.OPEN);
+
+        LifecycleOutcome outcome = service.reconcile(List.of(prevA, prevB),
+                List.of(freshA, freshB, freshC), NOW);
+
+        assertThat(outcome).usingRecursiveComparison()
+                .isEqualTo(new LifecycleOutcome(1, 1, 1, 0, 0));
     }
 
     @Test

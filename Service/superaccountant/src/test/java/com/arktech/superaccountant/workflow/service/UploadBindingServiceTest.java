@@ -71,7 +71,7 @@ class UploadBindingServiceTest {
     }
 
     private void stubWorkflow(WorkflowStage stage) {
-        when(workflowRepository.findById(wfId)).thenReturn(Optional.of(workflow(stage)));
+        when(workflowRepository.findByIdForUpdate(wfId)).thenReturn(Optional.of(workflow(stage)));
     }
 
     private void stubBind() {
@@ -105,7 +105,7 @@ class UploadBindingServiceTest {
         Workflow w = workflow(WorkflowStage.PREPARE);
         w.setMastersJobId(UUID.randomUUID());
         w.setUploadJobId(UUID.randomUUID());
-        when(workflowRepository.findById(wfId)).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(wfId)).thenReturn(Optional.of(w));
         stubBind();
         when(coverageService.coverageStart(orgId)).thenReturn(LocalDate.of(2025, 4, 1));
         when(dayBookIntakeService.intake(any(), any(), any(), eq(orgId), eq("op1"), eq(wfId)))
@@ -122,7 +122,7 @@ class UploadBindingServiceTest {
 
     @Test
     void bind_whenFinalized_throwsConflict() {
-        when(workflowRepository.findById(wfId))
+        when(workflowRepository.findByIdForUpdate(wfId))
                 .thenReturn(Optional.of(workflow(WorkflowStage.FINALIZED)));
 
         assertThatThrownBy(() -> service.uploadAndBind(orgId, wfId,
@@ -187,6 +187,22 @@ class UploadBindingServiceTest {
 
         assertThatThrownBy(() -> service.useUpload(orgId, wfId, jobId, "op1"))
                 .isInstanceOf(UploadNotFoundException.class);
+    }
+
+    @Test
+    void useUpload_locksWorkflowRow() {
+        stubWorkflow(WorkflowStage.STARTED);
+        stubBind();
+        when(coverageService.coverageStart(orgId)).thenReturn(LocalDate.of(2025, 4, 1));
+        when(dayBookUploadJobRepository.findByIdAndOrganizationId(jobId, orgId))
+                .thenReturn(Optional.of(job()));
+        when(dayBookUploadJobRepository.findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(
+                orgId, UploadJobStatus.COMPLETED)).thenReturn(Optional.of(job()));
+
+        service.useUpload(orgId, wfId, jobId, "op1");
+
+        verify(workflowRepository).findByIdForUpdate(wfId);
+        verify(workflowRepository, never()).findById(any());
     }
 
     @Test

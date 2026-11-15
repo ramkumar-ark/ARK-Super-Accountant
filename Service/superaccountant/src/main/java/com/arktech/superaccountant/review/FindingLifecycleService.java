@@ -38,9 +38,17 @@ public class FindingLifecycleService {
         int autoResolved = 0;
         int discarded = 0;
 
+        Set<String> previousKeys = new HashSet<>();
+        for (F p : previous) {
+            previousKeys.add(p.getFindingKey());
+        }
+
         for (F f : fresh) {
             if (duplicateKeys.contains(f.getFindingKey())) {
                 continue; // ambiguous key: carry nothing, both start OPEN
+            }
+            if (previousKeys.contains(f.getFindingKey())) {
+                continue; // carried or reopened, not fresh
             }
             freshCount++;
         }

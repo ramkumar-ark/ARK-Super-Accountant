@@ -73,7 +73,7 @@ public class WorkflowAnalysisService {
         List<WorkflowAnalyzer> matching = analyzers.stream()
                 .filter(a -> a.types().contains(workflow.getType()))
                 .toList();
-        boolean allDone = matching.isEmpty();
+        boolean allDone = true;
         for (WorkflowAnalyzer analyzer : matching) {
             WorkflowAnalysisRun run = new WorkflowAnalysisRun();
             run.setWorkflowId(workflowId);
@@ -96,7 +96,7 @@ public class WorkflowAnalysisService {
             }
             run.setFinishedAt(Instant.now());
             saveRunInNewTransaction(run);
-            allDone = allDone || run.getStatus() == AnalysisRunStatus.DONE;
+            allDone = allDone && run.getStatus() == AnalysisRunStatus.DONE;
         }
 
         // Re-lock: the upload may have been replaced while the analyzers were running.
