@@ -65,6 +65,8 @@ class SnapshotControllerIT {
     private WorkflowRepository workflowRepository;
     @Autowired
     private OrganizationRepository organizationRepository;
+    @Autowired
+    private com.arktech.superaccountant.masters.repository.UploadJobRepository uploadJobRepository;
 
     private final ObjectMapper json = new ObjectMapper();
 
@@ -325,5 +327,66 @@ class SnapshotControllerIT {
         f.setDoneAt(doneAt);
         f.setDoneNote(doneNote);
         return amendmentFollowUpRepository.save(f);
+    }
+
+    @Test
+    void mastersChanges_listsMasterChangesForUpload() throws Exception {
+        setup();
+        com.arktech.superaccountant.masters.models.UploadJob masters = mastersJob();
+        TamperChange c = masterChange(masters.getId(), true, "29ABCDE1234F1Z5", "29ABCDE1234F1Z6");
+
+        mockMvc.perform(get("/api/v1/masters/uploads/" + masters.getId() + "/changes")
+                        .header("Authorization", "Bearer " + accountantToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changes.length()").value(1))
+                .andExpect(jsonPath("$.changes[0].id").value(c.getId().toString()))
+                .andExpect(jsonPath("$.changes[0].changeKind").value("MASTER_MODIFIED"))
+                .andExpect(jsonPath("$.changes[0].ledgerName").value("Acme Traders"))
+                .andExpect(jsonPath("$.changes[0].attributeName").value("gstin"))
+                .andExpect(jsonPath("$.changes[0].oldValue").value("29ABCDE1234F1Z5"))
+                .andExpect(jsonPath("$.changes[0].newValue").value("29ABCDE1234F1Z6"))
+                .andExpect(jsonPath("$.changes[0].touchedScopes[0]").value("GSTR1"))
+                .andExpect(jsonPath("$.changes[0].blocking").value(true))
+                .andExpect(jsonPath("$.changes[0].createdAt").isNotEmpty());
+    }
+
+    @Test
+    void mastersChanges_otherOrgUpload_404() throws Exception {
+        setup();
+        com.arktech.superaccountant.masters.models.UploadJob otherOrgJob =
+                new com.arktech.superaccountant.masters.models.UploadJob();
+        otherOrgJob.setOrganizationId(UUID.randomUUID());
+        otherOrgJob.setFileName("other.json");
+        otherOrgJob.setStatus(UploadJobStatus.COMPLETED);
+        otherOrgJob = uploadJobRepository.save(otherOrgJob);
+
+        mockMvc.perform(get("/api/v1/masters/uploads/" + otherOrgJob.getId() + "/changes")
+                        .header("Authorization", "Bearer " + accountantToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Upload not found"));
+    }
+
+    private com.arktech.superaccountant.masters.models.UploadJob mastersJob() {
+        com.arktech.superaccountant.masters.models.UploadJob job =
+                new com.arktech.superaccountant.masters.models.UploadJob();
+        job.setOrganizationId(orgId);
+        job.setFileName("masters.json");
+        job.setStatus(UploadJobStatus.COMPLETED);
+        return uploadJobRepository.save(job);
+    }
+
+    private TamperChange masterChange(UUID jobId, boolean blocking, String oldValue, String newValue) {
+        TamperChange c = new TamperChange();
+        c.setOrganizationId(orgId);
+        c.setUploadJobId(jobId);
+        c.setChangeKind(TamperChangeKind.MASTER_MODIFIED);
+        c.setLedgerName("Acme Traders");
+        c.setAttributeName("gstin");
+        c.setOldValue(oldValue);
+        c.setNewValue(newValue);
+        c.setTouchedScopes("GSTR1,GSTR3B");
+        c.setBlocking(blocking);
+        c.setCreatedAt(java.time.Instant.now());
+        return tamperChangeRepository.save(c);
     }
 }

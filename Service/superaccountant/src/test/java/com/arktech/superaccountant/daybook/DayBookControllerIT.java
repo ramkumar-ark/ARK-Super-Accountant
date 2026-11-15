@@ -57,6 +57,8 @@ class DayBookControllerIT {
     @Autowired private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
     @Autowired private OrganizationRepository organizationRepository;
     @Autowired private com.arktech.superaccountant.masters.repository.ValidationFindingRepository validationFindingRepository;
+    @Autowired private com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository dayBookUploadJobRepository;
+    @Autowired private com.arktech.superaccountant.workflow.snapshot.TamperChangeRepository tamperChangeRepository;
     private UUID validatedMastersJobId;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -219,6 +221,38 @@ class DayBookControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0));
     }
+
+    @Test
+    void listUploads_includesTamperChangeCount() throws Exception {
+        String token = setupOrgScopedToken();
+        String touchedJobId = uploadViaWorkflow(token, "daybook-minimal.json", "touched.json");
+        var job = dayBookUploadJobRepository.findById(UUID.fromString(touchedJobId)).orElseThrow();
+        seedTamperChange(job.getId(), job.getOrganizationId());
+        seedTamperChange(job.getId(), job.getOrganizationId());
+        String cleanJobId = uploadViaWorkflow(token, "daybook-minimal.json", "clean.json",
+                "2025-05");
+
+        mockMvc.perform(get("/api/v1/day-book/uploads")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id=='" + touchedJobId + "')].tamperChangeCount").value(2))
+                .andExpect(jsonPath("$.content[?(@.id=='" + cleanJobId + "')].tamperChangeCount").value(0));
+    }
+
+    private void seedTamperChange(UUID jobId, UUID orgId) {
+        com.arktech.superaccountant.workflow.snapshot.TamperChange c =
+                new com.arktech.superaccountant.workflow.snapshot.TamperChange();
+        c.setOrganizationId(orgId);
+        c.setUploadJobId(jobId);
+        c.setVoucherKey("G:seed-" + UUID.randomUUID());
+        c.setChangeKind(com.arktech.superaccountant.workflow.snapshot.TamperChangeKind.MODIFIED);
+        c.setTouchedScopes("GSTR1");
+        c.setBlocking(true);
+        tamperChangeRepository.save(c);
+    }
+
+    /**
+     * Masters gate (MastersGateService) blocks day book uploads until the org has a completed
 
     /**
      * Masters gate (MastersGateService) blocks day book uploads until the org has a completed

@@ -40,6 +40,8 @@ public class SnapshotController {
     private TamperChangeRepository tamperChangeRepository;
     @Autowired
     private AmendmentFollowUpRepository amendmentFollowUpRepository;
+    @Autowired
+    private com.arktech.superaccountant.masters.repository.UploadJobRepository uploadJobRepository;
 
     @GetMapping("/day-book/uploads/{uploadId}/changes")
     public ResponseEntity<?> changes(@AuthenticationPrincipal UserDetailsImpl principal,
@@ -71,6 +73,37 @@ public class SnapshotController {
         map.put("newDate", c.getNewDate());
         map.put("touchedScopes", VoucherScopeClassifier.touchedScopesList(c.getTouchedScopes()));
         map.put("blocking", c.isBlocking());
+        return map;
+    }
+
+    @GetMapping("/masters/uploads/{uploadId}/changes")
+    public ResponseEntity<?> mastersChanges(@AuthenticationPrincipal UserDetailsImpl principal,
+                                            @PathVariable UUID uploadId) {
+        UUID orgId = principal.getOrganizationId();
+        com.arktech.superaccountant.masters.models.UploadJob job =
+                uploadJobRepository.findById(uploadId).orElse(null);
+        if (job == null || orgId == null || !job.getOrganizationId().equals(orgId)) {
+            return ResponseEntity.status(404).body(Map.of("error", "Upload not found"));
+        }
+        List<Map<String, Object>> changes = new ArrayList<>();
+        tamperChangeRepository.findByUploadJobId(uploadId).stream()
+                .sorted(Comparator.comparing(c -> c.getCreatedAt() == null
+                        ? java.time.Instant.MIN : c.getCreatedAt()))
+                .forEach(c -> changes.add(masterView(c)));
+        return ResponseEntity.ok(Map.of("changes", changes));
+    }
+
+    private Map<String, Object> masterView(TamperChange c) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", c.getId());
+        map.put("changeKind", c.getChangeKind() == null ? null : c.getChangeKind().name());
+        map.put("ledgerName", c.getLedgerName());
+        map.put("attributeName", c.getAttributeName());
+        map.put("oldValue", c.getOldValue());
+        map.put("newValue", c.getNewValue());
+        map.put("touchedScopes", VoucherScopeClassifier.touchedScopesList(c.getTouchedScopes()));
+        map.put("blocking", c.isBlocking());
+        map.put("createdAt", c.getCreatedAt());
         return map;
     }
 
