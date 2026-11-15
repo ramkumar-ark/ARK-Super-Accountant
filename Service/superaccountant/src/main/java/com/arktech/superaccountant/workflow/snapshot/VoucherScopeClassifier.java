@@ -58,4 +58,15 @@ public class VoucherScopeClassifier {
     public static String touchedScopesText(Set<WorkflowType> scopes) {
         return scopes.stream().map(Enum::name).sorted().collect(Collectors.joining(","));
     }
+
+    /** Inverse of {@link #touchedScopesText}: parses the comma-joined text back to names. */
+    public static java.util.List<String> touchedScopesList(String text) {
+        if (text == null || text.isBlank()) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(text.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
 }

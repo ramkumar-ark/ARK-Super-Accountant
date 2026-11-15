@@ -185,8 +185,10 @@ public class DayBookIntakeService {
         job.setStatus(com.arktech.superaccountant.masters.models.UploadJobStatus.COMPLETED);
         job.setCompletedAt(Instant.now());
         job = dayBookUploadJobRepository.save(job);
-        eventPublisher.publishEvent(new com.arktech.superaccountant.daybook.events.DayBookUploadCompletedEvent(
-                orgId, job.getId()));
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new com.arktech.superaccountant.daybook.events.DayBookUploadCompletedEvent(
+                    orgId, job.getId()));
+        }
 
         List<String> warnings = new ArrayList<>();
         if (min != null && min.isAfter(coverageFrom.plusDays(15))) {
