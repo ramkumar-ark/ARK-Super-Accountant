@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -66,4 +67,8 @@ public class TdsDeducteeEntry {
     // JSON array of ParsedVoucher UUIDs, e.g. ["a1b2..."] — normally one element
     @Column(name = "source_voucher_ids", columnDefinition = "TEXT")
     private String sourceVoucherIds;
+
+    /** Non-null when a re-analysis replaced this entry. */
+    @Column(name = "superseded_at")
+    private Instant supersededAt;
 }
