@@ -217,9 +217,19 @@ public class TdsWorkflowController {
                                          @AuthenticationPrincipal UserDetailsImpl principal)
             throws java.io.IOException {
         Workflow q = loadQuarter(principal.getOrganizationId(), id);
-        if (q.getStage() != WorkflowStage.FINALIZED && q.getStage() != WorkflowStage.FILED) {
+        WorkflowStage stage = q.getStage();
+        if (stage != WorkflowStage.PREPARE && stage != WorkflowStage.FINALIZED
+                && stage != WorkflowStage.FILED) {
             throw new WorkflowConflictException(
-                    "Export is available only after the quarter is finalized");
+                    "Export is available from Prepare onward");
+        }
+        if (stage == WorkflowStage.PREPARE) {
+            List<String> unmet = finalize26q.unmet(q);
+            if (!unmet.isEmpty()) {
+                throw new WorkflowConflictException(
+                        "Export is available once the gate conditions pass: "
+                                + String.join("; ", unmet));
+            }
         }
         Tds26qDetail detail = detail26qRepository.findByWorkflowId(q.getId()).orElseThrow();
         int fyStartMonth = organizationRepository.findById(q.getOrganizationId())
