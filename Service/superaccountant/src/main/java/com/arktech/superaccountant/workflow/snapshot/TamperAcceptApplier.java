@@ -32,9 +32,16 @@ public class TamperAcceptApplier implements FindingApplier<ReviewableFinding> {
     private AmendmentFollowUpRepository amendmentFollowUpRepository;
     @Autowired
     private WorkflowEventRepository workflowEventRepository;
+    @Autowired
+    private MasterTamperApplier masterTamperApplier;
 
     @Override
     public void validate(ReviewableFinding finding, String proposedValue, String note) {
+        TamperFinding f = (TamperFinding) finding;
+        if (isMastersKind(f.getChangeKind())) {
+            masterTamperApplier.validate(finding, proposedValue, note);
+            return;
+        }
         if (note == null || note.isBlank()) {
             throw new FindingReviewException(400, "A note is required.");
         }
@@ -43,11 +50,21 @@ public class TamperAcceptApplier implements FindingApplier<ReviewableFinding> {
     @Override
     public void apply(ReviewableFinding finding, String approver) {
         TamperFinding f = (TamperFinding) finding;
+        if (isMastersKind(f.getChangeKind())) {
+            masterTamperApplier.apply(finding, approver);
+            return;
+        }
         switch (f.getChangeKind()) {
             case MODIFIED, INSERTED -> rewriteOrInsert(f);
             case DELETED -> release(f);
+            default -> {
+            }
         }
         recordFollowUps(f, approver);
+    }
+
+    private boolean isMastersKind(TamperChangeKind kind) {
+        return kind == TamperChangeKind.MASTER_MODIFIED || kind == TamperChangeKind.MASTER_REMOVED;
     }
 
     private void rewriteOrInsert(TamperFinding f) {
