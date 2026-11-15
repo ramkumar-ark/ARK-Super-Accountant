@@ -2,6 +2,8 @@ package com.arktech.superaccountant.gst.models;
 
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
+import com.arktech.superaccountant.review.EvidenceHash;
+import com.arktech.superaccountant.review.LifecycleFinding;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,11 +16,12 @@ import java.util.UUID;
 @Entity
 @Table(name = "gst_daybook_findings", indexes = {
         @Index(columnList = "workflow_id"),
-        @Index(columnList = "upload_job_id")
+        @Index(columnList = "upload_job_id"),
+        @Index(columnList = "workflow_id, superseded_at")
 })
 @Data
 @NoArgsConstructor
-public class GstDaybookFinding {
+public class GstDaybookFinding implements LifecycleFinding {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -81,6 +84,15 @@ public class GstDaybookFinding {
 
     @Column(name = "carried_from_finding_id")
     private UUID carriedFromFindingId;
+
+    @Column(name = "superseded_at")
+    private Instant supersededAt;
+
+    @Transient
+    public String getFindingKey() {
+        String voucherIdentity = EvidenceHash.voucherIdentity(voucherGuid, voucherTypeName, voucherNumber, voucherDate);
+        return findingType.name() + "|" + voucherIdentity + "|" + (ledgerName == null ? "" : ledgerName);
+    }
 
     // ── Shared review columns (must match ValidationFinding exactly) ─────────
 

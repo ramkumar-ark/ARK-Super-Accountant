@@ -7,6 +7,8 @@ import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.GstApplicabilityType;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
+import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.masters.rules.GstRegistrationTypes;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -14,7 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Rule 1 — GST_NOT_CHARGED (HIGH): taxable expense/purchase debit, registered party,
+ * Rule 1 — GST_NOT_CHARGED (HIGH): taxable expense/purchase debit, registered party
+ * (by GST registration type, voucher first, ledger snapshot fallback),
  * but the voucher carries no GST entries with a non-zero amount. Purchase side only.
  */
 @Component
@@ -56,9 +59,12 @@ public class GstNotChargedRule implements GstDaybookRule {
     }
 
     private boolean partyRegistered(GstRuleContext ctx, ParsedVoucher v) {
-        if (v.getPartyGstin() != null && !v.getPartyGstin().isBlank()) return true;
-        return ctx.snapshot(v.getPartyLedgerName())
-                .map(s -> s.getGstin() != null && !s.getGstin().isBlank())
-                .orElse(false);
+        String type = v.getPartyGstRegistrationType();
+        if (type == null || type.isBlank()) {
+            UploadLedgerSnapshot party = ctx.snapshot(v.getPartyLedgerName()).orElse(null);
+            type = party == null ? null : party.getGstRegistrationType();
+        }
+        if (type == null || type.isBlank()) return false;
+        return GstRegistrationTypes.isRegistered(type);
     }
 }

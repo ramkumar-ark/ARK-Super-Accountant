@@ -98,7 +98,7 @@ public class UploadBindingService {
     }
 
     private Workflow loadWorkflow(UUID orgId, UUID workflowId) {
-        Workflow w = workflowRepository.findById(workflowId)
+        Workflow w = workflowRepository.findByIdForUpdate(workflowId)
                 .orElseThrow(() -> new WorkflowBadRequestException("Workflow not found"));
         if (!w.getOrganizationId().equals(orgId)) {
             throw new WorkflowBadRequestException("Workflow not found");

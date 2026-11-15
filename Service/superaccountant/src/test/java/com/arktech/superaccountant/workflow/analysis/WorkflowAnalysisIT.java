@@ -81,7 +81,7 @@ class WorkflowAnalysisIT {
 
                 @Override
                 public java.util.Set<WorkflowType> types() {
-                    return java.util.Set.of(WorkflowType.GSTR1);
+                    return java.util.Set.of(WorkflowType.TDS_PAYMENT);
                 }
 
                 @Override
@@ -148,7 +148,7 @@ class WorkflowAnalysisIT {
 
     @Test
     void boundEvent_afterCommit_movesWorkflowToFindingsReview() {
-        Workflow w = seedWorkflow(WorkflowType.GSTR3B); // no analyzer applies to GSTR3B in this IT
+        Workflow w = seedWorkflow(WorkflowType.GSTR3B); // real GST_INWARD analyzer runs on an empty upload
 
         new TransactionTemplate(txManager).executeWithoutResult(status ->
                 eventPublisher.publishEvent(new WorkflowUploadBoundEvent(
@@ -162,7 +162,7 @@ class WorkflowAnalysisIT {
 
     @Test
     void analyzeEndpoint_retriesAfterFailure() throws Exception {
-        Workflow w = seedWorkflow(WorkflowType.GSTR1); // failOnceAnalyzer applies to GSTR1
+        Workflow w = seedWorkflow(WorkflowType.TDS_PAYMENT); // failOnceAnalyzer applies to TDS_PAYMENT
         var withUser = SecurityMockMvcRequestPostProcessors.user(principal);
 
         mockMvc.perform(post("/api/v1/workflows/" + w.getId() + "/analyze").with(withUser))

@@ -106,6 +106,22 @@ class GstDaybookFindingPersistenceIT {
         assertThat(count).isEqualTo(1L);
     }
 
+    @Test
+    void supersededAt_roundTrips() {
+        GstDaybookFinding f = minimalFinding();
+        f.setFindingType(GstFindingType.GST_NOT_CHARGED);
+        f.setSeverity(FindingSeverity.HIGH);
+        f.setMessage("superseded");
+        java.time.Instant supersededAt = java.time.Instant.parse("2026-11-15T10:00:00Z");
+        f.setSupersededAt(supersededAt);
+
+        repository.saveAndFlush(f);
+        entityManager.clear();
+        GstDaybookFinding loaded = repository.findById(f.getId()).orElseThrow();
+
+        assertThat(loaded.getSupersededAt()).isEqualTo(supersededAt);
+    }
+
     private GstDaybookFinding minimalFinding() {
         GstDaybookFinding f = new GstDaybookFinding();
         f.setOrganizationId(UUID.randomUUID());
