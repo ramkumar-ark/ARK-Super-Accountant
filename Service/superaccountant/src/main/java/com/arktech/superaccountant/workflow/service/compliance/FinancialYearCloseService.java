@@ -76,7 +76,8 @@ public class FinancialYearCloseService {
         List<String> openItems = openItems(organizationId, financialYear);
         List<String> blockers = closeBlockers(organizationId, financialYear);
         boolean closable = close.isEmpty() && openItems.isEmpty() && blockers.isEmpty()
-                && end.isBefore(LocalDate.now());
+                && end.isBefore(LocalDate.now())
+                && financialYear == earliestOpenFy(organizationId, org);
         return new FinancialYearStatusResponse(
                 financialYear, start, end,
                 close.isPresent(),
@@ -85,6 +86,19 @@ public class FinancialYearCloseService {
                 close.map(FinancialYearClose::getItrAckDate).orElse(null),
                 close.map(FinancialYearClose::getNote).orElse(null),
                 closable, openItems, blockers);
+    }
+
+    private int earliestOpenFy(UUID organizationId, Organization org) {
+        int fyStartMonth = org.getFinancialYearStart();
+        LocalDate books = org.getBooksStartDate();
+        int earliestOpen = books != null
+                ? PeriodCalendar.financialYearOf(books, fyStartMonth)
+                : PeriodCalendar.financialYearOf(LocalDate.now(), fyStartMonth);
+        while (financialYearCloseRepository
+                .findByOrganizationIdAndFinancialYear(organizationId, earliestOpen).isPresent()) {
+            earliestOpen++;
+        }
+        return earliestOpen;
     }
 
     @Transactional
@@ -100,14 +114,7 @@ public class FinancialYearCloseService {
         if (!PeriodCalendar.fyEnd(financialYear, fyStartMonth).isBefore(LocalDate.now())) {
             throw new WorkflowConflictException("FY has not ended");
         }
-        int earliestFy = books != null
-                ? PeriodCalendar.financialYearOf(books, fyStartMonth)
-                : PeriodCalendar.financialYearOf(LocalDate.now(), fyStartMonth);
-        int earliestOpen = earliestFy;
-        while (financialYearCloseRepository
-                .findByOrganizationIdAndFinancialYear(organizationId, earliestOpen).isPresent()) {
-            earliestOpen++;
-        }
+        int earliestOpen = earliestOpenFy(organizationId, org);
         if (financialYear != earliestOpen) {
             throw new WorkflowConflictException("Close FY " + earliestOpen + " first");
         }

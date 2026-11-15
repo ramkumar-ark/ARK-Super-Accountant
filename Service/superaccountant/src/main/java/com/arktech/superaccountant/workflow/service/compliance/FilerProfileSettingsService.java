@@ -86,7 +86,7 @@ public class FilerProfileSettingsService {
         for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B)) {
             responsibilityStartSettingsService.list(organizationId).stream()
                     .filter(r -> r.type().equals(type.name()) && r.firstPeriodStart() != null)
-                    .filter(r -> !r.firstPeriodStart().isBefore(effectiveFrom))
+                    .filter(r -> r.firstPeriodStart().isAfter(effectiveFrom))
                     .findFirst()
                     .ifPresent(r -> responsibilityStartSettingsService
                             .rebuildBaselineRows(organizationId, actor, type));

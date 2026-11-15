@@ -71,14 +71,16 @@ public class BaselineConfirmationService {
         LocalDate rangeEnd = unconfirmed.stream()
                 .map(Workflow::getPeriodEnd).max(Comparator.naturalOrder()).orElse(null);
         Map<WorkflowType, List<Workflow>> unconfirmedByType = groupByType(unconfirmed);
+        Map<WorkflowType, Long> confirmedByType = workflowRepository
+                .findAllByOrganizationIdAndStageAndActiveTrue(organizationId, WorkflowStage.BASELINE)
+                .stream()
+                .filter(w -> w.getBaselineConfirmedAt() != null)
+                .collect(java.util.stream.Collectors.groupingBy(Workflow::getType,
+                        java.util.stream.Collectors.counting()));
         List<BaselineStatusResponse.TypeStatus> types = new ArrayList<>();
         for (WorkflowType type : WorkflowType.values()) {
             int unconfirmedRows = unconfirmedByType.getOrDefault(type, List.of()).size();
-            int confirmedRows = workflowRepository
-                    .findAllByOrganizationIdAndStageAndActiveTrue(organizationId, WorkflowStage.BASELINE)
-                    .stream()
-                    .filter(w -> w.getType() == type && w.getBaselineConfirmedAt() != null)
-                    .toList().size();
+            int confirmedRows = confirmedByType.getOrDefault(type, 0L).intValue();
             LocalDate latestEnd = unconfirmedByType.getOrDefault(type, List.of()).stream()
                     .map(Workflow::getPeriodEnd).max(Comparator.naturalOrder()).orElse(null);
             types.add(new BaselineStatusResponse.TypeStatus(type.name(), unconfirmedRows, confirmedRows, latestEnd));
