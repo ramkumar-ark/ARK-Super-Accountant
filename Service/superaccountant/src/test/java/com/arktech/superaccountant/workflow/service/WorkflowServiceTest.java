@@ -87,6 +87,7 @@ class WorkflowServiceTest {
         inject("uploadFreshnessGate", uploadFreshnessGate);
         inject("responsibilityStartService", responsibilityStartService);
         inject("baselineGate", baselineGate);
+        inject("finalizePreconditions", List.of());
         inject("snapshotService", snapshotService);
         inject("coverageService", coverageService);
 
@@ -447,5 +448,48 @@ class WorkflowServiceTest {
 
         assertThrows(WorkflowConflictException.class,
                 () -> service.advanceToPrepare(orgId, actor, w.getId()));
+    }
+
+    private static com.arktech.superaccountant.workflow.seam.FinalizePrecondition precondition(
+            boolean applies, java.util.List<String> unmet) {
+        return new com.arktech.superaccountant.workflow.seam.FinalizePrecondition() {
+            @Override
+            public boolean appliesTo(Workflow w) {
+                return applies;
+            }
+
+            @Override
+            public java.util.List<String> unmet(Workflow w) {
+                return unmet;
+            }
+        };
+    }
+
+    @Test
+    void finalize_blocksOnUnmetPrecondition() {
+        Workflow w = prepareWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowGate.blockingFindingCount(w.getId())).thenReturn(0);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.TDS_PAYMENT, "2026-03"))
+                .thenReturn(true);
+        inject("finalizePreconditions", List.of(precondition(true, List.of("x"))));
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.finalize(orgId, actor, w.getId()));
+        assertTrue(e.getMessage().contains("Finalize preconditions not met: x"));
+        assertEquals(WorkflowStage.PREPARE, w.getStage());
+    }
+
+    @Test
+    void finalize_ignoresNonApplyingPrecondition() {
+        Workflow w = prepareWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowGate.blockingFindingCount(w.getId())).thenReturn(0);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.TDS_PAYMENT, "2026-03"))
+                .thenReturn(true);
+        inject("finalizePreconditions", List.of(precondition(false, List.of("x"))));
+
+        Workflow finalized = service.finalize(orgId, actor, w.getId());
+        assertEquals(WorkflowStage.FINALIZED, finalized.getStage());
     }
 }
