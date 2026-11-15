@@ -19,6 +19,11 @@ public interface GstDaybookFindingRepository extends JpaRepository<GstDaybookFin
 
     List<GstDaybookFinding> findByWorkflowIdOrderByVoucherDateAscCreatedAtAsc(UUID workflowId);
 
+    List<GstDaybookFinding> findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAscCreatedAtAsc(UUID workflowId);
+
+    long countByWorkflowIdAndSupersededAtIsNullAndSeverityAndResolveStatusNotIn(UUID workflowId, FindingSeverity severity,
+                                                                                Collection<ResolveStatus> statuses);
+
     List<GstDaybookFinding> findByWorkflowIdAndResolveStatusNotIn(UUID workflowId, Collection<ResolveStatus> statuses);
 
     long countByWorkflowIdAndSeverityAndResolveStatusNotIn(UUID workflowId, FindingSeverity severity,
