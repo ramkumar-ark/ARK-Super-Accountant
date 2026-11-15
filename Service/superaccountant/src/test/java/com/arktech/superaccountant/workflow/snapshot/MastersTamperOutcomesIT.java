@@ -270,6 +270,29 @@ class MastersTamperOutcomesIT {
     }
 
     @Test
+    void validFrom_removedLedger_thenNextUploadStillWithoutIt_raisesNothing() throws Exception {
+        seedModifiedFinding();
+        mastersUpload(accountantToken, mastersFile(OLD_GSTIN, false));
+        awaitMasterChanges();
+        TamperFinding removed = masterFindings().stream()
+                .filter(f -> f.getFindingKey().equals("MASTER_REMOVED|" + LEDGER_KEY + "|gstin"))
+                .findFirst().orElseThrow();
+
+        assertThat(actStatusOn(openGstr1May.getId(), removed, operatorToken,
+                "ACKNOWLEDGE", "VALID_FROM:2025-05-01", "removed from May")).isEqualTo("200");
+        assertThat(actStatusOn(openGstr1May.getId(), removed, accountantToken,
+                "APPROVE", null, "approved")).isEqualTo("200");
+
+        long before = tamperChangeRepository.findByOrganizationId(orgId).stream()
+                .filter(c -> "gstin".equals(c.getAttributeName())).count();
+        mastersUpload(accountantToken, mastersFile(OLD_GSTIN, false));
+        Thread.sleep(2000);
+
+        assertThat(tamperChangeRepository.findByOrganizationId(orgId).stream()
+                .filter(c -> "gstin".equals(c.getAttributeName())).count()).isEqualTo(before);
+    }
+
+    @Test
     void validFrom_notAfterFrozenPeriodEnd_400() throws Exception {
         seedModifiedFinding();
         MvcResult result = mockMvc.perform(post("/api/v1/workflows/" + openGstr1May.getId() + "/findings/"

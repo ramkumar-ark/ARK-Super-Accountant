@@ -104,8 +104,10 @@ public class MastersTamperComparisonService {
             TamperChangeKind kind = snap == null ? TamperChangeKind.MASTER_REMOVED
                     : TamperChangeKind.MASTER_MODIFIED;
             List<FrozenMasterAttribute> differing = rows.stream()
-                    .filter(row -> snap == null || !Objects.equals(row.getValue(),
-                            MasterAttributes.valuesFor(row.getWorkflowType(), snap).get(attribute)))
+                    .filter(row -> snap == null
+                            ? !(row.getValue() == null && row.getValidFrom() != null)
+                            : !Objects.equals(row.getValue(),
+                                    MasterAttributes.valuesFor(row.getWorkflowType(), snap).get(attribute)))
                     .toList();
             if (differing.isEmpty()) {
                 continue;
