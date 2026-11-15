@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -27,4 +28,8 @@ public class TdsPaymentDetail {
     /** Statutory payment due date for the month's TDS. */
     @Column(name = "due_date", nullable = false)
     private LocalDate dueDate;
+
+    /** Sum of in-period deductee TDS; null means not yet analysed. */
+    @Column(name = "tds_deducted", precision = 19, scale = 2)
+    private BigDecimal tdsDeducted;
 }

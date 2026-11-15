@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -53,4 +54,20 @@ public class TdsChallan {
 
     @Column(name = "is_nil_challan", nullable = false)
     private boolean isNilChallan;
+
+    @Convert(converter = TdsChallanStatusConverter.class)
+    @Column(name = "status", length = 20)
+    private TdsChallanStatus status = TdsChallanStatus.PROPOSED;
+
+    @Column(name = "proposed_by")
+    private String proposedBy;
+
+    @Column(name = "proposed_at")
+    private Instant proposedAt;
+
+    @Column(name = "approved_by")
+    private String approvedBy;
+
+    @Column(name = "approved_at")
+    private Instant approvedAt;
 }

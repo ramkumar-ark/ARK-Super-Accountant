@@ -10,4 +10,8 @@ import java.util.UUID;
 @Repository
 public interface TdsDeducteeEntryRepository extends JpaRepository<TdsDeducteeEntry, UUID> {
     List<TdsDeducteeEntry> findByWorkflowId(UUID workflowId);
+
+    List<TdsDeducteeEntry> findByWorkflowIdAndSupersededAtIsNull(UUID workflowId);
+
+    List<TdsDeducteeEntry> findByTdsChallanIdAndSupersededAtIsNull(UUID challanId);
 }

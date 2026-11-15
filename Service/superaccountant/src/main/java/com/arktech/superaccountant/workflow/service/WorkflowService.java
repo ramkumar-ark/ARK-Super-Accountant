@@ -70,6 +70,10 @@ public class WorkflowService {
 
     @Autowired
     private com.arktech.superaccountant.workflow.seam.BaselineGate baselineGate;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private List<com.arktech.superaccountant.workflow.seam.FinalizePrecondition> finalizePreconditions
+            = List.of();
+
     // ---------- lookups ----------
 
     public List<Workflow> list(UUID orgId, String type, Integer fy, String stage) {
@@ -247,6 +251,18 @@ public class WorkflowService {
             throw new WorkflowConflictException("Dependencies not finalized: "
                     + unmet.stream().map(d -> d.type() + " " + d.periodKey())
                     .reduce((a, b) -> a + ", " + b).orElse(""));
+        }
+
+        List<String> unmetPreconditions = new ArrayList<>();
+        for (com.arktech.superaccountant.workflow.seam.FinalizePrecondition precondition
+                : finalizePreconditions) {
+            if (precondition.appliesTo(w)) {
+                unmetPreconditions.addAll(precondition.unmet(w));
+            }
+        }
+        if (!unmetPreconditions.isEmpty()) {
+            throw new WorkflowConflictException("Finalize preconditions not met: "
+                    + String.join("; ", unmetPreconditions));
         }
 
         if (w.getUploadJobId() != null

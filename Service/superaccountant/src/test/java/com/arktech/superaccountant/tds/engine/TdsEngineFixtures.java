@@ -14,17 +14,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-final class TdsEngineFixtures {
+public final class TdsEngineFixtures {
 
-    static final UUID ORG = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    static final UUID WF = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    static final UUID JOB = UUID.fromString("00000000-0000-0000-0000-000000000003");
-    static final LocalDate FY_START = LocalDate.of(2026, 4, 1);
+    public static final UUID ORG = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    public static final UUID WF = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    public static final UUID JOB = UUID.fromString("00000000-0000-0000-0000-000000000003");
+    public static final LocalDate FY_START = LocalDate.of(2026, 4, 1);
 
     private TdsEngineFixtures() {
     }
 
-    static ParsedVoucher voucher(String no, LocalDate date, String party, Object[][] rows) {
+    public static ParsedVoucher voucher(String no, LocalDate date, String party, Object[][] rows) {
         ParsedVoucher v = new ParsedVoucher();
         v.setId(UUID.randomUUID());
         v.setVoucherNumber(no);
@@ -45,12 +45,12 @@ final class TdsEngineFixtures {
         return v;
     }
 
-    static UploadLedgerSnapshot snap(String name, LedgerCategory cat, Boolean tdsApplicable,
+    public static UploadLedgerSnapshot snap(String name, LedgerCategory cat, Boolean tdsApplicable,
                                      String tdsSection, String pan) {
         return snap(name, cat, tdsApplicable, tdsSection, pan, null);
     }
 
-    static UploadLedgerSnapshot snap(String name, LedgerCategory cat, Boolean tdsApplicable,
+    public static UploadLedgerSnapshot snap(String name, LedgerCategory cat, Boolean tdsApplicable,
                                      String tdsSection, String pan, BigDecimal openingBalance) {
         UploadLedgerSnapshot s = new UploadLedgerSnapshot();
         s.setLedgerName(name);
@@ -62,7 +62,7 @@ final class TdsEngineFixtures {
         return s;
     }
 
-    static TdsSectionConfig config(String code, String rateCo, String rateNonCo, String perTxn, String annual) {
+    public static TdsSectionConfig config(String code, String rateCo, String rateNonCo, String perTxn, String annual) {
         TdsSectionConfig c = new TdsSectionConfig();
         c.setSectionCode(code);
         c.setRateCompany(new BigDecimal(rateCo));
@@ -73,7 +73,7 @@ final class TdsEngineFixtures {
         return c;
     }
 
-    static final Map<String, TdsSectionConfig> CONFIGS = buildConfigs();
+    public static final Map<String, TdsSectionConfig> CONFIGS = buildConfigs();
 
     private static Map<String, TdsSectionConfig> buildConfigs() {
         Map<String, TdsSectionConfig> m = new LinkedHashMap<>();
@@ -82,7 +82,7 @@ final class TdsEngineFixtures {
         return Map.copyOf(m);
     }
 
-    static Map<String, UploadLedgerSnapshot> stdSnaps(String pan) {
+    public static Map<String, UploadLedgerSnapshot> stdSnaps(String pan) {
         Map<String, UploadLedgerSnapshot> m = new LinkedHashMap<>();
         UploadLedgerSnapshot exp = snap("Subcontractor Charges", LedgerCategory.EXPENSE, true, "194C", null);
         UploadLedgerSnapshot cred = snap("ABC Contractors", LedgerCategory.CREDITOR, null, null, pan);
@@ -93,13 +93,13 @@ final class TdsEngineFixtures {
         return m;
     }
 
-    static TdsAnalysisInput input(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps,
+    public static TdsAnalysisInput input(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps,
                                   LocalDate periodStart, LocalDate periodEnd) {
         return new TdsAnalysisInput(ORG, WF, JOB, vouchers, snaps, CONFIGS,
                 FY_START, periodStart, periodEnd);
     }
 
-    static TdsAnalysisInput inputQ1(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps) {
+    public static TdsAnalysisInput inputQ1(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps) {
         return input(vouchers, snaps, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
     }
 }

@@ -20,6 +20,11 @@ public interface TdsFindingRepository extends JpaRepository<TdsFinding, UUID> {
 
     long countByWorkflowIdAndResolveStatusNotIn(UUID workflowId, Collection<ResolveStatus> statuses);
 
+    List<TdsFinding> findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(UUID workflowId);
+
+    long countByWorkflowIdAndSupersededAtIsNullAndResolveStatusNotIn(UUID workflowId,
+                                                                    Collection<ResolveStatus> statuses);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT f FROM TdsFinding f WHERE f.id = :id")
     Optional<TdsFinding> findByIdForUpdate(@Param("id") UUID id);

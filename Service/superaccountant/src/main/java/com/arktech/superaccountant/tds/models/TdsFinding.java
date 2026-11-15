@@ -2,6 +2,7 @@ package com.arktech.superaccountant.tds.models;
 
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
+import com.arktech.superaccountant.review.LifecycleFinding;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,7 +16,7 @@ import java.util.UUID;
 @Table(name = "tds_findings", indexes = @Index(name = "idx_tds_findings_workflow", columnList = "workflow_id"))
 @Data
 @NoArgsConstructor
-public class TdsFinding {
+public class TdsFinding implements LifecycleFinding {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -72,6 +73,12 @@ public class TdsFinding {
     /** SHA-256 hex of the evidence bundle that produced this finding. */
     @Column(name = "evidence_hash", length = 64)
     private String evidenceHash;
+
+    @Column(name = "finding_key", length = 512)
+    private String findingKey;
+
+    @Column(name = "superseded_at")
+    private Instant supersededAt;
 
     /** Finding in a superseded workflow this row was carried over from. */
     @Column(name = "carried_from_finding_id")
