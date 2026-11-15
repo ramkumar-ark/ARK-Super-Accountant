@@ -12,6 +12,7 @@ import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,14 +44,22 @@ public class TdsQuarterService {
         return payment;
     }
 
+    /** APPROVED challans of the quarter's payment workflows, keyed by payment workflow. */
+    public LinkedHashMap<Workflow, List<TdsChallan>> approvedChallansByMonth(Workflow quarter) {
+        LinkedHashMap<Workflow, List<TdsChallan>> byMonth = new LinkedHashMap<>();
+        for (Workflow payment : paymentWorkflows(quarter)) {
+            byMonth.put(payment, challanRepository
+                    .findByPaymentWorkflowIdIn(List.of(payment.getId())).stream()
+                    .filter(c -> c.getStatus() == TdsChallanStatus.APPROVED)
+                    .toList());
+        }
+        return byMonth;
+    }
+
     /** APPROVED challans of the quarter's payment workflows. */
     public List<TdsChallan> approvedChallans(Workflow quarter) {
-        List<UUID> paymentIds = paymentWorkflows(quarter).stream().map(Workflow::getId).toList();
-        if (paymentIds.isEmpty()) {
-            return List.of();
-        }
-        return challanRepository.findByPaymentWorkflowIdIn(paymentIds).stream()
-                .filter(c -> c.getStatus() == TdsChallanStatus.APPROVED)
+        return approvedChallansByMonth(quarter).values().stream()
+                .flatMap(List::stream)
                 .toList();
     }
 }

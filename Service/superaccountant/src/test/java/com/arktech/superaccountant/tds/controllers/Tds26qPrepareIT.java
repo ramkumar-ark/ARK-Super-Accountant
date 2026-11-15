@@ -280,6 +280,47 @@ class Tds26qPrepareIT {
     }
 
     @Test
+    void quarterChallans_listsApprovedChallansPerPaymentMonth() throws Exception {
+        Workflow quarter = seedQuarter();
+        seedPaymentWorkflow("2025-04", "2025-04", true, 111);
+        seedPaymentWorkflow("2025-05", "2025-05", false, 222);
+        seedPaymentWorkflow("2025-06", "2025-06", true, 333);
+
+        String body = mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/v1/workflows/" + quarter.getId()
+                                + "/tds/quarter-challans").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        List<java.util.Map<String, Object>> months = JsonPath.read(body, "$");
+        assertEquals(3, months.size(), body);
+        assertEquals("2025-04", months.get(0).get("periodKey"), body);
+        assertEquals("2025-05", months.get(1).get("periodKey"), body);
+        assertEquals("2025-06", months.get(2).get("periodKey"), body);
+        assertEquals(1, ((List<?>) months.get(0).get("challans")).size(), body);
+        assertEquals(0, ((List<?>) months.get(1).get("challans")).size(), body);
+        assertEquals(1, ((List<?>) months.get(2).get("challans")).size(), body);
+        assertEquals(challanIdsByPeriod.get("2025-04").toString(),
+                ((java.util.Map<?, ?>) ((List<?>) months.get(0).get("challans")).get(0))
+                        .get("id").toString(), body);
+    }
+
+    @Test
+    void quarterChallans_rejectsNonQuarterWorkflow() throws Exception {
+        Workflow payment = seedPaymentWorkflow("2025-04", "2025-04", true, 111);
+
+        String body = mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/v1/workflows/" + payment.getId()
+                                + "/tds/quarter-challans").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isBadRequest())
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(body.contains("Not a TDS_26Q workflow"), body);
+    }
+
+    @Test
     void map_rejectsChallanOutsideQuarterOrUnapproved() throws Exception {
         Workflow quarter = seedQuarter();
         seedPaymentWorkflow("2025-04", "2025-04", true, 111);

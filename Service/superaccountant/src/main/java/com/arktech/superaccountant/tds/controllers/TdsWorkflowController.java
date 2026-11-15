@@ -21,6 +21,7 @@ import com.arktech.superaccountant.tds.models.TdsChallanStatus;
 import com.arktech.superaccountant.tds.models.TdsPaymentDetail;
 import com.arktech.superaccountant.tds.payload.request.ChallanRequest;
 import com.arktech.superaccountant.tds.payload.response.ChallanListResponse;
+import com.arktech.superaccountant.tds.payload.response.QuarterChallansResponse;
 import com.arktech.superaccountant.tds.repository.TdsPaymentDetailRepository;
 import com.arktech.superaccountant.tds.services.TdsChallanService;
 import com.arktech.superaccountant.tds.services.TdsNotFoundException;
@@ -196,6 +197,18 @@ public class TdsWorkflowController {
                                        @AuthenticationPrincipal UserDetailsImpl principal) {
         Workflow q = loadQuarter(principal.getOrganizationId(), id);
         return finalize26q.evaluate(q);
+    }
+
+    @GetMapping("/quarter-challans")
+    public List<QuarterChallansResponse> quarterChallans(
+            @PathVariable UUID id, @AuthenticationPrincipal UserDetailsImpl principal) {
+        Workflow q = loadQuarter(principal.getOrganizationId(), id);
+        return quarterService.approvedChallansByMonth(q).entrySet().stream()
+                .sorted(java.util.Map.Entry.comparingByKey(
+                        java.util.Comparator.comparing(Workflow::getPeriodKey)))
+                .map(e -> new QuarterChallansResponse(e.getKey().getId(),
+                        e.getKey().getPeriodKey(), e.getKey().getStage(), e.getValue()))
+                .toList();
     }
 
     @GetMapping("/export")
