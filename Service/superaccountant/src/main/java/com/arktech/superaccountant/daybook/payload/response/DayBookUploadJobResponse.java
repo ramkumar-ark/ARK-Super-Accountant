@@ -31,4 +31,5 @@ public class DayBookUploadJobResponse {
     private UUID createdForWorkflowId;
     private List<String> warnings;
     private List<VoucherTypeSummaryResponse> voucherSummary;
+    private Long tamperChangeCount;
 }

@@ -15,6 +15,13 @@ public final class DayBookUploadJobResponseMapper {
     public static DayBookUploadJobResponse toResponse(DayBookUploadJob job,
                                                       List<String> warnings,
                                                       List<VoucherTypeSummaryResponse> voucherSummary) {
+        return toResponse(job, warnings, voucherSummary, null);
+    }
+
+    public static DayBookUploadJobResponse toResponse(DayBookUploadJob job,
+                                                      List<String> warnings,
+                                                      List<VoucherTypeSummaryResponse> voucherSummary,
+                                                      Long tamperChangeCount) {
         return DayBookUploadJobResponse.builder()
                 .id(job.getId())
                 .fileName(job.getFileName())
@@ -31,6 +38,7 @@ public final class DayBookUploadJobResponseMapper {
                 .createdForWorkflowId(job.getCreatedForWorkflowId())
                 .warnings(warnings)
                 .voucherSummary(voucherSummary)
+                .tamperChangeCount(tamperChangeCount)
                 .build();
     }
 }

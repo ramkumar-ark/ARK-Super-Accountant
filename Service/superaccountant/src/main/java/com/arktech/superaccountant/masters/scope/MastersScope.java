@@ -44,6 +44,20 @@ public final class MastersScope {
         };
     }
 
+    /** Attribute-freeze scope (Sm): latest/previous snapshots for one ledger; either may be null. */
+    public static Set<WorkflowType> typesForLedger(UploadLedgerSnapshot latest, UploadLedgerSnapshot previous) {
+        String name = latest != null && latest.getLedgerName() != null ? latest.getLedgerName()
+                : previous != null ? previous.getLedgerName() : null;
+        Set<WorkflowType> out = EnumSet.noneOf(WorkflowType.class);
+        if (latest != null && latest.getCategory() != null) {
+            addCategoryTypes(out, latest.getCategory(), name, latest, previous);
+        }
+        if (previous != null && previous.getCategory() != null) {
+            addCategoryTypes(out, previous.getCategory(), name, latest, previous);
+        }
+        return out;
+    }
+
     private static Set<WorkflowType> gstinPresence(Set<WorkflowType> base, ValidationFinding f,
                                                    UploadLedgerSnapshot l, UploadLedgerSnapshot p) {
         String chain = chainOf(l, p);

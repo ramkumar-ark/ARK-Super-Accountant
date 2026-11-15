@@ -8,8 +8,11 @@ import { WorkflowStepper } from '@/components/workflow/WorkflowStepper'
 import { WorkflowStageActions } from '@/components/workflow/WorkflowStageActions'
 import { WorkflowUploadStep } from '@/components/workflow/WorkflowUploadStep'
 import { WorkflowEventsTimeline } from '@/components/workflow/WorkflowEventsTimeline'
+import { AmendmentFollowUpList } from '@/components/snapshot/AmendmentFollowUpList'
+import { MastersTamperWarningBanner } from '@/components/snapshot/MastersTamperWarningBanner'
 import type { ReviewRole } from '@/components/review/FindingReviewPanel'
 import { useAuthStore } from '@/store/authStore'
+import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
 import {
   WORKFLOW_TYPE_LABEL,
@@ -49,6 +52,13 @@ export function WorkflowDetailPage() {
   const uploadsQuery = useQuery({
     queryKey: ['day-book-uploads'],
     queryFn: listUploads,
+  })
+  const findingsQuery = useQuery({
+    queryKey: ['workflow-findings', workflowId],
+    queryFn: async () => {
+      const res = await api.get(`/v1/workflows/${workflowId}/findings`)
+      return res.data as { findings: Array<{ findingType: string; blocking: boolean; message: string }>; blockingCount: number }
+    },
   })
 
   const analyzeMutation = useMutation({
@@ -106,6 +116,14 @@ export function WorkflowDetailPage() {
           <WorkflowStepper stage={workflow.stage} dependencies={detail.dependencies} />
 
           <WorkflowStageActions detail={detail} role={role ?? ''} />
+
+          <MastersTamperWarningBanner findings={findingsQuery.data?.findings ?? []} />
+
+          {(workflow.stage === 'FINALIZED' || workflow.stage === 'FILED') && (
+            <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <AmendmentFollowUpList workflowId={workflow.id} role={role as ReviewRole} />
+            </section>
+          )}
 
           {boundButNotAnalyzed && (
             <section className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--color-warning-bg)] bg-[var(--color-warning-bg)] p-4">

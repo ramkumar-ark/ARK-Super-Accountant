@@ -62,6 +62,9 @@ public class DayBookController {
     @Autowired
     private DayBookMasterValidationService dayBookMasterValidationService;
 
+    @Autowired
+    private com.arktech.superaccountant.workflow.snapshot.TamperChangeRepository tamperChangeRepository;
+
     /**
      * GET /api/v1/day-book/uploads?page=0&size=20
      *
@@ -84,7 +87,8 @@ public class DayBookController {
         var jobs = dayBookUploadJobRepository.findByOrganizationId(orgId, pageable);
         return ResponseEntity.ok(jobs.map(job ->
                 com.arktech.superaccountant.daybook.payload.response.DayBookUploadJobResponseMapper
-                        .toResponse(job, null, null)));
+                        .toResponse(job, null, null,
+                                tamperChangeRepository.countByUploadJobId(job.getId()))));
     }
 
     /**

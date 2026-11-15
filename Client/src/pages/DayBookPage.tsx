@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { AppShell } from '@/components/AppShell'
+import { UploadChangeList } from '@/components/snapshot/UploadChangeList'
 import { api } from '@/lib/api'
 
 interface UploadHistoryRow {
@@ -10,11 +11,13 @@ interface UploadHistoryRow {
   totalVouchersParsed: number
   coverageFrom: string | null
   coverageTo: string | null
+  tamperChangeCount?: number | null
   createdAt: string
 }
 
 export function DayBookPage() {
   const [history, setHistory] = useState<UploadHistoryRow[]>([])
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -62,22 +65,40 @@ export function DayBookPage() {
               </thead>
               <tbody>
                 {history.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="h-12 border-t border-[var(--color-surface-raised)] hover:bg-[var(--color-surface-raised)]"
-                  >
-                    <td className="px-4 py-2 text-sm text-[var(--color-text-primary)]">{row.fileName}</td>
-                    <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">
-                      {new Date(row.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2 text-sm font-mono text-[var(--color-text-secondary)]">
-                      {row.coverageFrom && row.coverageTo ? `${row.coverageFrom} – ${row.coverageTo}` : '—'}
-                    </td>
-                    <td className="px-4 py-2 text-sm font-mono text-[var(--color-text-primary)] text-right">
-                      {row.totalVouchersParsed ?? 0}
-                    </td>
-                    <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">{row.status}</td>
-                  </tr>
+                  <Fragment key={row.id}>
+                    <tr className="h-12 border-t border-[var(--color-surface-raised)] hover:bg-[var(--color-surface-raised)]">
+                      <td className="px-4 py-2 text-sm text-[var(--color-text-primary)]">
+                        {row.fileName}
+                        {row.tamperChangeCount != null && row.tamperChangeCount > 0 && (
+                          <button
+                            type="button"
+                            aria-expanded={expandedId === row.id}
+                            onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
+                            className="ml-2 text-xs px-2 py-0.5 rounded-full bg-[var(--color-info-bg)] text-[var(--color-info)]"
+                          >
+                            {row.tamperChangeCount} changes
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+                        {new Date(row.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2 text-sm font-mono text-[var(--color-text-secondary)]">
+                        {row.coverageFrom && row.coverageTo ? `${row.coverageFrom} – ${row.coverageTo}` : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-sm font-mono text-[var(--color-text-primary)] text-right">
+                        {row.totalVouchersParsed ?? 0}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">{row.status}</td>
+                    </tr>
+                    {expandedId === row.id && (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-3 bg-[var(--color-surface-raised)]">
+                          <UploadChangeList uploadId={row.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

@@ -190,4 +190,66 @@ describe('WorkflowFindingsTab', () => {
       expect(screen.queryByRole('link', { name: /Open .* in Masters/ })).not.toBeInTheDocument()
     })
   })
+
+  describe('TAMPER masters findings', () => {
+    const tamperFinding = (overrides: Record<string, unknown>) => ({
+      ...finding,
+      source: 'TAMPER',
+      findingType: 'TAMPER_MASTER_MODIFIED',
+      voucherNumber: null,
+      ledgerName: 'Acme Traders',
+      ...overrides,
+    })
+
+    it('sends VALID_FROM for a masters tamper finding', async () => {
+      mockGet.mockResolvedValue({
+        data: { findings: [tamperFinding({})], blockingCount: 1 },
+      })
+      mockPost.mockResolvedValue({ data: {} })
+
+      render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <WorkflowFindingsTab workflowId="wf-1" role="ROLE_OPERATOR" />
+        </QueryClientProvider>,
+      )
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Override Value for f1' }))
+      await userEvent.type(
+        screen.getByLabelText('Valid from (leave blank to accept as a correction)'),
+        '2025-05-01',
+      )
+      await userEvent.click(screen.getByRole('button', { name: 'Submit for Review' }))
+
+      await waitFor(() =>
+        expect(mockPost).toHaveBeenCalledWith('/v1/workflows/wf-1/findings/f1/action', {
+          action: 'ACKNOWLEDGE',
+          note: '',
+          value: 'VALID_FROM:2025-05-01',
+        }),
+      )
+    })
+
+    it('sends no value when valid-from is blank', async () => {
+      mockGet.mockResolvedValue({
+        data: { findings: [tamperFinding({})], blockingCount: 1 },
+      })
+      mockPost.mockResolvedValue({ data: {} })
+
+      render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <WorkflowFindingsTab workflowId="wf-1" role="ROLE_OPERATOR" />
+        </QueryClientProvider>,
+      )
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Override Value for f1' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Submit for Review' }))
+
+      await waitFor(() =>
+        expect(mockPost).toHaveBeenCalledWith('/v1/workflows/wf-1/findings/f1/action', {
+          action: 'ACKNOWLEDGE',
+          note: '',
+        }),
+      )
+    })
+  })
 })

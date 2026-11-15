@@ -43,10 +43,15 @@ public class SnapshotService {
     private FrozenVoucherRepository frozenVoucherRepository;
     @Autowired
     private com.arktech.superaccountant.workflow.snapshot.FrozenThrough frozenThrough;
+    @Autowired
+    private com.arktech.superaccountant.workflow.snapshot.MasterAttributeFreezer masterAttributeFreezer;
 
     @Transactional
     public void freeze(UUID workflowId, UUID organizationId, String actor) {
         Workflow w = workflowRepository.findById(workflowId).orElse(null);
+        if (w != null && w.getPeriodEnd() != null) {
+            masterAttributeFreezer.freeze(w, actor);
+        }
         if (w == null || w.getUploadJobId() == null || w.getPeriodEnd() == null) {
             return;
         }
@@ -131,6 +136,7 @@ public class SnapshotService {
             row.setReleasedAt(now);
             frozenVoucherRepository.save(row);
         }
-        return liveRows.size();
+        int masterRows = masterAttributeFreezer.release(organizationId);
+        return liveRows.size() + masterRows;
     }
 }

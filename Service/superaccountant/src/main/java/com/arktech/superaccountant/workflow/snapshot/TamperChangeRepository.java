@@ -11,4 +11,6 @@ public interface TamperChangeRepository extends JpaRepository<TamperChange, UUID
     List<TamperChange> findByUploadJobId(UUID uploadJobId);
 
     boolean existsByUploadJobId(UUID uploadJobId);
+
+    long countByUploadJobId(UUID uploadJobId);
 }

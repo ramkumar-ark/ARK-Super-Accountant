@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface AmendmentFollowUpRepository extends JpaRepository<AmendmentFollowUp, UUID> {
 
     List<AmendmentFollowUp> findByWorkflowIdOrderByCreatedAt(UUID workflowId);
+
+    List<AmendmentFollowUp> findByOrganizationIdAndStatus(UUID organizationId, AmendmentStatus status);
 }

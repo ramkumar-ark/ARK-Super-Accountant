@@ -28,6 +28,12 @@ public class SnapshotIndexInitializer implements ApplicationRunner {
                     ON frozen_vouchers (organization_id, voucher_key)
                     WHERE released_at IS NULL
                     """);
+            statement.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_frozen_master_attr_live
+                    ON frozen_master_attributes (organization_id, ledger_key, attribute, workflow_type,
+                        COALESCE(valid_from, DATE '0001-01-01'))
+                    WHERE released_at IS NULL
+                    """);
         }
     }
 }

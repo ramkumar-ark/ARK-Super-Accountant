@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
 import type { ReactNode } from 'react'
@@ -31,7 +32,7 @@ export function WorkflowFindingsTab({
 }: {
   workflowId: string
   role: ReviewRole
-}) {
+}): ReactNode {
   const queryClient = useQueryClient()
   const findingsQuery = useQuery({
     queryKey: ['workflow-findings', workflowId],
@@ -141,14 +142,26 @@ function Panel({
 }): ReactNode {
   const isMasters = finding.source === 'MASTERS'
   const isTyped = TYPED_INPUT_RULES.includes(finding.findingType)
-  const valueInput =
-    isMasters && !isTyped && finding.resolveStatus === 'OPEN' ? (
-      <p className="text-sm text-[var(--color-text-secondary)]">
-        {finding.findingType === 'MISSING_IN_CONFIGURATION'
-          ? `${finding.ledgerName ?? finding.id} will be added to the approved masters.`
-          : `The master will be updated to: ${finding.actualValue ?? '—'}`}
-      </p>
-    ) : undefined
+  const isMasterTamper =
+    finding.source === 'TAMPER' && finding.findingType.startsWith('TAMPER_MASTER_')
+  const [validFrom, setValidFrom] = useState('')
+  const valueInput = isMasterTamper ? (
+    <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
+      Valid from (leave blank to accept as a correction)
+      <input
+        type="date"
+        value={validFrom}
+        onChange={(e) => setValidFrom(e.target.value)}
+        className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)]"
+      />
+    </label>
+  ) : isMasters && !isTyped && finding.resolveStatus === 'OPEN' ? (
+    <p className="text-sm text-[var(--color-text-secondary)]">
+      {finding.findingType === 'MISSING_IN_CONFIGURATION'
+        ? `${finding.ledgerName ?? finding.id} will be added to the approved masters.`
+        : `The master will be updated to: ${finding.actualValue ?? '—'}`}
+    </p>
+  ) : undefined
   return (
     <FindingReviewPanel
       finding={finding}
@@ -158,6 +171,7 @@ function Panel({
       onAction={(action, body) =>
         onAction(finding, action, {
           ...body,
+          ...(isMasterTamper && validFrom !== '' ? { value: `VALID_FROM:${validFrom}` } : {}),
           ...(isMasters && !isTyped && action === 'ACKNOWLEDGE' && finding.actualValue != null
             ? { value: finding.actualValue }
             : {}),
