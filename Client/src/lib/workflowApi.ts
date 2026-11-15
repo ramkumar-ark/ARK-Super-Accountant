@@ -2,6 +2,8 @@ import { api } from './api'
 
 export type WorkflowType = 'GSTR1' | 'GSTR3B' | 'TDS_PAYMENT' | 'TDS_26Q'
 
+export const WORKFLOW_TYPES: WorkflowType[] = ['GSTR1', 'GSTR3B', 'TDS_PAYMENT', 'TDS_26Q']
+
 export type WorkflowStage =
   | 'BASELINE'
   | 'STARTED'

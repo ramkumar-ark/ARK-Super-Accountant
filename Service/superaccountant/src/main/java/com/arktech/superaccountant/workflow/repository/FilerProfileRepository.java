@@ -4,6 +4,7 @@ import com.arktech.superaccountant.workflow.models.FilerProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,4 +14,8 @@ public interface FilerProfileRepository extends JpaRepository<FilerProfile, UUID
             UUID organizationId, LocalDate effectiveFrom);
 
     Optional<FilerProfile> findFirstByOrganizationIdOrderByEffectiveFromDesc(UUID organizationId);
+
+    List<FilerProfile> findAllByOrganizationIdOrderByEffectiveFromAsc(UUID organizationId);
+
+    Optional<FilerProfile> findByOrganizationIdAndEffectiveFrom(UUID organizationId, LocalDate effectiveFrom);
 }

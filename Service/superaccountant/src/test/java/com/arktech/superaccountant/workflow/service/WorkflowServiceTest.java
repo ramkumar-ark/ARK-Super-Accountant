@@ -12,6 +12,7 @@ import com.arktech.superaccountant.workflow.repository.FilerProfileRepository;
 import com.arktech.superaccountant.workflow.repository.FinancialYearCloseRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowEventRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
+import com.arktech.superaccountant.workflow.seam.BaselineGate;
 import com.arktech.superaccountant.workflow.seam.MastersJobGate;
 import com.arktech.superaccountant.workflow.seam.ResponsibilityStartService;
 import com.arktech.superaccountant.workflow.seam.SnapshotService;
@@ -44,6 +45,7 @@ class WorkflowServiceTest {
     private MastersJobGate mastersJobGate;
     private UploadFreshnessGate uploadFreshnessGate;
     private ResponsibilityStartService responsibilityStartService;
+    private BaselineGate baselineGate;
     private WorkflowService service;
 
     private final UUID orgId = UUID.randomUUID();
@@ -60,6 +62,7 @@ class WorkflowServiceTest {
         mastersJobGate = Mockito.mock(MastersJobGate.class);
         uploadFreshnessGate = Mockito.mock(UploadFreshnessGate.class);
         responsibilityStartService = Mockito.mock(ResponsibilityStartService.class);
+        baselineGate = Mockito.mock(BaselineGate.class);
 
         CoverageService coverageService = new CoverageService();
         try {
@@ -83,6 +86,7 @@ class WorkflowServiceTest {
         inject("mastersJobGate", mastersJobGate);
         inject("uploadFreshnessGate", uploadFreshnessGate);
         inject("responsibilityStartService", responsibilityStartService);
+        inject("baselineGate", baselineGate);
         inject("snapshotService", snapshotService);
         inject("coverageService", coverageService);
 
@@ -91,7 +95,7 @@ class WorkflowServiceTest {
         when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
         lenient().when(financialYearCloseRepository
                 .findAllByOrganizationIdOrderByFinancialYearAsc(orgId)).thenReturn(List.of());
-        lenient().when(responsibilityStartService.responsibilityStart(orgId))
+        lenient().when(responsibilityStartService.responsibilityStart(eq(orgId), any()))
                 .thenReturn(Optional.empty());
         lenient().when(filerProfileRepository
                 .findFirstByOrganizationIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
@@ -168,7 +172,7 @@ class WorkflowServiceTest {
 
     @Test
     void start_rejectsBeforeResponsibilityStart() {
-        when(responsibilityStartService.responsibilityStart(orgId))
+        when(responsibilityStartService.responsibilityStart(orgId, WorkflowType.GSTR1))
                 .thenReturn(Optional.of(LocalDate.of(2026, 5, 1)));
         assertThrows(WorkflowBadRequestException.class,
                 () -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-04"));
@@ -423,10 +427,11 @@ class WorkflowServiceTest {
                 () -> service.advanceToPrepare(orgId, actor, w.getId()));
 
         w.setStage(WorkflowStage.FINDINGS_REVIEW);
+        when(baselineGate.isConfirmed(orgId)).thenReturn(false);
         assertThrows(WorkflowConflictException.class,
                 () -> service.advanceToPrepare(orgId, actor, w.getId()));
 
-        w.setBaselineConfirmedAt(java.time.Instant.now());
+        when(baselineGate.isConfirmed(orgId)).thenReturn(true);
         assertDoesNotThrow(() -> service.advanceToPrepare(orgId, actor, w.getId()));
     }
 
@@ -434,7 +439,7 @@ class WorkflowServiceTest {
     void advance_validatesMastersJobIsLatest() {
         Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-04");
         w.setStage(WorkflowStage.FINDINGS_REVIEW);
-        w.setBaselineConfirmedAt(java.time.Instant.now());
+        when(baselineGate.isConfirmed(orgId)).thenReturn(true);
         w.setMastersJobId(UUID.randomUUID());
         when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
         when(mastersJobGate.latestCompletedMastersJob(orgId))

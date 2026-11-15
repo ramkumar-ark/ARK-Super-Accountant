@@ -68,6 +68,8 @@ public class WorkflowService {
     @Autowired
     private ResponsibilityStartService responsibilityStartService;
 
+    @Autowired
+    private com.arktech.superaccountant.workflow.seam.BaselineGate baselineGate;
     // ---------- lookups ----------
 
     public List<Workflow> list(UUID orgId, String type, Integer fy, String stage) {
@@ -149,7 +151,7 @@ public class WorkflowService {
                     "Period starts before coverage start " + coverageStart);
         }
 
-        responsibilityStartService.responsibilityStart(organizationId).ifPresent(rs -> {
+        responsibilityStartService.responsibilityStart(organizationId, type).ifPresent(rs -> {
             if (range.start().isBefore(rs)) {
                 throw new WorkflowBadRequestException(
                         "Period starts before responsibility start " + rs);
@@ -213,7 +215,7 @@ public class WorkflowService {
                     "Only a workflow in FINDINGS_REVIEW can move to PREPARE");
         }
         requireZeroBlocking(w);
-        if (w.getBaselineConfirmedAt() == null) {
+        if (!baselineGate.isConfirmed(organizationId)) {
             throw new WorkflowConflictException("Baseline must be confirmed before Prepare");
         }
         UUID mastersJobId = w.getMastersJobId();
