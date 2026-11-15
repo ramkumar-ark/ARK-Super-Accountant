@@ -46,6 +46,8 @@ public interface WorkflowRepository extends JpaRepository<Workflow, UUID> {
 
     boolean existsByOrganizationIdAndTypeAndStageNot(UUID organizationId, WorkflowType type, WorkflowStage stage);
 
+    List<Workflow> findAllByOrganizationIdAndTypeAndStageNot(UUID organizationId, WorkflowType type, WorkflowStage stage);
+
     List<Workflow> findAllByOrganizationIdAndTypeAndStageAndActiveTrue(
             UUID organizationId, WorkflowType type, WorkflowStage stage);
 
