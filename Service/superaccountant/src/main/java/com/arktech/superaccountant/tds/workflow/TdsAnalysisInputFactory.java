@@ -34,6 +34,9 @@ public class TdsAnalysisInputFactory {
     @org.springframework.beans.factory.annotation.Autowired
     private OrganizationRepository organizationRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository panOverrideRepository;
+
     public TdsAnalysisInput build(AnalysisContext ctx) {
         if (ctx.mastersJobId() == null) {
             throw new IllegalStateException("No completed masters upload to analyse against");
@@ -48,11 +51,37 @@ public class TdsAnalysisInputFactory {
         for (UploadLedgerSnapshot s : snapshotRepository.findByUploadJobId(ctx.mastersJobId())) {
             snapshotsByName.putIfAbsent(TdsEngine.key(s.getLedgerName()), s);
         }
+        applyPanOverlay(ctx, snapshotsByName);
         Map<String, TdsSectionConfig> configsBySection = new LinkedHashMap<>();
         for (TdsSectionConfig c : configRepository.findAll()) {
             configsBySection.putIfAbsent(c.getSectionCode(), c);
         }
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
+    }
+
+    /**
+     * Company PAN overrides (C4-PAN): applied on detached copies so the stored masters snapshot is
+     * never mutated; a valid masters PAN always wins.
+     */
+    private void applyPanOverlay(AnalysisContext ctx,
+                                 Map<String, UploadLedgerSnapshot> snapshotsByName) {
+        for (com.arktech.superaccountant.tds.models.TdsPanOverride o
+                : panOverrideRepository.findByOrganizationIdOrderByPartyLedgerNameAsc(
+                        ctx.organizationId())) {
+            UploadLedgerSnapshot s = snapshotsByName.get(o.getPartyKey());
+            if (s == null) {
+                UploadLedgerSnapshot synthetic = new UploadLedgerSnapshot();
+                synthetic.setLedgerName(o.getPartyLedgerName());
+                synthetic.setPan(o.getPan());
+                snapshotsByName.put(o.getPartyKey(), synthetic);
+            } else if (s.getPan() == null || s.getPan().isBlank()
+                    || !s.getPan().matches(TdsEngine.PAN_PATTERN)) {
+                UploadLedgerSnapshot copy = new UploadLedgerSnapshot();
+                org.springframework.beans.BeanUtils.copyProperties(s, copy);
+                copy.setPan(o.getPan());
+                snapshotsByName.put(o.getPartyKey(), copy);
+            }
+        }
     }
 }
