@@ -91,7 +91,7 @@ class WorkflowServiceTest {
         when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
         lenient().when(financialYearCloseRepository
                 .findAllByOrganizationIdOrderByFinancialYearAsc(orgId)).thenReturn(List.of());
-        lenient().when(responsibilityStartService.responsibilityStart(orgId))
+        lenient().when(responsibilityStartService.responsibilityStart(eq(orgId), any()))
                 .thenReturn(Optional.empty());
         lenient().when(filerProfileRepository
                 .findFirstByOrganizationIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
@@ -168,7 +168,7 @@ class WorkflowServiceTest {
 
     @Test
     void start_rejectsBeforeResponsibilityStart() {
-        when(responsibilityStartService.responsibilityStart(orgId))
+        when(responsibilityStartService.responsibilityStart(orgId, WorkflowType.GSTR1))
                 .thenReturn(Optional.of(LocalDate.of(2026, 5, 1)));
         assertThrows(WorkflowBadRequestException.class,
                 () -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-04"));

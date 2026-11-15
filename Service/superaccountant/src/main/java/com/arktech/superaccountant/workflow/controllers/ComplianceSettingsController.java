@@ -1,0 +1,57 @@
+package com.arktech.superaccountant.workflow.controllers;
+
+import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.workflow.models.WorkflowType;
+import com.arktech.superaccountant.workflow.payload.request.ResponsibilityStartRequest;
+import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
+import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
+import com.arktech.superaccountant.workflow.service.compliance.ResponsibilityStartSettingsService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@CrossOrigin(origins = "*")
+@RestController
+@RequestMapping("/api/v1/compliance")
+public class ComplianceSettingsController {
+
+    @Autowired
+    private ResponsibilityStartSettingsService responsibilityStartSettingsService;
+
+    @GetMapping("/responsibility-start")
+    public ResponseEntity<?> listResponsibilityStarts(@AuthenticationPrincipal UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        return ResponseEntity.ok(responsibilityStartSettingsService.list(orgId));
+    }
+
+    @PutMapping("/responsibility-start")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
+    public ResponseEntity<?> putResponsibilityStart(@AuthenticationPrincipal UserDetailsImpl principal,
+            @Valid @RequestBody ResponsibilityStartRequest request) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        try {
+            WorkflowType type = WorkflowType.valueOf(request.getType());
+            return ResponseEntity.ok(responsibilityStartSettingsService
+                    .set(orgId, principal.getUsername(), type, request.getFirstPeriodStart()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Unknown type: " + request.getType()));
+        } catch (WorkflowBadRequestException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (WorkflowConflictException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        }
+    }
+}

@@ -149,7 +149,7 @@ public class WorkflowService {
                     "Period starts before coverage start " + coverageStart);
         }
 
-        responsibilityStartService.responsibilityStart(organizationId).ifPresent(rs -> {
+        responsibilityStartService.responsibilityStart(organizationId, type).ifPresent(rs -> {
             if (range.start().isBefore(rs)) {
                 throw new WorkflowBadRequestException(
                         "Period starts before responsibility start " + rs);
