@@ -334,6 +334,8 @@ public class TamperComparisonService {
             case MODIFIED -> "modified";
             case DELETED -> "deleted";
             case INSERTED -> "inserted";
+            case MASTER_MODIFIED, MASTER_REMOVED ->
+                    throw new IllegalStateException("masters change in voucher comparison");
         };
         LocalDate date = changeDate(change.getOldDate(), change.getNewDate());
         return change.getVoucherTypeName() + " " + change.getVoucherNumber() + " dated " + date

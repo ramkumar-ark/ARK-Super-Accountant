@@ -28,6 +28,18 @@ public class TamperChange {
 
     private String voucherKey;
 
+    /** Masters changes: the display ledger name; null on voucher changes. */
+    private String ledgerName;
+
+    /** Masters changes: the frozen attribute name; null on voucher changes. */
+    private String attributeName;
+
+    /** Masters changes: frozen value; null on voucher changes. */
+    private String oldValue;
+
+    /** Masters changes: uploaded value; null on voucher changes. */
+    private String newValue;
+
     @Convert(converter = TamperChangeKindConverter.class)
     private TamperChangeKind changeKind;
 

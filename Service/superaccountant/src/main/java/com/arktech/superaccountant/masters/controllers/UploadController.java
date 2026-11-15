@@ -87,6 +87,9 @@ public class UploadController {
     @Autowired
     private FindingReviewService findingReviewService;
 
+    @Autowired
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @Transactional
     @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
     @PostMapping("/uploads")
@@ -263,6 +266,13 @@ public class UploadController {
         );
 
         job = orchestrator.runAndPersist(job, parsedLedgers, context);
+
+        if (job.getStatus() == UploadJobStatus.COMPLETED
+                || job.getStatus() == UploadJobStatus.COMPLETED_WITH_MISMATCHES) {
+            eventPublisher.publishEvent(
+                    new com.arktech.superaccountant.masters.events.MastersUploadCompletedEvent(
+                            orgId, job.getId()));
+        }
 
         List<ValidationFinding> findings = findingRepository.findByUploadJobId(job.getId());
 

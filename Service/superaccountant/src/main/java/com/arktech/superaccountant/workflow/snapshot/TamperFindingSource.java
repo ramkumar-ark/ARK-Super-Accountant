@@ -65,6 +65,15 @@ public class TamperFindingSource implements WorkflowFindingSource {
                 findings.add(f);
             }
         }
+        // Masters tamper findings also warn (non-blocking) on every open workflow;
+        // relevantFindings already covers the blocking ones for the affected types.
+        for (TamperFinding f : tamperFindingRepository
+                .findByOrganizationIdAndResolveStatusNotIn(w.getOrganizationId(), TERMINAL)) {
+            if (!isMastersFinding(f) || findings.contains(f)) {
+                continue;
+            }
+            findings.add(f);
+        }
         return findings.stream().map(f -> view(f, w)).toList();
     }
 
@@ -119,6 +128,11 @@ public class TamperFindingSource implements WorkflowFindingSource {
                 .collect(Collectors.toSet());
     }
 
+    private boolean isMastersFinding(TamperFinding f) {
+        return f.getChangeKind() == TamperChangeKind.MASTER_MODIFIED
+                || f.getChangeKind() == TamperChangeKind.MASTER_REMOVED;
+    }
+
     private WorkflowFindingView view(TamperFinding f, Workflow w) {
         boolean blocking = w != null
                 && affectedTypes(f).contains(w.getType())
@@ -126,8 +140,11 @@ public class TamperFindingSource implements WorkflowFindingSource {
                 && w.getStage() != WorkflowStage.FILED
                 && f.getChangeDate() != null
                 && !w.getPeriodEnd().isBefore(f.getChangeDate());
+        String evidenceOld = isMastersFinding(f) ? f.getOldValue() : f.getOldHash();
+        String evidenceNew = isMastersFinding(f) ? f.getNewValue() : f.getNewHash();
         return new WorkflowFindingView(f.getId(), "TAMPER", "TAMPER_" + f.getChangeKind(), "HIGH", blocking,
-                f.getMessage(), f.getOldHash(), f.getNewHash(), f.getVoucherNumber(), f.getChangeDate(),
+                f.getMessage(), evidenceOld, evidenceNew,
+                isMastersFinding(f) ? null : f.getVoucherNumber(), f.getChangeDate(),
                 f.getPartyLedgerName(), f.getResolveStatus(), f.getResolveNote(), f.getProposedValue(),
                 f.getSubmittedBy(), f.getSubmittedAt(), f.getReviewedBy(), f.getReviewedAt(), f.getReviewNote(),
                 f.getResolvedBy(), f.getResolvedAt(), f.getCarriedFromFindingId());

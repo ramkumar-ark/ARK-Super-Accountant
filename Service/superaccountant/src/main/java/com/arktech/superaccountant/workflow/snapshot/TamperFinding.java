@@ -41,6 +41,21 @@ public class TamperFinding implements LifecycleFinding {
 
     private String voucherKey;
 
+    /** Masters findings: the display ledger name; null on voucher findings. */
+    private String ledgerName;
+
+    /** Masters findings: the frozen attribute name; null on voucher findings. */
+    private String attributeName;
+
+    /** Masters findings: frozen value; null on voucher findings. */
+    private String oldValue;
+
+    /** Masters findings: uploaded value; null on voucher findings. */
+    private String newValue;
+
+    /** Masters findings: max periodEnd of the affected frozen rows; null on voucher findings. */
+    private LocalDate frozenPeriodEnd;
+
     private String voucherTypeName;
 
     private String voucherNumber;
