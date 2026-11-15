@@ -6,6 +6,7 @@ import { LedgerMappingPanel } from '@/components/LedgerMappingPanel'
 import { AppShell } from '@/components/AppShell'
 import { useAuthStore } from '@/store/authStore'
 import { ValidationSettingsPanel } from '@/components/ValidationSettingsPanel'
+import { MastersChangeList } from '@/components/snapshot/MastersChangeList'
 import { apiErrorMessage } from '@/lib/apiError'
 import { FindingReviewPanel, type ReviewRole } from '@/components/review/FindingReviewPanel'
 
@@ -76,6 +77,13 @@ interface BulkFailure {
   error: string
 }
 
+interface UploadHistoryRow {
+  id: string
+  fileName: string
+  status: string
+  createdAt: string
+}
+
 const VALUE_LABELS: Record<string, string> = {
   GSTIN_PRESENCE: 'GSTIN',
   HSN_SAC_CODE: 'HSN/SAC code',
@@ -106,6 +114,8 @@ export function MastersPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState('')
+  const [uploadHistory, setUploadHistory] = useState<UploadHistoryRow[]>([])
+  const [expandedUploadId, setExpandedUploadId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const PAGE_SIZE = 50
 
@@ -193,8 +203,16 @@ export function MastersPage() {
     }
   }
 
-  const loadOpenFindingsCount = async () => {
+  const loadUploadHistory = async () => {
     try {
+      const res = await api.get('/v1/uploads', { params: { page: 0, size: 20 } })
+      setUploadHistory(res.data.content ?? [])
+    } catch {
+      // Upload history is informational; a load failure does not block the page
+    }
+  }
+
+  const loadOpenFindingsCount = async () => {    try {
       const res = await api.get('/v1/uploads/latest/mismatches?size=1&showResolved=false')
       const page = res.data
       setOpenFindingsCount(page.totalElements ?? 0)
@@ -206,7 +224,12 @@ export function MastersPage() {
   useEffect(() => {
     loadMasters()
     loadOpenFindingsCount()
+    loadUploadHistory()
   }, [page, categoryFilter])
+
+  useEffect(() => {
+    if (uploadSuccess) loadUploadHistory()
+  }, [uploadSuccess])
 
   useEffect(() => {
     if (activeTab === 'findings') loadFindings()
@@ -533,6 +556,58 @@ export function MastersPage() {
             onFindingResolved={loadFindings}
           />
         )}
+
+        <section className="mt-8">
+          <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-4">
+            Upload history
+          </h2>
+          <div className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] shadow-[var(--shadow-sm)] overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  {['File', 'Uploaded', 'Status', ''].map((col, i) => (
+                    <th
+                      key={col || `col-${i}`}
+                      scope="col"
+                      className="px-4 py-3 text-left text-[0.75rem] font-semibold uppercase tracking-[0.05em] text-[var(--color-text-secondary)]"
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {uploadHistory.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="h-12 border-t border-[var(--color-surface-raised)] hover:bg-[var(--color-surface-raised)]"
+                  >
+                    <td className="px-4 py-2 text-sm text-[var(--color-text-primary)]">{row.fileName}</td>
+                    <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">
+                      {new Date(row.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)]">{row.status}</td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        aria-expanded={expandedUploadId === row.id}
+                        onClick={() => setExpandedUploadId(expandedUploadId === row.id ? null : row.id)}
+                        className="text-xs px-3 py-1.5 rounded-[var(--radius-sm)] border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)]"
+                      >
+                        {expandedUploadId === row.id ? 'Hide changes' : 'Show changes'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {expandedUploadId && (
+              <div className="px-4 py-3 border-t border-[var(--color-border)]">
+                <MastersChangeList uploadId={expandedUploadId} />
+              </div>
+            )}
+          </div>
+        </section>
       </main>
 
       {editingMaster && (

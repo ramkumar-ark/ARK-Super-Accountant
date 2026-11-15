@@ -95,10 +95,14 @@ function routeApi({
   detailResponse,
   events = [],
   uploads = [],
+  findings = [],
+  followUps = [],
 }: {
   detailResponse: WorkflowDetail
   events?: WorkflowEvent[]
   uploads?: UploadHistoryRow[]
+  findings?: Array<{ findingType: string; blocking: boolean; message: string }>
+  followUps?: Array<{ id: string; voucherKey: string; summary: string; status: string; doneBy: string | null; doneAt: string | null; doneNote: string | null; createdAt: string }>
 }) {
   mockGet.mockImplementation((url: string) => {
     if (url === '/v1/workflows/wf-1') {
@@ -106,6 +110,12 @@ function routeApi({
     }
     if (url === '/v1/workflows/wf-1/events') {
       return Promise.resolve({ data: events })
+    }
+    if (url === '/v1/workflows/wf-1/findings') {
+      return Promise.resolve({ data: { findings, blockingCount: 0 } })
+    }
+    if (url === '/v1/workflows/wf-1/amendments') {
+      return Promise.resolve({ data: { followUps } })
     }
     if (url.startsWith('/v1/day-book/uploads')) {
       return Promise.resolve({ data: { content: uploads } })
@@ -305,5 +315,48 @@ describe('WorkflowDetailPage', () => {
     expect(items[0]).toContain('Upload bound')
     expect(items[1]).toContain('Started')
     expect(items[0]).toContain('op1')
+  })
+
+  it('shows the masters warning banner', async () => {
+    routeApi({
+      detailResponse: detail({ stage: 'FINDINGS_REVIEW' }),
+      findings: [
+        {
+          findingType: 'TAMPER_MASTER_MODIFIED',
+          blocking: false,
+          message: 'GSTIN of Acme Traders changed.',
+        },
+      ],
+    })
+    renderPage()
+
+    expect(
+      await screen.findByText(
+        'A masters change affects a finalized return of another type. It does not block this workflow.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows amendment follow-ups on a finalized workflow', async () => {
+    routeApi({
+      detailResponse: detail({ stage: 'FINALIZED' }),
+      followUps: [
+        {
+          id: 'fu-1',
+          voucherKey: 'MASTER:acme-traders:gstin',
+          summary: 'GSTIN of Acme Traders changed.',
+          status: 'OPEN',
+          doneBy: null,
+          doneAt: null,
+          doneNote: null,
+          createdAt: '2025-05-10T10:00:00Z',
+        },
+      ],
+    })
+    renderPage()
+
+    await screen.findByTestId('findings-tab')
+    expect(await screen.findByText('Amendment follow-ups')).toBeInTheDocument()
+    expect(await screen.findByText('GSTIN of Acme Traders changed.')).toBeInTheDocument()
   })
 })

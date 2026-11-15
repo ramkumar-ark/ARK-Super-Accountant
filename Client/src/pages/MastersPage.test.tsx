@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MastersPage } from './MastersPage'
 import { useAuthStore } from '@/store/authStore'
 
@@ -794,5 +795,62 @@ describe('MastersPage — validation settings tab', () => {
     render(<MastersPage />)
     await userEvent.click(await screen.findByRole('tab', { name: /Validation settings/ }))
     expect(await screen.findByRole('checkbox', { name: /Require HSN\/SAC/ })).toBeInTheDocument()
+  })
+})
+
+describe('MastersPage — upload history changes', () => {
+  it('expands masters changes for an upload', async () => {
+    setRole('ROLE_OWNER')
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) {
+        return Promise.resolve({ data: { totalElements: 0 } })
+      }
+      if (url === '/v1/uploads') {
+        return Promise.resolve({
+          data: {
+            content: [
+              {
+                id: 'm1',
+                fileName: 'masters-may.json',
+                status: 'COMPLETED',
+                createdAt: '2025-05-10T10:00:00Z',
+              },
+            ],
+          },
+        })
+      }
+      if (url === '/v1/masters/uploads/m1/changes') {
+        return Promise.resolve({
+          data: {
+            changes: [
+              {
+                id: 'c1',
+                changeKind: 'MASTER_MODIFIED',
+                ledgerName: 'Acme Traders',
+                attributeName: 'gstin',
+                oldValue: '29ABCDE1234F1Z5',
+                newValue: '29ABCDE1234F1Z6',
+                touchedScopes: ['GSTR1'],
+                blocking: true,
+                createdAt: '2025-05-10T10:00:00Z',
+              },
+            ],
+          },
+        })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MastersPage />
+      </QueryClientProvider>,
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Show changes' }))
+    expect(await screen.findByText('GSTIN: 29ABCDE1234F1Z5 → 29ABCDE1234F1Z6')).toBeInTheDocument()
+    expect(mockGet).toHaveBeenCalledWith('/v1/masters/uploads/m1/changes')
   })
 })

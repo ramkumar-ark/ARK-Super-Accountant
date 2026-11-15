@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DayBookPage } from './DayBookPage'
 
 vi.mock('@/components/AppShell', () => ({
@@ -81,5 +83,62 @@ describe('DayBookPage — upload history', () => {
     expect(screen.getByText('Uploads now happen inside a workflow.')).toBeInTheDocument()
     const link = screen.getByRole('link', { name: 'Go to Workflows' })
     expect(link).toHaveAttribute('href', '/workflows')
+  })
+
+  it('shows the change count and expands the change list', async () => {
+    const user = userEvent.setup()
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/day-book/uploads') {
+        return Promise.resolve({
+          data: {
+            content: [
+              {
+                id: 'u1',
+                fileName: 'daybook-april.json',
+                status: 'COMPLETED',
+                totalVouchersParsed: 7,
+                coverageFrom: '2025-04-01',
+                coverageTo: '2025-04-30',
+                tamperChangeCount: 2,
+              },
+            ],
+          },
+        })
+      }
+      if (url === '/v1/day-book/uploads/u1/changes') {
+        return Promise.resolve({
+          data: {
+            changes: [
+              {
+                id: 'c1',
+                changeKind: 'MODIFIED',
+                voucherKey: 'G:g-1',
+                voucherTypeName: 'Sales',
+                voucherNumber: 'SB/001',
+                partyLedgerName: 'Client ABC',
+                oldDate: '2025-04-15',
+                newDate: '2025-04-15',
+                touchedScopes: ['GSTR1'],
+                blocking: true,
+              },
+            ],
+          },
+        })
+      }
+      return Promise.reject(new Error('Unexpected GET ' + url))
+    })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <DayBookPage />
+      </QueryClientProvider>,
+    )
+
+    const toggle = await screen.findByRole('button', { name: '2 changes' })
+    expect(screen.queryByText('Changes against the frozen day book')).not.toBeInTheDocument()
+    await user.click(toggle)
+
+    expect(await screen.findByText('Changes against the frozen day book')).toBeInTheDocument()
+    expect(await screen.findByText(/SB\/001/)).toBeInTheDocument()
+    expect(mockGet).toHaveBeenCalledWith('/v1/day-book/uploads/u1/changes')
   })
 })
