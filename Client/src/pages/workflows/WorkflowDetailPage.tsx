@@ -8,6 +8,7 @@ import { WorkflowStepper } from '@/components/workflow/WorkflowStepper'
 import { WorkflowStageActions } from '@/components/workflow/WorkflowStageActions'
 import { WorkflowUploadStep } from '@/components/workflow/WorkflowUploadStep'
 import { WorkflowEventsTimeline } from '@/components/workflow/WorkflowEventsTimeline'
+import { TdsPreparePanel } from '@/components/tds/TdsPreparePanel'
 import { AmendmentFollowUpList } from '@/components/snapshot/AmendmentFollowUpList'
 import { MastersTamperWarningBanner } from '@/components/snapshot/MastersTamperWarningBanner'
 import type { ReviewRole } from '@/components/review/FindingReviewPanel'
@@ -116,6 +117,8 @@ export function WorkflowDetailPage() {
           <WorkflowStepper stage={workflow.stage} dependencies={detail.dependencies} />
 
           <WorkflowStageActions detail={detail} role={role ?? ''} />
+
+          <TdsPreparePanel workflow={workflow} role={role ?? ''} />
 
           <MastersTamperWarningBanner findings={findingsQuery.data?.findings ?? []} />
 
