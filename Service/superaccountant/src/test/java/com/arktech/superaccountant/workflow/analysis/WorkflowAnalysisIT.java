@@ -81,7 +81,7 @@ class WorkflowAnalysisIT {
 
                 @Override
                 public java.util.Set<WorkflowType> types() {
-                    return java.util.Set.of(WorkflowType.TDS_PAYMENT);
+                    return java.util.Set.of(WorkflowType.GSTR1);
                 }
 
                 @Override
@@ -162,7 +162,7 @@ class WorkflowAnalysisIT {
 
     @Test
     void analyzeEndpoint_retriesAfterFailure() throws Exception {
-        Workflow w = seedWorkflow(WorkflowType.TDS_PAYMENT); // failOnceAnalyzer applies to TDS_PAYMENT
+        Workflow w = seedWorkflow(WorkflowType.GSTR1); // failOnceAnalyzer applies to GSTR1 (real GST_OUTWARD analyzer runs on an empty upload)
         var withUser = SecurityMockMvcRequestPostProcessors.user(principal);
 
         mockMvc.perform(post("/api/v1/workflows/" + w.getId() + "/analyze").with(withUser))
@@ -176,7 +176,7 @@ class WorkflowAnalysisIT {
                 .isEqualTo(WorkflowStage.FINDINGS_REVIEW);
 
         List<WorkflowAnalysisRun> runs = runRepository.findAll().stream()
-                .filter(r -> r.getWorkflowId().equals(w.getId())).toList();
+                .filter(r -> r.getWorkflowId().equals(w.getId()) && "FAIL_ONCE".equals(r.getAnalyzerCode())).toList();
         assertThat(runs).hasSize(2);
         assertThat(runs.get(0).getStatus()).isEqualTo(AnalysisRunStatus.FAILED);
         assertThat(runs.get(0).getErrorMessage()).isEqualTo("boom");
