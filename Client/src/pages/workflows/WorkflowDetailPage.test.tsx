@@ -99,11 +99,13 @@ function routeApi({
   findings = [],
   followUps = [],
   challans = [],
+  parentWorkflows = [],
 }: {
   detailResponse: WorkflowDetail
   events?: WorkflowEvent[]
   uploads?: UploadHistoryRow[]
   challans?: TdsChallan[]
+  parentWorkflows?: WorkflowDetail['workflow'][]
   findings?: Array<{ findingType: string; blocking: boolean; message: string }>
   followUps?: Array<{ id: string; voucherKey: string; summary: string; status: string; doneBy: string | null; doneAt: string | null; doneNote: string | null; createdAt: string }>
 }) {
@@ -121,6 +123,18 @@ function routeApi({
       return Promise.resolve({
         data: { challans, tdsDeducted: 5000, approvedTdsTotal: 3000, excess: 0 },
       })
+    }
+    if (url === '/v1/workflows') {
+      return Promise.resolve({ data: parentWorkflows })
+    }
+    if (url === '/v1/workflows/wf-1/tds/entries') {
+      return Promise.resolve({ data: [] })
+    }
+    if (url === '/v1/workflows/wf-1/tds/quarter-challans') {
+      return Promise.resolve({ data: [] })
+    }
+    if (url === '/v1/workflows/wf-1/tds/gate') {
+      return Promise.resolve({ data: [] })
     }
     if (url === '/v1/workflows/wf-1/amendments') {
       return Promise.resolve({ data: { followUps } })
@@ -343,6 +357,29 @@ describe('WorkflowDetailPage', () => {
         'A masters change affects a finalized return of another type. It does not block this workflow.',
       ),
     ).toBeInTheDocument()
+  })
+
+  it('shows the payment months that reviewed the monthly findings above a 26Q workflow\'s findings', async () => {
+    routeApi({
+      detailResponse: detail(
+        { type: 'TDS_26Q', periodKey: '2025-Q1', stage: 'PREPARE' },
+        {
+          dependencies: [
+            { type: 'TDS_PAYMENT', periodKey: '2025-04', satisfied: true },
+            { type: 'TDS_PAYMENT', periodKey: '2025-05', satisfied: true },
+            { type: 'TDS_PAYMENT', periodKey: '2025-06', satisfied: true },
+          ],
+        },
+      ),
+      parentWorkflows: [
+        baseWorkflow({ id: 'p-apr', type: 'TDS_PAYMENT', periodKey: '2025-04' }),
+        baseWorkflow({ id: 'p-may', type: 'TDS_PAYMENT', periodKey: '2025-05' }),
+        baseWorkflow({ id: 'p-jun', type: 'TDS_PAYMENT', periodKey: '2025-06' }),
+      ],
+    })
+    renderPage()
+
+    expect(await screen.findAllByText(/Monthly findings were reviewed on/)).toHaveLength(3)
   })
 
   it('shows the challans for a TDS payment workflow in Prepare', async () => {
