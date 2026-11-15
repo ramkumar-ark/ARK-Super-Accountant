@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/store/authStore'
 import { Link } from '@tanstack/react-router'
-import { LayoutDashboard, Database, BookOpen, Users, ListChecks } from 'lucide-react'
+import { LayoutDashboard, Database, BookOpen, Users, ListChecks, Settings } from 'lucide-react'
 import { Header } from './Header'
 
 interface AppShellProps {
@@ -85,6 +85,19 @@ export function AppShell({ children }: AppShellProps) {
             >
               <Database size={20} />
               Masters
+            </Link>
+          )}
+          {user?.organizationId && (
+            <Link
+              to="/settings/compliance"
+              className="h-11 px-4 flex items-center gap-3 text-sm text-[var(--color-sidebar-item)] hover:bg-[var(--color-sidebar-active-bg)]/50 transition-colors"
+              activeProps={{
+                className:
+                  'h-11 px-4 flex items-center gap-3 text-sm bg-[var(--color-sidebar-active-bg)] text-[var(--color-sidebar-active-text)] border-l-[3px] border-[var(--color-primary)] transition-colors',
+              }}
+            >
+              <Settings size={20} />
+              Compliance settings
             </Link>
           )}
         </nav>

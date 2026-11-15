@@ -18,6 +18,7 @@ import { DayBookPage } from '@/pages/DayBookPage'
 import { WorkflowListPage } from '@/pages/workflows/WorkflowListPage'
 import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
 import { TeamPage } from '@/pages/TeamPage'
+import { CompliancePage } from '@/pages/settings/CompliancePage'
 import { useAuthStore } from '@/store/authStore'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/queryClient'
@@ -148,6 +149,17 @@ const teamRoute = createRoute({
   component: TeamPage,
 })
 
+const complianceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/compliance',
+  beforeLoad: () => {
+    const { isAuthenticated, user } = useAuthStore.getState()
+    if (!isAuthenticated) throw redirect({ to: '/login' })
+    if (!user?.organizationId) throw redirect({ to: '/organization/setup' })
+  },
+  component: CompliancePage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -160,6 +172,7 @@ const routeTree = rootRoute.addChildren([
   workflowsRoute,
   workflowDetailRoute,
   teamRoute,
+  complianceRoute,
 ])
 
 const router = createRouter({ routeTree })
