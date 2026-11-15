@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +41,8 @@ public class SnapshotService {
     private DayBookUploadJobRepository dayBookUploadJobRepository;
     @Autowired
     private FrozenVoucherRepository frozenVoucherRepository;
+    @Autowired
+    private com.arktech.superaccountant.workflow.snapshot.FrozenThrough frozenThrough;
 
     @Transactional
     public void freeze(UUID workflowId, UUID organizationId, String actor) {
@@ -109,5 +112,25 @@ public class SnapshotService {
             event.setReason(rewritten + " rewritten, " + released + " released");
             workflowEventRepository.save(event);
         }
+    }
+
+    /**
+     * Releases live frozen rows dated after the organization's current frozen-through
+     * date (all rows when nothing is frozen). Rows are never deleted; amendment
+     * follow-ups are untouched. Runs after the workflow is already back in PREPARE.
+     */
+    @Transactional
+    public int release(UUID workflowId, UUID organizationId, String actor) {
+        LocalDate frozenThrough = this.frozenThrough.of(organizationId).orElse(null);
+        List<FrozenVoucher> liveRows = frozenThrough == null
+                ? frozenVoucherRepository.findByOrganizationIdAndReleasedAtIsNull(organizationId)
+                : frozenVoucherRepository.findByOrganizationIdAndReleasedAtIsNullAndVoucherDateAfter(
+                        organizationId, frozenThrough);
+        Instant now = Instant.now();
+        for (FrozenVoucher row : liveRows) {
+            row.setReleasedAt(now);
+            frozenVoucherRepository.save(row);
+        }
+        return liveRows.size();
     }
 }
