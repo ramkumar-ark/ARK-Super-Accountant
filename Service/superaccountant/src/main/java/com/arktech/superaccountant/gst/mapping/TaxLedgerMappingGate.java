@@ -40,6 +40,11 @@ public class TaxLedgerMappingGate {
         return blockerMessage(organizationId).isEmpty();
     }
 
+    public void requireComplete(UUID organizationId) {
+        blockerMessage(organizationId)
+                .ifPresent(message -> { throw new TaxLedgerMappingIncompleteException(message); });
+    }
+
     public Optional<String> blockerMessage(UUID organizationId) {
         Optional<UUID> jobId = mastersJobGate.latestCompletedMastersJob(organizationId);
         if (jobId.isEmpty()) {

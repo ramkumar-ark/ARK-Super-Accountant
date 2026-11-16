@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gst.workflow;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.VoucherSide;
 import com.arktech.superaccountant.gst.repository.GstDaybookFindingRepository;
@@ -32,19 +33,22 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
     private final OrganizationRepository organizationRepository;
     private final GstRuleRunner gstRuleRunner;
     private final FindingLifecycleService lifecycle;
+    private final TaxLedgerMappingGate mappingGate;
 
     protected AbstractGstAnalyzer(ParsedVoucherRepository parsedVoucherRepository,
                                   GstDaybookFindingRepository findingRepository,
                                   FindingOverrideMasterService mastersService,
                                   OrganizationRepository organizationRepository,
                                   GstRuleRunner gstRuleRunner,
-                                  FindingLifecycleService lifecycle) {
+                                  FindingLifecycleService lifecycle,
+                                  TaxLedgerMappingGate mappingGate) {
         this.parsedVoucherRepository = parsedVoucherRepository;
         this.findingRepository = findingRepository;
         this.mastersService = mastersService;
         this.organizationRepository = organizationRepository;
         this.gstRuleRunner = gstRuleRunner;
         this.lifecycle = lifecycle;
+        this.mappingGate = mappingGate;
     }
 
     /** The voucher sides this analyzer owns; no finding is raised on both. */
@@ -52,6 +56,7 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
 
     @Override
     public void analyze(AnalysisContext ctx) {
+        mappingGate.requireComplete(ctx.organizationId());
         List<ParsedVoucher> vouchers = parsedVoucherRepository.findByUploadJobId(ctx.uploadJobId());
         Map<String, UploadLedgerSnapshot> snapshots = ctx.mastersJobId() == null
                 ? Map.of()
