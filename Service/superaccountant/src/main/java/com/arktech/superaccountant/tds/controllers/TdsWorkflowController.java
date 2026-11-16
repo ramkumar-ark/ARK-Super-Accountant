@@ -21,6 +21,7 @@ import com.arktech.superaccountant.tds.models.TdsChallanStatus;
 import com.arktech.superaccountant.tds.models.TdsPaymentDetail;
 import com.arktech.superaccountant.tds.payload.request.ChallanRequest;
 import com.arktech.superaccountant.tds.payload.response.ChallanListResponse;
+import com.arktech.superaccountant.tds.payload.response.QuarterChallansResponse;
 import com.arktech.superaccountant.tds.repository.TdsPaymentDetailRepository;
 import com.arktech.superaccountant.tds.services.TdsChallanService;
 import com.arktech.superaccountant.tds.services.TdsNotFoundException;
@@ -198,15 +199,37 @@ public class TdsWorkflowController {
         return finalize26q.evaluate(q);
     }
 
+    @GetMapping("/quarter-challans")
+    public List<QuarterChallansResponse> quarterChallans(
+            @PathVariable UUID id, @AuthenticationPrincipal UserDetailsImpl principal) {
+        Workflow q = loadQuarter(principal.getOrganizationId(), id);
+        return quarterService.approvedChallansByMonth(q).entrySet().stream()
+                .sorted(java.util.Map.Entry.comparingByKey(
+                        java.util.Comparator.comparing(Workflow::getPeriodKey)))
+                .map(e -> new QuarterChallansResponse(e.getKey().getId(),
+                        e.getKey().getPeriodKey(), e.getKey().getStage(), e.getValue()))
+                .toList();
+    }
+
     @GetMapping("/export")
     @PreAuthorize("hasRole('ACCOUNTANT')")
     public ResponseEntity<byte[]> export(@PathVariable UUID id,
                                          @AuthenticationPrincipal UserDetailsImpl principal)
             throws java.io.IOException {
         Workflow q = loadQuarter(principal.getOrganizationId(), id);
-        if (q.getStage() != WorkflowStage.FINALIZED && q.getStage() != WorkflowStage.FILED) {
+        WorkflowStage stage = q.getStage();
+        if (stage != WorkflowStage.PREPARE && stage != WorkflowStage.FINALIZED
+                && stage != WorkflowStage.FILED) {
             throw new WorkflowConflictException(
-                    "Export is available only after the quarter is finalized");
+                    "Export is available from Prepare onward");
+        }
+        if (stage == WorkflowStage.PREPARE) {
+            List<String> unmet = finalize26q.unmet(q);
+            if (!unmet.isEmpty()) {
+                throw new WorkflowConflictException(
+                        "Export is available once the gate conditions pass: "
+                                + String.join("; ", unmet));
+            }
         }
         Tds26qDetail detail = detail26qRepository.findByWorkflowId(q.getId()).orElseThrow();
         int fyStartMonth = organizationRepository.findById(q.getOrganizationId())
