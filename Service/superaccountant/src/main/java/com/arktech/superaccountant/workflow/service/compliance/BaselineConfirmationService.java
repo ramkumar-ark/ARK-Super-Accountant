@@ -60,6 +60,10 @@ public class BaselineConfirmationService {
     @Autowired(required = false)
     private List<CompanyBlockerSource> blockerSources;
 
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<
+            com.arktech.superaccountant.workflow.seam.BaselineDiscrepancyCounter> discrepancyCounter;
+
     private List<String> confirmBlockers(UUID organizationId) {
         if (blockerSources == null) {
             return List.of();
@@ -91,7 +95,12 @@ public class BaselineConfirmationService {
             types.add(new BaselineStatusResponse.TypeStatus(type.name(), unconfirmedRows, confirmedRows, latestEnd));
         }
         long imports = baselineImportRepository.countByWorkflowIdIn(
-                unconfirmed.stream().map(Workflow::getId).toList());
+                workflowRepository
+                        .findAllByOrganizationIdAndStageAndActiveTrue(organizationId, WorkflowStage.BASELINE)
+                        .stream().map(Workflow::getId).toList());
+        Integer discrepancyCount = discrepancyCounter.getIfAvailable() == null
+                ? null
+                : discrepancyCounter.getObject().openMaterialCount(organizationId);
         return new BaselineStatusResponse(
                 baselineGate.isConfirmed(organizationId),
                 rangeStart,
@@ -99,7 +108,7 @@ public class BaselineConfirmationService {
                 types,
                 confirmBlockers(organizationId),
                 imports > 0 ? "available" : "not available",
-                null);
+                discrepancyCount);
     }
 
     @Transactional

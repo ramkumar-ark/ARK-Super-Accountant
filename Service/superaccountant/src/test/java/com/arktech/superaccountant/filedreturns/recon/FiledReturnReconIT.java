@@ -51,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -386,6 +387,31 @@ class FiledReturnReconIT {
         assertEquals("PORTAL_JSON", imports.get(0).getSource());
         assertNotNull(imports.get(0).getFiledReturnRef());
         assertEquals(1, imports.get(0).getDiscrepancyCount());
+
+        MvcResult findingsResult = mockMvc.perform(
+                        get("/api/v1/workflows/{id}/findings", s.gstr1Row())
+                                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andReturn();
+        var findingsRoot = objectMapper.readTree(findingsResult.getResponse().getContentAsString());
+        var filedReturnFindings = new ArrayList<com.fasterxml.jackson.databind.JsonNode>();
+        findingsRoot.get("findings").forEach(n -> {
+            if ("FILED_RETURN".equals(n.get("source").asText())) {
+                filedReturnFindings.add(n);
+            }
+        });
+        assertEquals(1, filedReturnFindings.size());
+        var view = filedReturnFindings.get(0);
+        assertEquals("VALUE_DIFFERENCE", view.get("findingType").asText());
+        assertEquals("WARNING", view.get("severity").asText());
+        assertTrue(view.get("blocking").asBoolean() == false);
+        assertTrue(view.get("message").asText().contains("filed IGST 1700.00 vs books IGST 1800.00"));
+        assertEquals("T 10000.00 | I 1700.00 | C 0.00 | S 0.00 | Cess 0.00",
+                view.get("expectedValue").asText());
+        assertEquals("T 10000.00 | I 1800.00 | C 0.00 | S 0.00 | Cess 0.00",
+                view.get("actualValue").asText());
+        assertEquals("INV-7", view.get("voucherNumber").asText());
+        assertEquals(PARTY_A, view.get("ledgerName").asText());
 
         MvcResult result = postReconcile(s.accountantJwt(), s.gstr1Row());
         assertEquals(200, result.getResponse().getStatus());
