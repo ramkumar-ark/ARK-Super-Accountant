@@ -4,6 +4,7 @@ import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
 import type { ReactNode } from 'react'
 import { FindingReviewPanel, type ReviewFinding, type ReviewRole } from '@/components/review/FindingReviewPanel'
+import { valueInputFor } from '@/components/workflow/findingValueInputs'
 
 interface WorkflowFinding extends ReviewFinding {
   source: string
@@ -375,6 +376,18 @@ function FindingCard({
             <p className="text-sm font-semibold text-[var(--color-text-primary)]">{f.ledgerName}</p>
           )}
           <p className="text-sm text-[var(--color-text-secondary)]">{f.message}</p>
+          {f.source === 'GST' && (
+            <div className="mt-1 text-sm">
+              <p className="text-[var(--color-text-secondary)]">
+                Fix this in Tally and re-upload the day book, or acknowledge it with a note.
+              </p>
+              {(f.expectedValue != null || f.actualValue != null) && (
+                <p className="text-[var(--color-text-muted)]">
+                  Expected {f.expectedValue ?? '—'}, found {f.actualValue ?? '—'}
+                </p>
+              )}
+            </div>
+          )}
           {f.source === 'MASTERS' && (
             <p className="mt-1 text-sm">
               <a
@@ -416,6 +429,11 @@ function Panel({
   const isMasterTamper =
     finding.source === 'TAMPER' && finding.findingType.startsWith('TAMPER_MASTER_')
   const [validFrom, setValidFrom] = useState('')
+  const [typedValue, setTypedValue] = useState('')
+  const customInput =
+    finding.source !== 'MASTERS' && finding.source !== 'TAMPER'
+      ? valueInputFor(finding, { value: typedValue, onChange: setTypedValue })
+      : null
   const valueInput = isMasterTamper ? (
     <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
       Valid from (leave blank to accept as a correction)
@@ -432,16 +450,20 @@ function Panel({
         ? `${finding.ledgerName ?? finding.id} will be added to the approved masters.`
         : `The master will be updated to: ${finding.actualValue ?? '—'}`}
     </p>
-  ) : undefined
+  ) : (
+    customInput?.node
+  )
   return (
     <FindingReviewPanel
       finding={finding}
       role={role}
       label={finding.id}
       valueInput={valueInput}
+      submitDisabled={customInput != null && !customInput.valid}
       onAction={(action, body) =>
         onAction(finding, action, {
           ...body,
+          ...(customInput != null && action === 'ACKNOWLEDGE' ? { value: customInput.value } : {}),
           ...(isMasterTamper && validFrom !== '' ? { value: `VALID_FROM:${validFrom}` } : {}),
           ...(isMasters && !isTyped && action === 'ACKNOWLEDGE' && finding.actualValue != null
             ? { value: finding.actualValue }

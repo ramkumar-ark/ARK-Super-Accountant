@@ -63,6 +63,12 @@ const gstFinding = (overrides: Record<string, unknown>) => ({
   ...overrides,
 })
 
+const tdsFinding = (overrides: Record<string, unknown>) => ({
+  ...finding,
+  source: 'TDS',
+  ...overrides,
+})
+
 describe('WorkflowFindingsTab', () => {
   it('shows blocking count and lists findings', async () => {
     mockGet.mockResolvedValue({ data: { findings: [finding], blockingCount: 1 } })
@@ -240,6 +246,59 @@ describe('WorkflowFindingsTab', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Finding f2 is not pending review')
     expect(screen.getByRole('checkbox', { name: 'Select f1' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Select f2' })).toBeChecked()
+  })
+
+  it('tells the user to fix a GST finding in Tally and re-upload', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [gstFinding({ expectedValue: '18', actualValue: '0' })],
+        blockingCount: 1,
+      },
+    })
+
+    renderTab()
+
+    await screen.findByText('Ledger name mismatch')
+    expect(
+      screen.getByText(
+        'Fix this in Tally and re-upload the day book, or acknowledge it with a note.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Expected 18, found 0')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Open .* in Masters/ })).not.toBeInTheDocument()
+  })
+
+  it('requires a valid PAN before a TDS PAN finding can be submitted, and sends it as the value', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [tdsFinding({ findingType: 'PAN_MISSING' })],
+        blockingCount: 1,
+      },
+    })
+    mockPost.mockResolvedValue({ data: {} })
+
+    renderTab()
+
+    await screen.findByText('Ledger name mismatch')
+    await userEvent.click(screen.getByRole('button', { name: 'Override Value for f1' }))
+
+    const input = screen.getByLabelText('Corrected PAN')
+    await userEvent.type(input, 'abc')
+
+    const submit = screen.getByRole('button', { name: 'Confirm Override' })
+    expect(submit).toBeDisabled()
+
+    await userEvent.clear(input)
+    await userEvent.type(input, 'AAAAA9999A')
+    expect(submit).toBeEnabled()
+    await userEvent.click(submit)
+
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(
+        '/v1/workflows/wf-1/findings/f1/action',
+        expect.objectContaining({ action: 'ACKNOWLEDGE', value: 'AAAAA9999A' }),
+      ),
+    )
   })
 
   it('shows "No findings" when empty', async () => {
