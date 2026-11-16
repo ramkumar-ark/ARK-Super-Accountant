@@ -32,6 +32,7 @@ const baseFinding = {
   ledgerName: 'Acme Traders',
   category: 'SUNDRY_DEBTOR',
   actualValue: null as string | null,
+  expectedValue: null as string | null,
   severity: 'HIGH' as const,
   message: 'GSTIN missing',
   suggestedFix: null,
@@ -131,6 +132,22 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     await userEvent.click(screen.getByRole('button', { name: /Override Value/ }))
     expect(screen.getByText(/will be added to the approved masters/)).toBeInTheDocument()
     expect(screen.queryByText(/will be updated to/)).toBeNull()
+  })
+
+  it('TDS applicability mismatch with null uploaded value says master will keep its expected value', async () => {
+    current = {
+      ...current,
+      ruleCode: 'MISMATCH_DETECTION',
+      mismatchType: 'TDS_APPLICABILITY_MISMATCH',
+      expectedValue: 'true',
+      actualValue: 'null',
+    }
+    await openFindingsTab()
+
+    await userEvent.click(screen.getByRole('button', { name: /Override Value/ }))
+    expect(screen.getByText(/The master will keep its expected value:/)).toBeInTheDocument()
+    expect(screen.getByText('true')).toBeInTheDocument()
+    expect(screen.queryByText(/The master will be updated to:/)).toBeNull()
   })
 
   it('accountant sees Confirm Override instead of Submit for Review', async () => {

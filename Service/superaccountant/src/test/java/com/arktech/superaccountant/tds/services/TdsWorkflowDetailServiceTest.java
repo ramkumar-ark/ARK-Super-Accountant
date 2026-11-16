@@ -122,16 +122,38 @@ class TdsWorkflowDetailServiceTest {
     }
 
     @Test
-    void ensure26qDetail_idempotent() {
+    void ensure26qDetail_refreshesDeductorWhenNotFinalized() {
         Organization org = organization();
+        org.setName("Updated Acme");
         Workflow w = workflow(WorkflowType.TDS_26Q, org.getId());
+        w.setStage(com.arktech.superaccountant.workflow.models.WorkflowStage.PREPARE);
         Tds26qDetail existing = new Tds26qDetail();
         existing.setWorkflowId(w.getId());
+        existing.setDeductorName("Old Acme");
+        when(twenty6qDetailRepository.findByWorkflowId(w.getId())).thenReturn(Optional.of(existing));
+        when(organizationRepository.findById(org.getId())).thenReturn(Optional.of(org));
+        when(twenty6qDetailRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Tds26qDetail d = service.ensure26qDetail(w);
+
+        assertThat(d.getDeductorName()).isEqualTo("Updated Acme");
+        verify(twenty6qDetailRepository).save(existing);
+    }
+
+    @Test
+    void ensure26qDetail_doesNotRefreshDeductorWhenFinalized() {
+        Organization org = organization();
+        org.setName("Updated Acme");
+        Workflow w = workflow(WorkflowType.TDS_26Q, org.getId());
+        w.setStage(com.arktech.superaccountant.workflow.models.WorkflowStage.FINALIZED);
+        Tds26qDetail existing = new Tds26qDetail();
+        existing.setWorkflowId(w.getId());
+        existing.setDeductorName("Old Acme");
         when(twenty6qDetailRepository.findByWorkflowId(w.getId())).thenReturn(Optional.of(existing));
 
         Tds26qDetail d = service.ensure26qDetail(w);
 
-        assertThat(d).isSameAs(existing);
+        assertThat(d.getDeductorName()).isEqualTo("Old Acme");
         verify(twenty6qDetailRepository, never()).save(any());
         verify(organizationRepository, never()).findById(any());
     }

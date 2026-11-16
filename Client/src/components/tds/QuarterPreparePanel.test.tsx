@@ -270,4 +270,18 @@ describe('QuarterPreparePanel', () => {
     await screen.findByText(/All entries mapped/)
     expect(screen.queryByRole('button', { name: 'Download RPU file' })).not.toBeInTheDocument()
   })
+
+  it('distinguishes missing PAN from invalid PAN in entries table', async () => {
+    routeApi({
+      entries: [
+        entry({ id: 'e-missing', deducteeName: 'No PAN Party', deducteePan: null, panValid: false }),
+        entry({ id: 'e-invalid', deducteeName: 'Bad PAN Party', deducteePan: 'INVALID123', panValid: false }),
+      ],
+    })
+    renderPanel()
+
+    await screen.findByText('No PAN Party')
+    expect(screen.getByText('missing PAN')).toBeInTheDocument()
+    expect(screen.getByText('invalid PAN')).toBeInTheDocument()
+  })
 })

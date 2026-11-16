@@ -376,9 +376,33 @@ class FindingOverrideMasterServiceTest {
     }
 
     @Test
-    void applicabilityMismatch_withAbsentTallyFlag_throws400AndWritesNothing() {
+    void applicabilityMismatch_withAbsentTallyFlag_appliesExpectedValueWhenAvailable() {
         for (MismatchType t : List.of(MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH)) {
             ValidationFinding f = finding("MISMATCH_DETECTION", t, "Office Rent", "true", "null");
+            assertThatCode(() -> service.validate(f, null, orgId)).as(t.name()).doesNotThrowAnyException();
+            assertThat(FindingOverrideMasterService.isDerivable(f)).isTrue();
+        }
+    }
+
+    @Test
+    void apply_tdsApplicabilityMismatch_withNullActualValue_retainsExpectedFlag() {
+        masters();
+        master.setExpectedTdsApplicable(true);
+        ValidationFinding f = finding("MISMATCH_DETECTION", MismatchType.TDS_APPLICABILITY_MISMATCH,
+                "Office Rent", "true", "null");
+
+        service.apply(f, orgId, "acct1");
+
+        assertThat(master.getExpectedTdsApplicable()).isTrue();
+        // Since old value was true and resolved value is true, no change is logged
+        verify(masterRepository, never()).save(any());
+        verifyNoInteractions(editLogRepository);
+    }
+
+    @Test
+    void applicabilityMismatch_withAbsentTallyFlagAndNoExpectedValue_throws400AndWritesNothing() {
+        for (MismatchType t : List.of(MismatchType.GST_APPLICABILITY_MISMATCH, MismatchType.TDS_APPLICABILITY_MISMATCH)) {
+            ValidationFinding f = finding("MISMATCH_DETECTION", t, "Office Rent", "null", "null");
             assertThatThrownBy(() -> service.validate(f, null, orgId))
                     .as(t.name())
                     .isInstanceOfSatisfying(FindingOverrideException.class,

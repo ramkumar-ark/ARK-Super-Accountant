@@ -106,19 +106,32 @@ public class Tds26qFinalizePrecondition implements FinalizePrecondition {
 
     private TdsGateCondition pansValid(List<TdsDeducteeEntry> entries) {
         long invalid = entries.stream()
-                .filter(e -> !e.isPanValid() && !e.isHigherRateApplied()).count();
+                .filter(e -> !e.isPanValid()).count();
         return new TdsGateCondition("PANS_VALID", "PANs valid", invalid == 0,
                 invalid + " entries without a valid PAN");
     }
 
     private TdsGateCondition deductorComplete(Workflow q) {
+        Organization org = organizationRepository.findById(q.getOrganizationId()).orElse(null);
+        int fyStartMonth = org != null ? org.getFinancialYearStart() : 4;
+
         Tds26qDetail detail = detailRepository.findByWorkflowId(q.getId()).orElse(null);
         if (detail == null) {
             return new TdsGateCondition("DEDUCTOR_COMPLETE", "Deductor complete", false,
                     "No 26Q detail");
         }
-        int fyStartMonth = organizationRepository.findById(q.getOrganizationId())
-                .map(Organization::getFinancialYearStart).orElse(4);
+        if (q.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FINALIZED
+                && q.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FILED
+                && org != null) {
+            detail.setTan(org.getTan());
+            detail.setDeductorPan(org.getPan());
+            detail.setDeductorName(org.getName());
+            detail.setDeductorAddress(org.getRegisteredAddress());
+            detail.setDeductorType(org.getDeductorType());
+            detail.setResponsiblePersonName(org.getResponsiblePersonName());
+            detail.setResponsiblePersonDesignation(org.getResponsiblePersonDesignation());
+            detail = detailRepository.save(detail);
+        }
         List<String> problems = new ArrayList<>();
         if (detail.getTan() == null || !detail.getTan().matches(Organization.TAN_PATTERN)) {
             problems.add("TAN is invalid");

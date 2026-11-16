@@ -296,7 +296,9 @@ export function QuarterPreparePanel({ workflow, role }: Props) {
                   <td className="py-2 pr-2">
                     {entry.deducteePan ?? '—'}
                     {!entry.panValid && (
-                      <span className="ml-2 text-xs text-[var(--color-danger)]">invalid PAN</span>
+                      <span className="ml-2 text-xs text-[var(--color-danger)]">
+                        {entry.deducteePan ? 'invalid PAN' : 'missing PAN'}
+                      </span>
                     )}
                   </td>
                   <td className="py-2 pr-2">{entry.section ?? '—'}</td>
