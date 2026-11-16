@@ -23,6 +23,12 @@ interface WorkflowFinding extends ReviewFinding {
 // Mirrors MastersPage: rules whose corrected value is typed in by the user in Masters.
 const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
 
+function needsTypedValue(f: WorkflowFinding): boolean {
+  if (f.source === 'TDS') return f.findingType === 'PAN_MISSING' || f.findingType === 'PAN_INVALID'
+  if (f.source === 'MASTERS') return TYPED_INPUT_RULES.includes(f.findingType)
+  return false
+}
+
 /**
  * The findings tab of a workflow: every module's findings for the workflow, blocking first,
  * with the shared review panel per finding. Rendered inside the workflow screens worker F owns.
@@ -68,12 +74,8 @@ export function WorkflowFindingsTab({
   const isAccountantUser = role === 'ROLE_ACCOUNTANT'
   const selectable = (f: WorkflowFinding) =>
     canBulk &&
+    !needsTypedValue(f) &&
     (f.resolveStatus === 'OPEN' || (isAccountantUser && f.resolveStatus === 'ACKNOWLEDGED'))
-
-  const selectedFindings = findings.filter((f) => selected.includes(f.id))
-  const allOpen = selectedFindings.length > 0 && selectedFindings.every((f) => f.resolveStatus === 'OPEN')
-  const allAcknowledged =
-    selectedFindings.length > 0 && selectedFindings.every((f) => f.resolveStatus === 'ACKNOWLEDGED')
 
   const filtered = useMemo(
     () =>
@@ -85,6 +87,12 @@ export function WorkflowFindingsTab({
       ),
     [findings, typeFilter, severityFilter, statusFilter],
   )
+
+  const selectedFindings = filtered.filter((f) => selectable(f) && selected.includes(f.id))
+  const selectedIds = selectedFindings.map((f) => f.id)
+  const allOpen = selectedFindings.length > 0 && selectedFindings.every((f) => f.resolveStatus === 'OPEN')
+  const allAcknowledged =
+    selectedFindings.length > 0 && selectedFindings.every((f) => f.resolveStatus === 'ACKNOWLEDGED')
 
   const groups = useMemo(() => {
     const byType = new Map<string, WorkflowFinding[]>()
@@ -121,7 +129,7 @@ export function WorkflowFindingsTab({
     setBulkError('')
     try {
       await api.post(`/v1/workflows/${workflowId}/findings/bulk-action`, {
-        findingIds: selected,
+        findingIds: selectedIds,
         action,
         ...(bulkNote.trim() !== '' ? { note: bulkNote.trim() } : {}),
       })
@@ -233,9 +241,9 @@ export function WorkflowFindingsTab({
           )
         })}
       </div>
-      {selected.length > 0 && (
+      {selectedIds.length > 0 && (
         <div className="sticky bottom-0 mt-4 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-          <span className="text-sm text-[var(--color-text-secondary)]">{selected.length} selected</span>
+          <span className="text-sm text-[var(--color-text-secondary)]">{selectedIds.length} selected</span>
           <input
             type="text"
             aria-label="Bulk note"
@@ -251,7 +259,7 @@ export function WorkflowFindingsTab({
               disabled={!allOpen || bulkBusy}
               className="h-9 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-raised)] disabled:opacity-50"
             >
-              Acknowledge {selected.length}
+              Acknowledge {selectedIds.length}
             </button>
           )}
           {isAccountantUser && (
@@ -261,7 +269,7 @@ export function WorkflowFindingsTab({
               disabled={!allAcknowledged || bulkBusy}
               className="h-9 px-3 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-sm disabled:opacity-50"
             >
-              Approve {selected.length}
+              Approve {selectedIds.length}
             </button>
           )}
           <button

@@ -185,6 +185,66 @@ describe('WorkflowFindingsTab', () => {
     )
   })
 
+  it('leaves findings that need a typed value out of bulk selection', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          tdsFinding({ id: 'p1', findingType: 'PAN_MISSING', message: 'PAN one' }),
+          tdsFinding({ id: 'p2', findingType: 'PAN_INVALID', message: 'PAN two' }),
+          mastersFinding({ id: 'm1', findingType: 'HSN_SAC_CODE', message: 'HSN one' }),
+          gstFinding({ id: 'g1', message: 'GST one' }),
+        ],
+        blockingCount: 4,
+      },
+    })
+    mockPost.mockResolvedValue({ data: { processed: 1, action: 'ACKNOWLEDGE' } })
+
+    renderTab()
+
+    await screen.findByText('PAN one')
+    expect(screen.queryByRole('checkbox', { name: 'Select p1' })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: 'Select p2' })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: 'Select m1' })).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: 'Select all in PAN MISSING' })).toBeNull()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select g1' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Acknowledge 1' }))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith('/v1/workflows/wf-1/findings/bulk-action', {
+        findingIds: ['g1'],
+        action: 'ACKNOWLEDGE',
+      }),
+    )
+  })
+
+  it('drops findings hidden by a filter from the selection and the submitted ids', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          gstFinding({ id: 'f1', findingType: 'TYPE_A', message: 'First finding' }),
+          gstFinding({ id: 'f2', findingType: 'TYPE_B', message: 'Second finding' }),
+        ],
+        blockingCount: 2,
+      },
+    })
+    mockPost.mockResolvedValue({ data: { processed: 1, action: 'ACKNOWLEDGE' } })
+
+    renderTab()
+
+    await screen.findByText('First finding')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f1' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f2' }))
+    expect(screen.getByText('2 selected')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: /^TYPE_B/ }))
+    expect(screen.getByText('1 selected')).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: 'Acknowledge 1' }))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith('/v1/workflows/wf-1/findings/bulk-action', {
+        findingIds: ['f2'],
+        action: 'ACKNOWLEDGE',
+      }),
+    )
+  })
+
   it('lets only an accountant approve acknowledged findings and hides bulk controls from an operator or auditor', async () => {
     mockGet.mockResolvedValue({
       data: {
