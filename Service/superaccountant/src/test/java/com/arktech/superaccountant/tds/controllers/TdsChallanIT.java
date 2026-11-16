@@ -285,4 +285,21 @@ class TdsChallanIT {
 
         assertTrue(body.contains("(short by 1000.00)"));
     }
+
+    @Test
+    void proposeChallan_invalidJson_returns400WithoutTrace() throws Exception {
+        Workflow w = seedWorkflow();
+        seedDetail(w.getId());
+
+        String malformedJson = "{\"bsrCode\":\"1234567\",\"depositDate\":\"not-a-date\"}";
+
+        mockMvc.perform(postJson("/api/v1/workflows/" + w.getId()
+                        + "/tds/challans", malformedJson).with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isBadRequest())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.message").exists())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.trace").doesNotExist());
+    }
 }

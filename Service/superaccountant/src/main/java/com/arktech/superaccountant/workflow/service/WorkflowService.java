@@ -266,9 +266,9 @@ public class WorkflowService {
         }
 
         if (w.getUploadJobId() != null
-                && !uploadFreshnessGate.isStillLatest(organizationId, w.getUploadJobId())) {
+                && !uploadFreshnessGate.isStillLatestForPeriod(organizationId, w.getUploadJobId(), w.getPeriodStart(), w.getPeriodEnd())) {
             throw new WorkflowConflictException(
-                    "The bound upload is no longer the company's latest upload");
+                    "The bound upload is no longer the latest upload for this period");
         }
 
         w.setStage(WorkflowStage.FINALIZED);

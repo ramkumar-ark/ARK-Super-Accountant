@@ -120,7 +120,18 @@ class PreconfiguredMastersControllerIT {
     }
 
     @Test
-    void owner_allWrites_403_operatorCreateStillAllowed() throws Exception {
+    void owner_canApplyOnboardTemplate() throws Exception {
+        String ownerToken = setupOrgScopedToken("owner");
+
+        mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"templateSlug\":\"standard\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void owner_manualWrites_403_operatorCreateStillAllowed() throws Exception {
         String ownerToken = setupOrgScopedToken("owner");
         String operatorToken = operatorJwt();
         java.util.UUID randomId = java.util.UUID.randomUUID();
@@ -144,11 +155,6 @@ class PreconfiguredMastersControllerIT {
                         .header("Authorization", "Bearer " + ownerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"masters\":[]}"))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(post("/api/v1/preconfigured-masters")

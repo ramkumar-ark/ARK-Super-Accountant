@@ -6,12 +6,13 @@ import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Whether the given day-book upload is still the organization's latest
- * COMPLETED upload (owner: worker B). Finalize requires this.
+ * COMPLETED upload for the workflow's period (owner: worker B). Finalize requires this.
  */
 @Service
 public class UploadFreshnessGate {
@@ -25,6 +26,15 @@ public class UploadFreshnessGate {
         }
         Optional<DayBookUploadJob> latest = dayBookUploadJobRepository
                 .findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(organizationId, UploadJobStatus.COMPLETED);
+        return latest.isPresent() && latest.get().getId().equals(uploadJobId);
+    }
+
+    public boolean isStillLatestForPeriod(UUID organizationId, UUID uploadJobId, LocalDate periodStart, LocalDate periodEnd) {
+        if (uploadJobId == null) {
+            return false;
+        }
+        Optional<DayBookUploadJob> latest = dayBookUploadJobRepository
+                .findLatestCovering(organizationId, UploadJobStatus.COMPLETED, periodStart, periodEnd);
         return latest.isPresent() && latest.get().getId().equals(uploadJobId);
     }
 }

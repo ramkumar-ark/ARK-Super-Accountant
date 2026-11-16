@@ -492,4 +492,38 @@ class WorkflowServiceTest {
         Workflow finalized = service.finalize(orgId, actor, w.getId());
         assertEquals(WorkflowStage.FINALIZED, finalized.getStage());
     }
+
+    @Test
+    void finalize_refusesWhenUploadNotLatestForPeriod() {
+        Workflow w = prepareWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        UUID uploadJobId = UUID.randomUUID();
+        w.setUploadJobId(uploadJobId);
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowGate.blockingFindingCount(w.getId())).thenReturn(0);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.TDS_PAYMENT, "2026-03"))
+                .thenReturn(true);
+        when(uploadFreshnessGate.isStillLatestForPeriod(orgId, uploadJobId, w.getPeriodStart(), w.getPeriodEnd()))
+                .thenReturn(false);
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.finalize(orgId, actor, w.getId()));
+        assertTrue(e.getMessage().contains("The bound upload is no longer the latest upload for this period"));
+        assertEquals(WorkflowStage.PREPARE, w.getStage());
+    }
+
+    @Test
+    void finalize_succeedsWhenUploadIsLatestForPeriod() {
+        Workflow w = prepareWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        UUID uploadJobId = UUID.randomUUID();
+        w.setUploadJobId(uploadJobId);
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowGate.blockingFindingCount(w.getId())).thenReturn(0);
+        when(workflowRepository.existsFinalized(orgId, WorkflowType.TDS_PAYMENT, "2026-03"))
+                .thenReturn(true);
+        when(uploadFreshnessGate.isStillLatestForPeriod(orgId, uploadJobId, w.getPeriodStart(), w.getPeriodEnd()))
+                .thenReturn(true);
+
+        Workflow finalized = service.finalize(orgId, actor, w.getId());
+        assertEquals(WorkflowStage.FINALIZED, finalized.getStage());
+    }
 }
