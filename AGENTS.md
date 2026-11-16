@@ -47,7 +47,7 @@ Service/superaccountant/          # Spring Boot backend
         services/                          # UserDetailsImpl, UserDetailsServiceImpl
       config/DataInitializer.java          # Seed data
     config/DatabasePasswordValidator.java  # Fails startup without DB_PASSWORD
-    gst/ daybook/ masters/ tally/ tds/ review/ workflow/   # Feature modules (controllers/models/payload/repository/services); list the dir for contents
+    gst/ filedreturns/ daybook/ masters/ tally/ tds/ review/ workflow/   # Feature modules (controllers/models/payload/repository/services); list the dir for contents
   src/main/resources/
     application.properties                 # DB + JWT config
 

@@ -1,0 +1,126 @@
+{
+  "gstin": "29ABCDE1234F1Z5",
+  "fp": "042026",
+  "b2b": [
+    {
+      "ctin": "27AAECS6620H1ZQ",
+      "inv": [
+        {
+          "inum": "INV-100",
+          "idt": "03-04-2026",
+          "val": 14400.00,
+          "pos": "27",
+          "inv_typ": "R",
+          "itms": [
+            {"num": 1, "itm_det": {"rt": 18, "txval": 10000.00, "iamt": 1800.00, "camt": 0, "samt": 0, "csamt": 0}},
+            {"num": 2, "itm_det": {"rt": 5, "txval": 2000.00, "iamt": 100.00, "camt": 0, "samt": 0, "csamt": 0}}
+          ]
+        }
+      ]
+    }
+  ],
+  "b2ba": [
+    {
+      "ctin": "27AAECS6620H1ZQ",
+      "inv": [
+        {
+          "oinum": "INV-90",
+          "oidt": "05-03-2026",
+          "inum": "INV-90A",
+          "idt": "10-04-2026",
+          "val": 1180.00,
+          "pos": "27",
+          "inv_typ": "R",
+          "itms": [
+            {"num": 1, "itm_det": {"rt": 18, "txval": 1000.00, "iamt": 180.00, "camt": 0, "samt": 0, "csamt": 0}}
+          ]
+        }
+      ]
+    }
+  ],
+  "cdnr": [
+    {
+      "ctin": "27AAECS6620H1ZQ",
+      "nt": [
+        {
+          "ntty": "C",
+          "nt_num": "CN-1",
+          "nt_dt": "12-04-2026",
+          "val": -1180.00,
+          "pos": "27",
+          "itms": [
+            {"num": 1, "itm_det": {"rt": 18, "txval": -1000.00, "iamt": -180.00, "camt": 0, "samt": 0, "csamt": 0}}
+          ]
+        }
+      ]
+    }
+  ],
+  "b2cl": [
+    {
+      "pos": "24",
+      "inv": [
+        {
+          "inum": "INV-200",
+          "idt": "15-04-2026",
+          "val": 11800.00,
+          "itms": [
+            {"num": 1, "itm_det": {"rt": 18, "txval": 10000.00, "iamt": 1800.00, "camt": 0, "samt": 0, "csamt": 0}}
+          ]
+        }
+      ]
+    }
+  ],
+  "exp": [
+    {
+      "exp_typ": "WOPAY",
+      "inv": [
+        {
+          "inum": "EXP-1",
+          "idt": "18-04-2026",
+          "val": 5000.00,
+          "itms": [
+            {"txval": 5000.00, "rt": 18, "iamt": 900.00}
+          ]
+        }
+      ]
+    }
+  ],
+  "b2cs": [
+    {"sply_ty": "INTRA", "pos": "29", "rt": 18, "txval": 3000.00, "camt": 540.00, "samt": 540.00, "csamt": 0},
+    {"sply_ty": "INTER", "pos": "27", "rt": 12, "txval": 4000.00, "iamt": 480.00, "camt": 0, "samt": 0, "csamt": 0}
+  ],
+  "b2csa": [
+    {
+      "omon": "032026",
+      "sply_ty": "INTRA",
+      "pos": "29",
+      "itms": [
+        {"rt": 18, "txval": 500.00, "camt": 90.00, "samt": 90.00, "csamt": 0},
+        {"rt": 12, "txval": 300.00, "iamt": 36.00, "camt": 0, "samt": 0, "csamt": 0}
+      ]
+    }
+  ],
+  "nil": {
+    "inv": [
+      {"sply_ty": "INTRB2B", "nil_amt": 1000.00, "expt_amt": 0, "ngsup_amt": 0},
+      {"sply_ty": "INTRB2C", "nil_amt": 0, "expt_amt": 2000.00, "ngsup_amt": 0}
+    ]
+  },
+  "hsn": {
+    "hsn_b2b": null,
+    "data": [
+      {"num": 1, "hsn_sc": "1101", "desc": "Wheat", "uqc": "MT", "qty": 10.00, "txval": 20000.00, "iamt": 0, "camt": 0, "samt": 0, "csamt": 0},
+      {"num": 2, "hsn_sc": "1106", "desc": "Flour", "uqc": "MT", "qty": 5.00, "txval": 15000.00, "iamt": 2700.00, "camt": 0, "samt": 0, "csamt": 0}
+    ]
+  },
+  "doc_issue": {
+    "doc_det": [
+      {
+        "doc_num": "Invoices for outward supply",
+        "docs": [
+          {"from": "INV-100", "to": "INV-210", "totnum": 111, "cancel": 1, "net_num": 110}
+        ]
+      }
+    ]
+  }
+}
