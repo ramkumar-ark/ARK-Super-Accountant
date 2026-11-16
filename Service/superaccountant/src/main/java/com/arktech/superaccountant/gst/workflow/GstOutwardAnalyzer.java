@@ -3,6 +3,7 @@ package com.arktech.superaccountant.gst.workflow;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.gst.models.VoucherSide;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingService;
 import com.arktech.superaccountant.gst.repository.GstDaybookFindingRepository;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
@@ -22,9 +23,10 @@ public class GstOutwardAnalyzer extends AbstractGstAnalyzer {
                               OrganizationRepository organizationRepository,
                               GstRuleRunner gstRuleRunner,
                               FindingLifecycleService lifecycle,
-                              TaxLedgerMappingGate mappingGate) {
+                              TaxLedgerMappingGate mappingGate,
+                              TaxLedgerMappingService mappingService) {
         super(parsedVoucherRepository, findingRepository, mastersService, organizationRepository,
-                gstRuleRunner, lifecycle, mappingGate);
+                gstRuleRunner, lifecycle, mappingGate, mappingService);
     }
 
     @Override

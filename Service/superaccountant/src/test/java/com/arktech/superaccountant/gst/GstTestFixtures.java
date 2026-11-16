@@ -2,6 +2,10 @@ package com.arktech.superaccountant.gst;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.gst.mapping.GstHead;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMapping;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerRole;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerSuggester;
 import com.arktech.superaccountant.gst.rules.GstRuleContext;
 import com.arktech.superaccountant.masters.models.GstApplicabilityType;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
@@ -72,10 +76,38 @@ public final class GstTestFixtures {
     }
 
     public static GstRuleContext ctx(String orgGstin, UploadLedgerSnapshot... snaps) {
+        return ctxWithTaxLedgers(orgGstin, mappingsFor(snaps), snaps);
+    }
+
+    /** Tax-ledger mappings derived from the suggester for every fixture snapshot, by name. */
+    public static Map<String, TaxLedgerMapping> mappingsFor(UploadLedgerSnapshot... snaps) {
+        Map<String, TaxLedgerMapping> mappings = new HashMap<>();
+        for (UploadLedgerSnapshot s : snaps) {
+            TaxLedgerSuggester.Suggestion suggestion = TaxLedgerSuggester.suggest(s.getLedgerName());
+            if (suggestion.role() == null && suggestion.head() == null) continue;
+            mappings.put(s.getLedgerName().trim().toLowerCase(),
+                    mapping(s.getLedgerName(), suggestion.role(), suggestion.head()));
+        }
+        return mappings;
+    }
+
+    public static GstRuleContext ctxWithTaxLedgers(String orgGstin, Map<String, TaxLedgerMapping> taxLedgers,
+                                                   UploadLedgerSnapshot... snaps) {
         Map<String, UploadLedgerSnapshot> byName = new HashMap<>();
         for (UploadLedgerSnapshot s : snaps) {
             byName.put(s.getLedgerName().trim().toLowerCase(), s);
         }
-        return new GstRuleContext(ORG_ID, UUID.randomUUID(), UUID.randomUUID(), orgGstin, byName);
+        return new GstRuleContext(ORG_ID, UUID.randomUUID(), UUID.randomUUID(), orgGstin, byName, taxLedgers);
+    }
+
+    public static TaxLedgerMapping mapping(String ledgerName, TaxLedgerRole role, GstHead head) {
+        TaxLedgerMapping m = new TaxLedgerMapping();
+        m.setOrganizationId(ORG_ID);
+        m.setLedgerName(ledgerName);
+        m.setLedgerKey(ledgerName.trim().toLowerCase());
+        m.setRole(role);
+        m.setHead(head);
+        m.setSavedBy("test");
+        return m;
     }
 }

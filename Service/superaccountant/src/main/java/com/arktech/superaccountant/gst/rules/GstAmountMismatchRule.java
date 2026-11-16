@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gst.rules;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.gst.mapping.GstHead;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
@@ -47,10 +48,10 @@ public class GstAmountMismatchRule implements GstDaybookRule {
             }
             if (!anyRate) continue;
 
-            Map<String, BigDecimal> heads = GstRuleSupport.headTotals(gstEntries);
-            BigDecimal cgst = heads.getOrDefault("CGST", BigDecimal.ZERO);
-            BigDecimal sgst = heads.getOrDefault("SGST", BigDecimal.ZERO);
-            BigDecimal igst = heads.getOrDefault("IGST", BigDecimal.ZERO);
+            Map<GstHead, BigDecimal> heads = GstRuleSupport.rateHeadTotals(ctx, gstEntries);
+            BigDecimal cgst = heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO);
+            BigDecimal sgst = heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO);
+            BigDecimal igst = heads.getOrDefault(GstHead.IGST, BigDecimal.ZERO);
             BigDecimal actualTotal = cgst.add(sgst).add(igst);
 
             Boolean inter = GstRuleSupport.interState(ctx, v);

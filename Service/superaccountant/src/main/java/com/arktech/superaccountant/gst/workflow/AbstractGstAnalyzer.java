@@ -3,6 +3,7 @@ package com.arktech.superaccountant.gst.workflow;
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingService;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.VoucherSide;
 import com.arktech.superaccountant.gst.repository.GstDaybookFindingRepository;
@@ -34,6 +35,7 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
     private final GstRuleRunner gstRuleRunner;
     private final FindingLifecycleService lifecycle;
     private final TaxLedgerMappingGate mappingGate;
+    private final TaxLedgerMappingService mappingService;
 
     protected AbstractGstAnalyzer(ParsedVoucherRepository parsedVoucherRepository,
                                   GstDaybookFindingRepository findingRepository,
@@ -41,7 +43,8 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
                                   OrganizationRepository organizationRepository,
                                   GstRuleRunner gstRuleRunner,
                                   FindingLifecycleService lifecycle,
-                                  TaxLedgerMappingGate mappingGate) {
+                                  TaxLedgerMappingGate mappingGate,
+                                  TaxLedgerMappingService mappingService) {
         this.parsedVoucherRepository = parsedVoucherRepository;
         this.findingRepository = findingRepository;
         this.mastersService = mastersService;
@@ -49,6 +52,7 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
         this.gstRuleRunner = gstRuleRunner;
         this.lifecycle = lifecycle;
         this.mappingGate = mappingGate;
+        this.mappingService = mappingService;
     }
 
     /** The voucher sides this analyzer owns; no finding is raised on both. */
@@ -65,7 +69,8 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
                 .map(Organization::getGstin)
                 .orElse(null);
         GstRuleContext ruleCtx = new GstRuleContext(ctx.organizationId(), ctx.workflowId(),
-                ctx.uploadJobId(), gstin, snapshots);
+                ctx.uploadJobId(), gstin, snapshots,
+                mappingService.mappingsByKey(ctx.organizationId()));
 
         List<GstDaybookFinding> fresh = gstRuleRunner.run(ruleCtx, vouchers, ctx.periodStart(),
                 ctx.periodEnd(), keepSides());

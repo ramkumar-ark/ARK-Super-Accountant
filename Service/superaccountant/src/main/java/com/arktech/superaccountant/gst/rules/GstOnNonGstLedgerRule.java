@@ -22,7 +22,7 @@ public class GstOnNonGstLedgerRule implements GstDaybookRule {
         for (ParsedVoucher v : vouchers) {
             if (v == null || v.isCancelled() || v.getEntries() == null) continue;
             for (ParsedVoucherEntry e : v.getEntries()) {
-                if (GstRuleSupport.gstHead(e.getLedgerName()) == null) continue;
+                if (GstRuleSupport.gstHead(ctx, e.getLedgerName()) == null) continue;
                 if (ctx.snapshot(e.getLedgerName()).isEmpty()) continue;
                 if (ctx.category(e.getLedgerName()) == LedgerCategory.GST) continue;
                 if (e.getAmount() == null || e.getAmount().compareTo(BigDecimal.ZERO) == 0) continue;
