@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -11,13 +10,7 @@ function formatAmount(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2 })
 }
 
-export function BaselinePeriodDetail({
-  row,
-  onRerun,
-}: {
-  row: BaselinePeriodView
-  onRerun: () => void
-}) {
+export function BaselinePeriodDetail({ row }: { row: BaselinePeriodView }) {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
   const canUpload = user?.role === 'ROLE_ACCOUNTANT' || user?.role === 'ROLE_OPERATOR'

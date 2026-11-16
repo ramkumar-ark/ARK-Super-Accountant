@@ -8,7 +8,6 @@ import {
   TAX_LEDGER_ROLE_LABELS,
   type TaxLedgerRole,
   type GstHead,
-  type TaxLedgerMappingRow,
 } from '@/lib/taxMappingApi'
 
 const ROLES = Object.keys(TAX_LEDGER_ROLE_LABELS) as TaxLedgerRole[]

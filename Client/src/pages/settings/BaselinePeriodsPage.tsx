@@ -152,7 +152,7 @@ export function BaselinePeriodsPage() {
           {expanded &&
             rows
               .filter((r) => r.workflowId === expanded)
-              .map((r) => <BaselinePeriodDetail key={r.workflowId} row={r} onRerun={refresh} />)}
+              .map((r) => <BaselinePeriodDetail key={r.workflowId} row={r} />)}
         </div>
       </main>
     </AppShell>

@@ -268,6 +268,57 @@ describe('CompliancePage — baseline', () => {
     expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeDisabled()
   })
 
+  it('baselineCardDistinguishesZeroFromNotAvailable', async () => {
+    mockBaseline({
+      confirmed: false,
+      rangeStart: null,
+      rangeEnd: null,
+      types: [],
+      blockers: [],
+      importedFiledData: 'not available',
+      discrepancyCount: 0,
+    })
+
+    const { unmount } = renderPage('ROLE_ACCOUNTANT')
+    expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
+      'Differences to explain (informational): 0',
+    )
+    expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeEnabled()
+    expect(screen.getByText('Baseline periods')).toBeInTheDocument()
+    unmount()
+
+    mockBaseline({
+      confirmed: false,
+      rangeStart: null,
+      rangeEnd: null,
+      types: [],
+      blockers: [],
+      importedFiledData: 'not available',
+      discrepancyCount: null,
+    })
+    const second = renderPage('ROLE_ACCOUNTANT')
+    expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
+      'Differences to explain: Not available (import filed returns and map tax ledgers)',
+    )
+    expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeEnabled()
+    second.unmount()
+
+    mockBaseline({
+      confirmed: false,
+      rangeStart: null,
+      rangeEnd: null,
+      types: [],
+      blockers: [],
+      importedFiledData: 'not available',
+      discrepancyCount: 3,
+    })
+    renderPage('ROLE_ACCOUNTANT')
+    expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
+      'Differences to explain (informational): 3',
+    )
+    expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeEnabled()
+  })
+
   it('baseline confirmed shows confirmed state', async () => {
     mockBaseline({
       confirmed: true,
