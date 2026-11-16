@@ -4,7 +4,10 @@ import com.arktech.superaccountant.filedreturns.payload.FiledReturnSnapshotSumma
 import com.arktech.superaccountant.filedreturns.payload.FiledReturnSnapshotView;
 import com.arktech.superaccountant.filedreturns.payload.Gstr3bEntryRequest;
 import com.arktech.superaccountant.filedreturns.parse.Gstr1JsonParser;
+import com.arktech.superaccountant.filedreturns.parse.Gstr3bPdfParser;
 import com.arktech.superaccountant.filedreturns.parse.Gstr1Parsed;
+import com.arktech.superaccountant.filedreturns.parse.Gstr3bParsed;
+import com.arktech.superaccountant.filedreturns.payload.Gstr3bParseResponse;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -75,6 +78,31 @@ public class FiledReturnController {
         FiledReturnSnapshot snapshot = importService.save(orgId, principal.getUsername(), draft);
         return ResponseEntity.status(201).body(
                 FiledReturnSnapshotView.from(snapshot, lineRepository.findBySnapshotIdOrderByLineNo(snapshot.getId())));
+    }
+
+    @Autowired
+    private Gstr3bPdfParser gstr3bPdfParser;
+
+    @PostMapping("/gstr3b/pdf")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
+    public ResponseEntity<?> parseGstr3bPdf(
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        FiledReturnFile stored = fileService.store(orgId, principal.getUsername(), file);
+        try {
+            Gstr3bParsed parsed = gstr3bPdfParser.parse(stored.getContent());
+            return ResponseEntity.ok(new Gstr3bParseResponse(stored.getId(), parsed.gstin(),
+                    parsed.filingPeriod(), parsed.rows(), parsed.warnings(),
+                    Gstr3bPdfParser.PARSER_VERSION));
+        } catch (com.arktech.superaccountant.filedreturns.parse.FiledReturnParseException e) {
+            return ResponseEntity.status(422).body(Map.of(
+                    "message", "Could not read a GSTR-3B from this PDF; enter the values manually",
+                    "fileId", stored.getId().toString()));
+        }
     }
 
     @ExceptionHandler({com.arktech.superaccountant.filedreturns.parse.FiledReturnParseException.class})

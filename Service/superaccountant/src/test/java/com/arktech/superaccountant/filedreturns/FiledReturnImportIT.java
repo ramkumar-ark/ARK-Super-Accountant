@@ -342,6 +342,95 @@ class FiledReturnImportIT {
     }
 
     @Test
+    void pdfParseThenConfirmSavesPortalPdfSnapshot() throws Exception {
+        Setup s = monthlySetup();
+        byte[] pdf = gstr3bPdf(
+                "GSTR-3B",
+                "GSTIN: 29ABCDE1234F1Z5",
+                "Year: 2026-27   Period: April",
+                "3.1(a) Outward taxable supplies (other than zero rated)",
+                "1,00,000.00  18,000.00  9,000.00  9,000.00  0.00",
+                "4A(5) All other ITC",
+                "5,000.00  2,500.00  2,500.00  0.00");
+        MockMultipartFile file = new MockMultipartFile("file", "gstr3b.pdf", "application/pdf", pdf);
+
+        MvcResult parse = mockMvc.perform(multipart("/api/v1/filed-returns/gstr3b/pdf").file(file)
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gstin").value("29ABCDE1234F1Z5"))
+                .andExpect(jsonPath("$.filingPeriod").value("2026-04"))
+                .andExpect(jsonPath("$.rows.length()").value(2))
+                .andExpect(jsonPath("$.rows[0].rowCode").value("3.1a"))
+                .andExpect(jsonPath("$.rows[0].taxable").value(100000.00))
+                .andExpect(jsonPath("$.rows[1].rowCode").value("4A5"))
+                .andExpect(jsonPath("$.parserVersion").value("gstr3b-pdf-1"))
+                .andExpect(jsonPath("$.fileId").exists())
+                .andReturn();
+
+        String parsedBody = parse.getResponse().getContentAsString();
+        ObjectMapper mapper = new ObjectMapper();
+        var root = mapper.readTree(parsedBody);
+        String fileId = root.get("fileId").asText();
+        String filingPeriod = root.get("filingPeriod").asText();
+        String confirmBody = """
+            {"filingPeriod":"%s","fileId":"%s","parserVersion":"gstr3b-pdf-1","rows":%s}
+            """.formatted(filingPeriod, fileId, root.get("rows").toString());
+
+        mockMvc.perform(post("/api/v1/filed-returns/gstr3b")
+                .header("Authorization", "Bearer " + s.accountantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(confirmBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sourceKind").value("PORTAL_PDF"))
+                .andExpect(jsonPath("$.fileId").value(fileId));
+    }
+
+    @Test
+    void garbagePdfGives422AndManualEntryStillSaves() throws Exception {
+        Setup s = monthlySetup();
+        byte[] pdf = gstr3bPdf("this is not a gstr3b document", "just some prose");
+        MockMultipartFile file = new MockMultipartFile("file", "junk.pdf", "application/pdf", pdf);
+
+        MvcResult parse = mockMvc.perform(multipart("/api/v1/filed-returns/gstr3b/pdf").file(file)
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").exists())
+                .andExpect(jsonPath("$.fileId").exists())
+                .andReturn();
+
+        mockMvc.perform(post("/api/v1/filed-returns/gstr3b")
+                .header("Authorization", "Bearer " + s.accountantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(gstr3bBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sourceKind").value("MANUAL_ENTRY"));
+
+        assertEquals(1, snapshotRepository.findAllByOrganizationId(s.orgId()).size());
+    }
+
+    private byte[] gstr3bPdf(String... lines) throws Exception {
+        try (var doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            var page = new org.apache.pdfbox.pdmodel.PDPage();
+            doc.addPage(page);
+            try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page)) {
+                cs.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                        org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 10);
+                float y = 750;
+                for (String line : lines) {
+                    cs.beginText();
+                    cs.newLineAtOffset(50, y);
+                    cs.showText(line);
+                    cs.endText();
+                    y -= 15;
+                }
+            }
+            var out = new java.io.ByteArrayOutputStream();
+            doc.save(out);
+            return out.toByteArray();
+        }
+    }
+
+    @Test
     void operatorMaySaveAndOwnerMayNot() throws Exception {
         Setup s = monthlySetup();
         mockMvc.perform(post("/api/v1/filed-returns/gstr3b")
