@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WorkflowFindingsTab } from './WorkflowFindingsTab'
 import { api } from '@/lib/api'
+import type { ReviewRole } from '@/components/review/FindingReviewPanel'
 
 vi.mock('@/lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn() },
@@ -37,11 +38,11 @@ const finding = {
   carriedFromFindingId: null,
 }
 
-function renderTab() {
+function renderTab(role: ReviewRole = 'ROLE_ACCOUNTANT') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
+  return render(
     <QueryClientProvider client={client}>
-      <WorkflowFindingsTab workflowId="wf-1" role="ROLE_ACCOUNTANT" />
+      <WorkflowFindingsTab workflowId="wf-1" role={role} />
     </QueryClientProvider>,
   )
 }
@@ -149,6 +150,96 @@ describe('WorkflowFindingsTab', () => {
     expect(screen.getByText('Open high')).toBeInTheDocument()
     expect(screen.queryByText('Acknowledged high')).not.toBeInTheDocument()
     expect(screen.queryByText('Open low')).not.toBeInTheDocument()
+  })
+
+  it('bulk acknowledges the selected open findings', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          gstFinding({ id: 'f1', message: 'First finding' }),
+          gstFinding({ id: 'f2', message: 'Second finding' }),
+        ],
+        blockingCount: 2,
+      },
+    })
+    mockPost.mockResolvedValue({ data: { processed: 2, action: 'ACKNOWLEDGE' } })
+
+    renderTab()
+
+    await screen.findByText('First finding')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f1' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f2' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Acknowledge 2' }))
+
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith('/v1/workflows/wf-1/findings/bulk-action', {
+        findingIds: ['f1', 'f2'],
+        action: 'ACKNOWLEDGE',
+      }),
+    )
+  })
+
+  it('lets only an accountant approve acknowledged findings and hides bulk controls from an operator or auditor', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          gstFinding({ id: 'f1', message: 'Open one' }),
+          gstFinding({
+            id: 'f2',
+            message: 'Acknowledged one',
+            resolveStatus: 'ACKNOWLEDGED',
+            proposedValue: 'x',
+            submittedBy: 'op',
+          }),
+        ],
+        blockingCount: 2,
+      },
+    })
+
+    const operator = renderTab('ROLE_OPERATOR')
+    await screen.findByText('Open one')
+    expect(screen.getByRole('checkbox', { name: 'Select f1' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Select f2' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f1' }))
+    expect(screen.getByRole('button', { name: 'Acknowledge 1' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Approve/ })).not.toBeInTheDocument()
+    operator.unmount()
+
+    const auditor = renderTab('ROLE_AUDITOR_CA')
+    await screen.findByText('Open one')
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    auditor.unmount()
+
+    renderTab('ROLE_ACCOUNTANT')
+    await screen.findByText('Open one')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f2' }))
+    expect(screen.getByRole('button', { name: 'Approve 1' })).toBeEnabled()
+  })
+
+  it('shows the server error and keeps the selection when a bulk action is refused', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          gstFinding({ id: 'f1', message: 'First finding' }),
+          gstFinding({ id: 'f2', message: 'Second finding' }),
+        ],
+        blockingCount: 2,
+      },
+    })
+    mockPost.mockRejectedValue({
+      response: { data: { error: 'Finding f2 is not pending review' } },
+    })
+
+    renderTab()
+
+    await screen.findByText('First finding')
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f1' }))
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select f2' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Acknowledge 2' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Finding f2 is not pending review')
+    expect(screen.getByRole('checkbox', { name: 'Select f1' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select f2' })).toBeChecked()
   })
 
   it('shows "No findings" when empty', async () => {
