@@ -55,6 +55,16 @@ export function BaselineSection() {
             </tbody>
           </table>
           <p className="text-sm mt-2">Imported filed data: {status.importedFiledData}</p>
+          <p className="text-sm mt-1" data-testid="discrepancy-count">
+            {status.discrepancyCount === null || status.discrepancyCount === undefined
+              ? 'Differences to explain: Not available (import filed returns and map tax ledgers)'
+              : `Differences to explain (informational): ${status.discrepancyCount}`}
+          </p>
+          <p className="text-sm mt-1">
+            <a href="/settings/baseline-periods" className="underline">
+              Baseline periods
+            </a>
+          </p>
           {(status.blockers ?? []).length > 0 && (
             <ul className="text-sm text-red-600 mt-2 list-disc list-inside">
               {status.blockers.map((b) => (

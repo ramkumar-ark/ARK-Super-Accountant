@@ -19,6 +19,7 @@ import { WorkflowListPage } from '@/pages/workflows/WorkflowListPage'
 import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
 import { TeamPage } from '@/pages/TeamPage'
 import { CompliancePage } from '@/pages/settings/CompliancePage'
+import { BaselinePeriodsPage } from '@/pages/settings/BaselinePeriodsPage'
 import { useAuthStore } from '@/store/authStore'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/queryClient'
@@ -160,6 +161,17 @@ const complianceRoute = createRoute({
   component: CompliancePage,
 })
 
+const baselinePeriodsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/baseline-periods',
+  beforeLoad: () => {
+    const { isAuthenticated, user } = useAuthStore.getState()
+    if (!isAuthenticated) throw redirect({ to: '/login' })
+    if (!user?.organizationId) throw redirect({ to: '/organization/setup' })
+  },
+  component: BaselinePeriodsPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -173,6 +185,7 @@ const routeTree = rootRoute.addChildren([
   workflowDetailRoute,
   teamRoute,
   complianceRoute,
+  baselinePeriodsRoute,
 ])
 
 const router = createRouter({ routeTree })

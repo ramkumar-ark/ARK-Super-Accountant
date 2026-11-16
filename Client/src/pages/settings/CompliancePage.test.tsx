@@ -1,8 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CompliancePage } from './CompliancePage'
+
+const MAPPING_VIEW = {
+  complete: true,
+  mastersJobId: null,
+  blockers: [],
+  ledgers: [
+    {
+      ledgerName: 'Output CGST',
+      parentGroup: 'Duties & Taxes',
+      saved: true,
+      role: 'OUTPUT',
+      head: 'CGST',
+      suggestedRole: 'OUTPUT',
+      suggestedHead: 'CGST',
+      savedBy: 'alice',
+      savedAt: '2026-01-01T00:00:00Z',
+    },
+  ],
+}
 
 vi.mock('@/components/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -73,7 +92,7 @@ describe('CompliancePage — responsibility start', () => {
           ],
         })
       }
-      return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
     })
 
     renderPage('ROLE_ACCOUNTANT')
@@ -105,7 +124,7 @@ describe('CompliancePage — responsibility start', () => {
           ],
         })
       }
-      return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
     })
     mockPut.mockRejectedValueOnce({
       response: { status: 409, data: { error: 'Responsibility start for GSTR1 is locked: a workflow already exists' } },
@@ -116,7 +135,8 @@ describe('CompliancePage — responsibility start', () => {
     const user = userEvent.setup()
     const dateInput = await screen.findByLabelText('GSTR-1 responsibility start date')
     await user.type(dateInput, '2025-06-01')
-    const saveButtons = screen.getAllByRole('button', { name: 'Save' })
+    const respSection = screen.getByText('Responsibility start').closest('section') as HTMLElement
+    const saveButtons = within(respSection).getAllByRole('button', { name: 'Save' })
     await user.click(saveButtons[0])
 
     await waitFor(() => {
@@ -166,7 +186,7 @@ describe('CompliancePage — responsibility start', () => {
           ],
         })
       }
-      return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
     })
     mockPut.mockResolvedValue({ data: {} })
 
@@ -203,7 +223,7 @@ describe('CompliancePage — baseline', () => {
     mockGet.mockImplementation((url: string) => {
       if (url === '/v1/compliance/baseline') return Promise.resolve({ data: status })
       if (url === '/v1/compliance/financial-years') return Promise.resolve({ data: years })
-      return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
     })
   }
 
@@ -248,6 +268,57 @@ describe('CompliancePage — baseline', () => {
     expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeDisabled()
   })
 
+  it('baselineCardDistinguishesZeroFromNotAvailable', async () => {
+    mockBaseline({
+      confirmed: false,
+      rangeStart: null,
+      rangeEnd: null,
+      types: [],
+      blockers: [],
+      importedFiledData: 'not available',
+      discrepancyCount: 0,
+    })
+
+    const { unmount } = renderPage('ROLE_ACCOUNTANT')
+    expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
+      'Differences to explain (informational): 0',
+    )
+    expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeEnabled()
+    expect(screen.getByText('Baseline periods')).toBeInTheDocument()
+    unmount()
+
+    mockBaseline({
+      confirmed: false,
+      rangeStart: null,
+      rangeEnd: null,
+      types: [],
+      blockers: [],
+      importedFiledData: 'not available',
+      discrepancyCount: null,
+    })
+    const second = renderPage('ROLE_ACCOUNTANT')
+    expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
+      'Differences to explain: Not available (import filed returns and map tax ledgers)',
+    )
+    expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeEnabled()
+    second.unmount()
+
+    mockBaseline({
+      confirmed: false,
+      rangeStart: null,
+      rangeEnd: null,
+      types: [],
+      blockers: [],
+      importedFiledData: 'not available',
+      discrepancyCount: 3,
+    })
+    renderPage('ROLE_ACCOUNTANT')
+    expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
+      'Differences to explain (informational): 3',
+    )
+    expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeEnabled()
+  })
+
   it('baseline confirmed shows confirmed state', async () => {
     mockBaseline({
       confirmed: true,
@@ -276,7 +347,7 @@ describe('CompliancePage — financial years', () => {
   function mockYears(years: Record<string, unknown>[]) {
     mockGet.mockImplementation((url: string) => {
       if (url === '/v1/compliance/financial-years') return Promise.resolve({ data: years })
-      return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
     })
   }
 
