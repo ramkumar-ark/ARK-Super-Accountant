@@ -68,9 +68,13 @@ public class FindingOverrideMasterService {
         }
         return switch (f.getMismatchType()) {
             case GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH ->
-                    "true".equals(f.getActualValue()) || "false".equals(f.getActualValue());
+                    isBoolean(f.getActualValue()) || isBoolean(f.getExpectedValue());
             default -> true;
         };
+    }
+
+    private static boolean isBoolean(String value) {
+        return "true".equals(value) || "false".equals(value);
     }
 
     private static boolean isOverridableMismatch(ValidationFinding f) {
@@ -105,7 +109,7 @@ public class FindingOverrideMasterService {
         }
         switch (f.getMismatchType()) {
             case NAME_MISMATCH, PARENT_GROUP_MISMATCH -> { }
-            case GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH -> parseFlag(f.getActualValue());
+            case GST_APPLICABILITY_MISMATCH, TDS_APPLICABILITY_MISMATCH -> resolveFlag(f);
             case MISSING_IN_CONFIGURATION -> findSnapshot(f, snapshots);
             default -> throw badRequest("This finding type cannot be resolved by overriding a master value.");
         }
@@ -204,13 +208,13 @@ public class FindingOverrideMasterService {
                         approver, submitter, () -> master.setExpectedParentGroup(v));
             }
             case GST_APPLICABILITY_MISMATCH -> {
-                Boolean v = parseFlag(f.getActualValue());
+                Boolean v = resolveFlag(f);
                 PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
                 change(master, f, "expected_gst_applicable", str(master.getExpectedGstApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedGstApplicable(v));
             }
             case TDS_APPLICABILITY_MISMATCH -> {
-                Boolean v = parseFlag(f.getActualValue());
+                Boolean v = resolveFlag(f);
                 PreconfiguredMaster master = findMaster(masters, f.getLedgerName());
                 change(master, f, "expected_tds_applicable", str(master.getExpectedTdsApplicable()), str(v),
                         approver, submitter, () -> master.setExpectedTdsApplicable(v));
@@ -341,6 +345,28 @@ public class FindingOverrideMasterService {
         if (!pattern.matcher(value).matches()) {
             throw badRequest(message);
         }
+    }
+
+    private static Boolean resolveFlag(ValidationFinding f) {
+        if ("true".equals(f.getActualValue())) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(f.getActualValue())) {
+            return Boolean.FALSE;
+        }
+        if ("true".equals(f.getProposedValue())) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(f.getProposedValue())) {
+            return Boolean.FALSE;
+        }
+        if ("true".equals(f.getExpectedValue())) {
+            return Boolean.TRUE;
+        }
+        if ("false".equals(f.getExpectedValue())) {
+            return Boolean.FALSE;
+        }
+        throw badRequest("The uploaded ledger has no value for this flag; it cannot be applied to the master.");
     }
 
     private static Boolean parseFlag(String value) {

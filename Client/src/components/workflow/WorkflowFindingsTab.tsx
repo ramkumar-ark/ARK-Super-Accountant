@@ -442,6 +442,11 @@ function Panel({
     finding.source !== 'MASTERS' && finding.source !== 'TAMPER'
       ? valueInputFor(finding, { value: typedValue, onChange: setTypedValue })
       : null
+  const isApplicabilityMismatch =
+    finding.findingType === 'GST_APPLICABILITY_MISMATCH' || finding.findingType === 'TDS_APPLICABILITY_MISMATCH'
+  const keepsExpected =
+    isApplicabilityMismatch && finding.actualValue !== 'true' && finding.actualValue !== 'false'
+
   const valueInput = isMasterTamper ? (
     <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
       Valid from (leave blank to accept as a correction)
@@ -456,7 +461,9 @@ function Panel({
     <p className="text-sm text-[var(--color-text-secondary)]">
       {finding.findingType === 'MISSING_IN_CONFIGURATION'
         ? `${finding.ledgerName ?? finding.id} will be added to the approved masters.`
-        : `The master will be updated to: ${finding.actualValue ?? '—'}`}
+        : keepsExpected
+          ? `The master will keep its expected value: ${finding.expectedValue ?? '—'}`
+          : `The master will be updated to: ${finding.actualValue ?? '—'}`}
     </p>
   ) : (
     customInput?.node
@@ -473,8 +480,8 @@ function Panel({
           ...body,
           ...(customInput != null && action === 'ACKNOWLEDGE' ? { value: customInput.value } : {}),
           ...(isMasterTamper && validFrom !== '' ? { value: `VALID_FROM:${validFrom}` } : {}),
-          ...(isMasters && !isTyped && action === 'ACKNOWLEDGE' && finding.actualValue != null
-            ? { value: finding.actualValue }
+          ...(isMasters && !isTyped && action === 'ACKNOWLEDGE'
+            ? { value: keepsExpected ? (finding.expectedValue ?? undefined) : (finding.actualValue ?? undefined) }
             : {}),
         })
       }

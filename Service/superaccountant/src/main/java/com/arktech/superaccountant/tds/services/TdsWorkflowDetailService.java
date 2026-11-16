@@ -52,19 +52,23 @@ public class TdsWorkflowDetailService {
             throw new IllegalArgumentException("Not a TDS_26Q workflow");
         }
         return twenty6qDetailRepository.findByWorkflowId(workflow.getId())
+                .map(existing -> {
+                    if (workflow.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FINALIZED
+                            && workflow.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FILED) {
+                        Organization org = organizationRepository.findById(workflow.getOrganizationId())
+                                .orElseThrow(() -> new IllegalStateException("Organization not found: " + workflow.getOrganizationId()));
+                        existing.copyDeductorFrom(org);
+                        return twenty6qDetailRepository.save(existing);
+                    }
+                    return existing;
+                })
                 .orElseGet(() -> {
                     Tds26qDetail detail = new Tds26qDetail();
                     detail.setWorkflowId(workflow.getId());
 
                     Organization org = organizationRepository.findById(workflow.getOrganizationId())
                             .orElseThrow(() -> new IllegalStateException("Organization not found: " + workflow.getOrganizationId()));
-                    detail.setTan(org.getTan());
-                    detail.setDeductorPan(org.getPan());
-                    detail.setDeductorName(org.getName());
-                    detail.setDeductorAddress(org.getRegisteredAddress());
-                    detail.setDeductorType(org.getDeductorType());
-                    detail.setResponsiblePersonName(org.getResponsiblePersonName());
-                    detail.setResponsiblePersonDesignation(org.getResponsiblePersonDesignation());
+                    detail.copyDeductorFrom(org);
 
                     if (workflow.getSupersedesWorkflowId() != null) {
                         workflowRepository.findById(workflow.getSupersedesWorkflowId())

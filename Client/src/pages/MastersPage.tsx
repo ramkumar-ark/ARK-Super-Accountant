@@ -33,6 +33,7 @@ interface ValidationFinding {
   mismatchType: string | null
   ledgerName: string
   category: string
+  expectedValue: string | null
   actualValue: string | null
   severity: 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | 'WARNING' | 'ERROR'
   message: string
@@ -796,6 +797,12 @@ function FindingsTab({
       <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
         <span className="font-mono">{finding.ledgerName}</span> will be added to the approved masters.
       </p>
+    ) : APPLICABILITY_MISMATCH_TYPES.includes(finding.mismatchType ?? '') &&
+      finding.actualValue !== 'true' &&
+      finding.actualValue !== 'false' ? (
+      <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
+        The master will keep its expected value: <span className="font-mono">{finding.expectedValue ?? '—'}</span>
+      </p>
     ) : (
       <p className="mb-2 text-xs text-[var(--color-text-secondary)]">
         The master will be updated to: <span className="font-mono">{finding.actualValue ?? '—'}</span>
@@ -840,7 +847,9 @@ function FindingsTab({
     DERIVABLE_MISMATCH_TYPES.includes(f.mismatchType) &&
     (!APPLICABILITY_MISMATCH_TYPES.includes(f.mismatchType) ||
       f.actualValue === 'true' ||
-      f.actualValue === 'false')
+      f.actualValue === 'false' ||
+      f.expectedValue === 'true' ||
+      f.expectedValue === 'false')
   const canBulkTyped = (f: ValidationFinding, rule: string) =>
     canSubmit && f.resolveStatus === 'OPEN' && f.ruleCode === rule
   const canBulkApprove = (f: ValidationFinding) => isAccountant && f.resolveStatus === 'ACKNOWLEDGED'

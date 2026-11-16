@@ -24,7 +24,10 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class Tds26qFinalizePreconditionTest {
@@ -62,7 +65,12 @@ class Tds26qFinalizePreconditionTest {
 
         Organization org = new Organization("Org");
         org.setFinancialYearStart(4);
+        org.setTan(TAN);
+        org.setPan(PAN);
+        org.setRegisteredAddress("Address");
+        org.setResponsiblePersonName("Responsible");
         when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+        when(detailRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         TdsChallan approved = new TdsChallan();
         approved.setId(challanId);
@@ -151,12 +159,79 @@ class Tds26qFinalizePreconditionTest {
     }
 
     @Test
-    void invalidPanWithoutHigherRate_failsPansValid() {
-        entries(List.of(entry("194C", "1000.00", "1000.00", false, false)));
+    void invalidPanWithHigherRate_passesPansValid() {
+        entries(List.of(entry("194C", "1000.00", "1000.00", false, true)));
 
         List<String> unmet = precondition.unmet(quarter);
 
-        assertTrue(unmet.stream().anyMatch(m -> m.startsWith("PANs valid:")));
+        assertTrue(unmet.stream().noneMatch(m -> m.startsWith("PANs valid:")));
+    }
+
+    @Test
+    void deductorDetailsRefreshedFromOrgWhenNotFinalized() {
+        Organization updatedOrg = new Organization("Updated Org");
+        updatedOrg.setFinancialYearStart(4);
+        updatedOrg.setTan("XYZP99999K");
+        updatedOrg.setPan("ABCDE9999F");
+        updatedOrg.setRegisteredAddress("New Address");
+        updatedOrg.setResponsiblePersonName("New Person");
+
+        OrganizationRepository orgRepo = mock(OrganizationRepository.class);
+        when(orgRepo.findById(orgId)).thenReturn(Optional.of(updatedOrg));
+
+        TdsQuarterService quarterService = mock(TdsQuarterService.class);
+        when(quarterService.approvedChallans(quarter)).thenReturn(List.of());
+
+        precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
+                detailRepository, orgRepo, mock(WorkflowRepository.class));
+
+        Tds26qDetail detail = new Tds26qDetail();
+        detail.setWorkflowId(quarterId);
+        detail.setTan(TAN);
+        detail.setDeductorPan(PAN);
+        detail.setDeductorName("Old Deductor");
+        when(detailRepository.findByWorkflowId(quarterId)).thenReturn(Optional.of(detail));
+
+        quarter.setStage(com.arktech.superaccountant.workflow.models.WorkflowStage.PREPARE);
+        precondition.evaluate(quarter);
+
+        verify(detailRepository).save(detail);
+        assertEquals("XYZP99999K", detail.getTan());
+        assertEquals("ABCDE9999F", detail.getDeductorPan());
+        assertEquals("Updated Org", detail.getDeductorName());
+        assertEquals("New Address", detail.getDeductorAddress());
+        assertEquals("New Person", detail.getResponsiblePersonName());
+    }
+
+    @Test
+    void deductorDetailsNotRefreshedWhenFinalized() {
+        Organization updatedOrg = new Organization("Updated Org");
+        updatedOrg.setFinancialYearStart(4);
+        updatedOrg.setTan("XYZP99999K");
+
+        OrganizationRepository orgRepo = mock(OrganizationRepository.class);
+        when(orgRepo.findById(orgId)).thenReturn(Optional.of(updatedOrg));
+
+        TdsQuarterService quarterService = mock(TdsQuarterService.class);
+        when(quarterService.approvedChallans(quarter)).thenReturn(List.of());
+
+        precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
+                detailRepository, orgRepo, mock(WorkflowRepository.class));
+
+        Tds26qDetail detail = new Tds26qDetail();
+        detail.setWorkflowId(quarterId);
+        detail.setTan(TAN);
+        detail.setDeductorPan(PAN);
+        detail.setDeductorName("Old Deductor");
+        detail.setDeductorAddress("Old Address");
+        detail.setResponsiblePersonName("Old Person");
+        when(detailRepository.findByWorkflowId(quarterId)).thenReturn(Optional.of(detail));
+
+        quarter.setStage(com.arktech.superaccountant.workflow.models.WorkflowStage.FINALIZED);
+        precondition.evaluate(quarter);
+
+        verify(detailRepository, never()).save(any());
+        assertEquals(TAN, detail.getTan());
     }
 
     @Test
