@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -321,6 +323,22 @@ class FiledReturnImportIT {
                     ]}
                     """))
                 .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void gstr1JsonUploadCreatesSnapshot() throws Exception {
+        Setup s = monthlySetup();
+        byte[] json = getClass().getResourceAsStream("/filedreturns/gstr1-synthetic.json").readAllBytes();
+        MockMultipartFile file = new MockMultipartFile("file", "gstr1.json", "application/json", json);
+
+        mockMvc.perform(multipart("/api/v1/filed-returns/gstr1/json").file(file)
+                .param("form", "GSTR1")
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sourceKind").value("PORTAL_JSON"))
+                .andExpect(jsonPath("$.parserVersion").value("gstr1-json-1"))
+                .andExpect(jsonPath("$.lines.length()").value(15))
+                .andExpect(jsonPath("$.fileId").exists());
     }
 
     @Test

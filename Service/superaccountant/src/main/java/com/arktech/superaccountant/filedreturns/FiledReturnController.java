@@ -3,6 +3,8 @@ package com.arktech.superaccountant.filedreturns;
 import com.arktech.superaccountant.filedreturns.payload.FiledReturnSnapshotSummary;
 import com.arktech.superaccountant.filedreturns.payload.FiledReturnSnapshotView;
 import com.arktech.superaccountant.filedreturns.payload.Gstr3bEntryRequest;
+import com.arktech.superaccountant.filedreturns.parse.Gstr1JsonParser;
+import com.arktech.superaccountant.filedreturns.parse.Gstr1Parsed;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +19,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,10 +38,50 @@ public class FiledReturnController {
     private FiledReturnImportService importService;
 
     @Autowired
+    private FiledReturnFileService fileService;
+
+    @Autowired
+    private com.arktech.superaccountant.filedreturns.parse.Gstr1JsonParser gstr1JsonParser;
+
+    @Autowired
     private FiledReturnLineRepository lineRepository;
 
     @Autowired
     private FiledReturnSnapshotRepository snapshotRepository;
+
+    @PostMapping("/gstr1/json")
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
+    public ResponseEntity<?> uploadGstr1Json(
+            @AuthenticationPrincipal UserDetailsImpl principal,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("form") String form) throws IOException {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        FiledFormType formType;
+        try {
+            formType = FiledFormType.valueOf(form);
+        } catch (Exception e) {
+            throw new FiledReturnValidationException("form must be GSTR1 or IFF");
+        }
+        if (formType != FiledFormType.GSTR1 && formType != FiledFormType.IFF) {
+            throw new FiledReturnValidationException("form must be GSTR1 or IFF");
+        }
+        FiledReturnFile stored = fileService.store(orgId, principal.getUsername(), file);
+        Gstr1Parsed parsed = gstr1JsonParser.parse(stored.getContent());
+        SnapshotDraft draft = new SnapshotDraft(formType, parsed.filingPeriod(), parsed.gstin(),
+                FiledSourceKind.PORTAL_JSON, stored.getId(), Gstr1JsonParser.PARSER_VERSION, parsed.lines());
+        FiledReturnSnapshot snapshot = importService.save(orgId, principal.getUsername(), draft);
+        return ResponseEntity.status(201).body(
+                FiledReturnSnapshotView.from(snapshot, lineRepository.findBySnapshotIdOrderByLineNo(snapshot.getId())));
+    }
+
+    @ExceptionHandler({com.arktech.superaccountant.filedreturns.parse.FiledReturnParseException.class})
+    public ResponseEntity<Map<String, String>> handleParse(
+            com.arktech.superaccountant.filedreturns.parse.FiledReturnParseException e) {
+        return ResponseEntity.status(422).body(Map.of("message", e.getMessage()));
+    }
 
     @PostMapping("/gstr3b")
     @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR')")
