@@ -131,6 +131,16 @@ describe('TaxLedgerMappingSection', () => {
     })
   })
 
+  it('changingOnlyTheHeadKeepsTheSuggestedRole', async () => {
+    renderSection('ROLE_ACCOUNTANT')
+
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Head for Output CGST'), 'SGST')
+
+    expect(screen.getByLabelText('Role for Output CGST')).toHaveValue('OUTPUT')
+    expect(screen.getByLabelText('Head for Output CGST')).toHaveValue('SGST')
+  })
+
   it('portalBalanceRolesAreSelectableAndNeedAHead', async () => {
     renderSection('ROLE_ACCOUNTANT')
 

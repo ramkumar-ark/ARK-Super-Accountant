@@ -62,12 +62,9 @@ export function TaxLedgerMappingSection() {
     },
   })
 
-  function setDraft(ledgerName: string, patch: Partial<Draft>) {
+  function setDraft(ledgerName: string, base: Draft, patch: Partial<Draft>) {
     setDrafts((prev) => {
-      const current = prev[ledgerName] ?? {
-        role: null,
-        head: null,
-      }
+      const current = prev[ledgerName] ?? base
       return { ...prev, [ledgerName]: { ...current, ...patch } }
     })
   }
@@ -129,7 +126,7 @@ export function TaxLedgerMappingSection() {
                     value={r.role ?? ''}
                     onChange={(e) => {
                       const nextRole = (e.target.value || null) as TaxLedgerRole | null
-                      setDraft(r.ledgerName, { role: nextRole, head: null })
+                      setDraft(r.ledgerName, { role: r.role, head: r.head }, { role: nextRole, head: null })
                     }}
                   >
                     <option value="">—</option>
@@ -147,9 +144,11 @@ export function TaxLedgerMappingSection() {
                     disabled={!canEdit || r.role === 'NOT_TAX'}
                     value={r.role === 'NOT_TAX' ? '' : (r.head ?? '')}
                     onChange={(e) =>
-                      setDraft(r.ledgerName, {
-                        head: (e.target.value || null) as GstHead | null,
-                      })
+                      setDraft(
+                        r.ledgerName,
+                        { role: r.role, head: r.head },
+                        { head: (e.target.value || null) as GstHead | null },
+                      )
                     }
                   >
                     <option value="">—</option>
