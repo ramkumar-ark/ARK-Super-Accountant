@@ -52,8 +52,7 @@ public final class TaxLedgerSuggester {
         if (upper.contains("LIABILITY")) {
             return TaxLedgerRole.LIABILITY_BALANCE;
         }
-        if (ITC_TOKEN.matcher(upper).find()
-                || (upper.contains("CREDIT") && (upper.contains("BALANCE") || upper.contains("INPUT")))) {
+        if (upper.contains("BALANCE") && (upper.contains("CREDIT") || ITC_TOKEN.matcher(upper).find())) {
             return TaxLedgerRole.CREDIT_BALANCE;
         }
         if (TDS_TOKEN.matcher(upper).find()) {

@@ -53,6 +53,9 @@ class TaxLedgerSuggesterTest {
     void existingRolesUnaffectedByNewTokens() {
         assertEquals(RCM_LIABILITY, TaxLedgerSuggester.suggest("CGST RCM Liability").role());
         assertEquals(INPUT, TaxLedgerSuggester.suggest("Input CGST").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input CGST (ITC Eligible)").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input Tax Credit CGST").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input CGST Credit").role());
         assertEquals(OUTPUT, TaxLedgerSuggester.suggest("Output SGST").role());
         assertEquals(null, TaxLedgerSuggester.suggest("Credit Card Charges").role());
     }
