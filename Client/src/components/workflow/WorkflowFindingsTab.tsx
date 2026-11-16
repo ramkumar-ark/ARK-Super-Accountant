@@ -61,7 +61,7 @@ export function WorkflowFindingsTab({
     }
   }
 
-  const findings = findingsQuery.data?.findings ?? []
+  const findings = useMemo(() => findingsQuery.data?.findings ?? [], [findingsQuery.data])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [severityFilter, setSeverityFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
