@@ -59,16 +59,21 @@ public class FiledReturnImportService {
                     "GSTIN in file (" + gstin + ") does not match the company GSTIN (" + orgGstin + ")");
         }
 
-        Workflow row = matchBaselineRow(org, draft.formType(), draft.filingPeriod());
+        YearMonth period;
+        try {
+            period = YearMonth.parse(draft.filingPeriod());
+        } catch (RuntimeException e) {
+            throw new FiledReturnValidationException("filingPeriod must be formatted as yyyy-MM");
+        }
+        Workflow row = matchBaselineRow(org, draft.formType(), period);
         if (draft.formType() == FiledFormType.GSTR3B) {
             validate3bLineCodes(draft.lines());
         }
         LocalDate coverStart;
         LocalDate coverEnd;
         if (draft.formType() == FiledFormType.IFF) {
-            YearMonth month = YearMonth.parse(draft.filingPeriod());
-            coverStart = month.atDay(1);
-            coverEnd = month.atEndOfMonth();
+            coverStart = period.atDay(1);
+            coverEnd = period.atEndOfMonth();
         } else {
             coverStart = row.getPeriodStart();
             coverEnd = row.getPeriodEnd();
@@ -115,15 +120,15 @@ public class FiledReturnImportService {
         return snapshot;
     }
 
-    private Workflow matchBaselineRow(UUID org, FiledFormType formType, String filingPeriod) {
+    private Workflow matchBaselineRow(UUID org, FiledFormType formType, YearMonth period) {
         WorkflowType wantedType = formType == FiledFormType.GSTR3B ? WorkflowType.GSTR3B : WorkflowType.GSTR1;
-        LocalDate first = YearMonth.parse(filingPeriod).atDay(1);
+        LocalDate first = period.atDay(1);
         return workflowRepository.findAllByOrganizationIdAndStageAndActiveTrue(org, WorkflowStage.BASELINE).stream()
                 .filter(w -> w.getType() == wantedType)
                 .filter(w -> !w.getPeriodStart().isAfter(first) && !w.getPeriodEnd().isBefore(first))
                 .findFirst()
                 .orElseThrow(() -> new FiledReturnConflictException(
-                        "No baseline period covers " + filingPeriod));
+                        "No baseline period covers " + period));
     }
 
     private String contentHash(List<FiledReturnLine> lines) {

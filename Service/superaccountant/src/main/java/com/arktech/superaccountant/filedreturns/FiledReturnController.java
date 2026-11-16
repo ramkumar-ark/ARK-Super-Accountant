@@ -122,6 +122,9 @@ public class FiledReturnController {
         if (orgId == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
         }
+        if (request.rows() == null || request.rows().stream().anyMatch(java.util.Objects::isNull)) {
+            throw new FiledReturnValidationException("rows are required");
+        }
         if (request.fileId() != null) {
             boolean owned = fileRepository.findById(request.fileId())
                     .map(f -> orgId.equals(f.getOrganizationId())).orElse(false);
