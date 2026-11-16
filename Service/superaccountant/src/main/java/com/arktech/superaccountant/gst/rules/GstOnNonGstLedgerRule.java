@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gst.rules;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerSuggester;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
@@ -22,7 +23,8 @@ public class GstOnNonGstLedgerRule implements GstDaybookRule {
         for (ParsedVoucher v : vouchers) {
             if (v == null || v.isCancelled() || v.getEntries() == null) continue;
             for (ParsedVoucherEntry e : v.getEntries()) {
-                if (GstRuleSupport.gstHead(ctx, e.getLedgerName()) == null) continue;
+                if (ctx.taxLedger(e.getLedgerName()).isPresent()) continue;
+                if (TaxLedgerSuggester.suggest(e.getLedgerName()).head() == null) continue;
                 if (ctx.snapshot(e.getLedgerName()).isEmpty()) continue;
                 if (ctx.category(e.getLedgerName()) == LedgerCategory.GST) continue;
                 if (e.getAmount() == null || e.getAmount().compareTo(BigDecimal.ZERO) == 0) continue;
