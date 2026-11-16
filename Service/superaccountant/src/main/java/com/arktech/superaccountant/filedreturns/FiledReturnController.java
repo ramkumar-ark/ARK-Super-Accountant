@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +41,9 @@ public class FiledReturnController {
 
     @Autowired
     private FiledReturnFileService fileService;
+
+    @Autowired
+    private FiledReturnFileRepository fileRepository;
 
     @Autowired
     private com.arktech.superaccountant.filedreturns.parse.Gstr1JsonParser gstr1JsonParser;
@@ -120,28 +122,30 @@ public class FiledReturnController {
         if (orgId == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
         }
-        importService.validate3bRows(request.rows());
+        if (request.fileId() != null) {
+            boolean owned = fileRepository.findById(request.fileId())
+                    .map(f -> orgId.equals(f.getOrganizationId())).orElse(false);
+            if (!owned) {
+                throw new FiledReturnValidationException("Unknown file");
+            }
+        }
         List<FiledReturnLine> lines = new ArrayList<>();
         for (Gstr3bEntryRequest.Row row : request.rows()) {
             FiledReturnLine line = new FiledReturnLine();
             line.setTableCode(row.rowCode());
-            line.setTaxable(nvl(row.taxable()));
-            line.setIgst(nvl(row.igst()));
-            line.setCgst(nvl(row.cgst()));
-            line.setSgst(nvl(row.sgst()));
-            line.setCess(nvl(row.cess()));
+            line.setTaxable(FiledReturnImportService.nvl(row.taxable()));
+            line.setIgst(FiledReturnImportService.nvl(row.igst()));
+            line.setCgst(FiledReturnImportService.nvl(row.cgst()));
+            line.setSgst(FiledReturnImportService.nvl(row.sgst()));
+            line.setCess(FiledReturnImportService.nvl(row.cess()));
             lines.add(line);
         }
-        SnapshotDraft draft = new SnapshotDraft(FiledFormType.GSTR3B, request.filingPeriod(), null,
+        SnapshotDraft draft = new SnapshotDraft(FiledFormType.GSTR3B, request.filingPeriod(), request.gstin(),
                 request.fileId() == null ? FiledSourceKind.MANUAL_ENTRY : FiledSourceKind.PORTAL_PDF,
                 request.fileId(), request.parserVersion(), lines);
         FiledReturnSnapshot snapshot = importService.save(orgId, principal.getUsername(), draft);
         return ResponseEntity.status(201).body(
                 FiledReturnSnapshotView.from(snapshot, lineRepository.findBySnapshotIdOrderByLineNo(snapshot.getId())));
-    }
-
-    private BigDecimal nvl(BigDecimal v) {
-        return v == null ? BigDecimal.ZERO : v;
     }
 
     @GetMapping("/snapshots")
@@ -158,8 +162,9 @@ public class FiledReturnController {
     }
 
     @GetMapping("/snapshots/{id}")
-    public ResponseEntity<FiledReturnSnapshotView> snapshot(@PathVariable UUID id) {
-        return snapshotRepository.findById(id)
+    public ResponseEntity<FiledReturnSnapshotView> snapshot(
+            @AuthenticationPrincipal UserDetailsImpl principal, @PathVariable UUID id) {
+        return snapshotRepository.findByIdAndOrganizationId(id, principal.getOrganizationId())
                 .map(s -> ResponseEntity.ok(FiledReturnSnapshotView.from(s,
                         lineRepository.findBySnapshotIdOrderByLineNo(s.getId()))))
                 .orElse(ResponseEntity.notFound().build());

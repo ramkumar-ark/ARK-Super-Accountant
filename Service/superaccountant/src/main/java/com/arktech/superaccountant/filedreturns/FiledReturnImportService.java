@@ -1,6 +1,5 @@
 package com.arktech.superaccountant.filedreturns;
 
-import com.arktech.superaccountant.filedreturns.payload.Gstr3bEntryRequest;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.workflow.models.Workflow;
@@ -19,7 +18,6 @@ import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -167,7 +165,7 @@ public class FiledReturnImportService {
         return sha256(root.toString());
     }
 
-    private BigDecimal nvl(BigDecimal v) {
+    static BigDecimal nvl(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
     }
 
@@ -193,27 +191,6 @@ public class FiledReturnImportService {
             }
             if (!known || !seen.add(line.getTableCode())) {
                 bad.add(line.getTableCode());
-            }
-        }
-        if (!bad.isEmpty()) {
-            throw new FiledReturnValidationException("Invalid or duplicate 3B rows: " + String.join(", ", bad));
-        }
-    }
-
-    public void validate3bRows(List<Gstr3bEntryRequest.Row> rows) {        Set<String> seen = new HashSet<>();
-        List<String> bad = new ArrayList<>();
-        for (Gstr3bEntryRequest.Row row : rows) {
-            boolean known = false;
-            for (Gstr3bRowCode code : Gstr3bRowCode.values()) {
-                if (code.code().equals(row.rowCode())) {
-                    known = true;
-                    break;
-                }
-            }
-            if (!known) {
-                bad.add(row.rowCode());
-            } else if (!seen.add(row.rowCode())) {
-                bad.add(row.rowCode());
             }
         }
         if (!bad.isEmpty()) {

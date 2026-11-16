@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record Gstr3bEntryRequest(
         String filingPeriod,
+        String gstin,
         UUID fileId,
         String parserVersion,
         List<Row> rows) {
