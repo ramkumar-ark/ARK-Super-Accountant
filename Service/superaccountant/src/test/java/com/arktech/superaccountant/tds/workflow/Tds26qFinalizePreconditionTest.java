@@ -168,15 +168,6 @@ class Tds26qFinalizePreconditionTest {
     }
 
     @Test
-    void invalidPanWithoutHigherRate_failsPansValid() {
-        entries(List.of(entry("194C", "1000.00", "1000.00", false, false)));
-
-        List<String> unmet = precondition.unmet(quarter);
-
-        assertTrue(unmet.stream().anyMatch(m -> m.startsWith("PANs valid:")));
-    }
-
-    @Test
     void deductorDetailsRefreshedFromOrgWhenNotFinalized() {
         Organization updatedOrg = new Organization("Updated Org");
         updatedOrg.setFinancialYearStart(4);

@@ -470,4 +470,39 @@ class Tds26qPrepareIT {
 
         assertTrue(body.contains("entries unmapped"), body);
     }
+
+    @Test
+    void paymentFinalize_openHigherRateNotAppliedFinding_conflicts() throws Exception {
+        Workflow payment = new Workflow();
+        payment.setOrganizationId(orgId);
+        payment.setType(WorkflowType.TDS_PAYMENT);
+        payment.setPeriodStart(LocalDate.of(2025, 4, 1));
+        payment.setPeriodEnd(LocalDate.of(2025, 4, 30));
+        payment.setPeriodKey("2025-04");
+        payment.setFinancialYear(2025);
+        payment.setStage(WorkflowStage.PREPARE);
+        payment.setCreatedBy("it");
+        payment = workflowRepository.save(payment);
+
+        TdsFinding finding = new TdsFinding();
+        finding.setOrganizationId(orgId);
+        finding.setWorkflowId(payment.getId());
+        finding.setUploadJobId(UUID.randomUUID());
+        finding.setFindingType(TdsFindingType.HIGHER_RATE_NOT_APPLIED);
+        finding.setSeverity(com.arktech.superaccountant.masters.models.FindingSeverity.ERROR);
+        finding.setPartyLedgerName("No PAN Party");
+        finding.setMessage("Higher rate not applied");
+        findingRepository.save(finding);
+
+        String body = mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.post("/api/v1/workflows/" + payment.getId()
+                                + "/finalize")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(body.contains("blocking findings must be resolved first"), body);
+    }
 }
