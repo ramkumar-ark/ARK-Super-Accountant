@@ -2,6 +2,8 @@ package com.arktech.superaccountant.gst.rules;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.gst.mapping.GstHead;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerRole;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.gst.models.VoucherSide;
@@ -22,14 +24,9 @@ public final class GstRuleSupport {
 
     private GstRuleSupport() {}
 
-    /** IGST checked before CGST/SGST — "IGST" contains no other head token. */
-    public static String gstHead(String ledgerName) {
-        if (ledgerName == null) return null;
-        String upper = ledgerName.toUpperCase();
-        if (upper.contains("IGST")) return "IGST";
-        if (upper.contains("CGST")) return "CGST";
-        if (upper.contains("SGST")) return "SGST";
-        return null;
+    /** Head of the ledger from its saved mapping; null when unmapped or NOT_TAX. */
+    public static GstHead gstHead(GstRuleContext ctx, String ledgerName) {
+        return ctx.head(ledgerName);
     }
 
     public static boolean isValidGstin(String gstin) {
@@ -56,21 +53,34 @@ public final class GstRuleSupport {
         return VoucherSide.OTHER;
     }
 
-    /** Entries whose snapshot category is GST and whose name resolves to a head. */
+    /** Entries whose saved mapping resolves to a role other than NOT_TAX. */
     public static List<ParsedVoucherEntry> gstEntries(ParsedVoucher voucher, GstRuleContext ctx) {
         if (voucher.getEntries() == null) return List.of();
         return voucher.getEntries().stream()
-                .filter(e -> ctx.category(e.getLedgerName()) == com.arktech.superaccountant.masters.models.LedgerCategory.GST)
-                .filter(e -> gstHead(e.getLedgerName()) != null)
+                .filter(e -> {
+                    TaxLedgerRole role = ctx.role(e.getLedgerName());
+                    return role != null && role != TaxLedgerRole.NOT_TAX;
+                })
                 .toList();
     }
 
-    /** Sum of abs(amount) per head over the given entries. Missing heads absent from the map. */
-    public static Map<String, BigDecimal> headTotals(List<ParsedVoucherEntry> entries) {
-        Map<String, BigDecimal> totals = new HashMap<>();
+    /** Sum of abs(amount) per mapped head over the given entries, cess included. */
+    public static Map<GstHead, BigDecimal> headTotals(GstRuleContext ctx, List<ParsedVoucherEntry> entries) {
+        return headTotals(ctx, entries, true);
+    }
+
+    /** Same as headTotals but without CESS — use for rate comparisons. */
+    public static Map<GstHead, BigDecimal> rateHeadTotals(GstRuleContext ctx, List<ParsedVoucherEntry> entries) {
+        return headTotals(ctx, entries, false);
+    }
+
+    private static Map<GstHead, BigDecimal> headTotals(GstRuleContext ctx, List<ParsedVoucherEntry> entries,
+                                                       boolean includeCess) {
+        Map<GstHead, BigDecimal> totals = new HashMap<>();
         for (ParsedVoucherEntry e : entries) {
-            String head = gstHead(e.getLedgerName());
-            if (head == null || e.getAmount() == null) continue;
+            if (e.getAmount() == null) continue;
+            GstHead head = gstHead(ctx, e.getLedgerName());
+            if (head == null || (head == GstHead.CESS && !includeCess)) continue;
             totals.merge(head, e.getAmount().abs(), BigDecimal::add);
         }
         return totals;

@@ -2,6 +2,9 @@ package com.arktech.superaccountant.gst.rules;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.gst.mapping.GstHead;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMapping;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerRole;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.VoucherSide;
@@ -20,12 +23,75 @@ import static org.junit.jupiter.api.Assertions.*;
 class GstRuleSupportTest {
 
     @Test
-    void classifiesGstHeadFromLedgerName() {
-        assertEquals("CGST", GstRuleSupport.gstHead("Input CGST 9%"));
-        assertEquals("SGST", GstRuleSupport.gstHead("output sgst"));
-        assertEquals("IGST", GstRuleSupport.gstHead("IGST Payable"));
-        assertNull(GstRuleSupport.gstHead("Rent Expense"));
-        assertNull(GstRuleSupport.gstHead(null));
+    void headComesFromTheSavedMapping() {
+        GstRuleContext ctx = ctx("27AAPFU0939F1ZV",
+                snapshot("Input CGST", LedgerCategory.GST));
+        assertEquals(GstHead.CGST, GstRuleSupport.gstHead(ctx, "Input CGST"));
+        assertNull(GstRuleSupport.gstHead(ctx, "Rent Expense"));
+        assertNull(GstRuleSupport.gstHead(ctx, null));
+    }
+
+    @Test
+    void mappingWinsOverLedgerName() {
+        GstRuleContext ctx = ctxWithTaxLedgers("27AAPFU0939F1ZV",
+                Map.of("output cgst", mapping("Output CGST", TaxLedgerRole.INPUT, GstHead.CGST)),
+                snapshot("Output CGST", LedgerCategory.GST));
+
+        assertEquals(TaxLedgerRole.INPUT, ctx.role("Output CGST"));
+
+        ParsedVoucher v = voucher("Sales", LocalDate.of(2026, 4, 10), "Acme", "27AABCU9603R1ZM");
+        entry(v, "Output CGST", "900.00");
+        List<com.arktech.superaccountant.gst.models.GstDaybookFinding> findings =
+                new InputOutputDirectionRule().execute(ctx, List.of(v));
+        assertEquals(1, findings.size());
+        assertEquals(com.arktech.superaccountant.gst.models.GstFindingType.INPUT_OUTPUT_DIRECTION,
+                findings.get(0).getFindingType());
+    }
+
+    @Test
+    void unmappedGstCategoryLedgerIsNotATaxEntry() {
+        ParsedVoucher v = voucher("Purchase", LocalDate.of(2026, 4, 10), "Acme", null);
+        entry(v, "Input CGST", "-900.00");
+        GstRuleContext ctx = ctxWithTaxLedgers("27AAPFU0939F1ZV", Map.of(),
+                snapshot("Input CGST", LedgerCategory.GST));
+        assertTrue(GstRuleSupport.gstEntries(v, ctx).isEmpty());
+    }
+
+    @Test
+    void notTaxRoleIsExcluded() {
+        ParsedVoucher v = voucher("Purchase", LocalDate.of(2026, 4, 10), "Acme", null);
+        entry(v, "Input CGST", "-900.00");
+        GstRuleContext ctx = ctxWithTaxLedgers("27AAPFU0939F1ZV",
+                Map.of("input cgst", mapping("Input CGST", TaxLedgerRole.NOT_TAX, null)),
+                snapshot("Input CGST", LedgerCategory.GST));
+        assertTrue(GstRuleSupport.gstEntries(v, ctx).isEmpty());
+        assertNull(ctx.head("Input CGST"));
+        assertEquals(TaxLedgerRole.NOT_TAX, ctx.role("Input CGST"));
+    }
+
+    @Test
+    void headTotalsIncludeCessButRateHeadTotalsDoNot() {
+        TaxLedgerMapping cess = mapping("Compensation Cess", TaxLedgerRole.OUTPUT, GstHead.CESS);
+        TaxLedgerMapping cgst = mapping("Output CGST", TaxLedgerRole.OUTPUT, GstHead.CGST);
+        TaxLedgerMapping sgst = mapping("Output SGST", TaxLedgerRole.OUTPUT, GstHead.SGST);
+        GstRuleContext ctx = ctxWithTaxLedgers("27AAPFU0939F1ZV",
+                Map.of("compensation cess", cess, "output cgst", cgst, "output sgst", sgst),
+                snapshot("Compensation Cess", LedgerCategory.GST),
+                snapshot("Output CGST", LedgerCategory.GST),
+                snapshot("Output SGST", LedgerCategory.GST));
+
+        ParsedVoucher v = voucher("Sales", LocalDate.of(2026, 4, 10), "Acme", null);
+        entry(v, "Output CGST", "90.00");
+        entry(v, "Output SGST", "90.00");
+        entry(v, "Compensation Cess", "12.00");
+
+        Map<GstHead, BigDecimal> totals = GstRuleSupport.headTotals(ctx, GstRuleSupport.gstEntries(v, ctx));
+        assertEquals(0, new BigDecimal("90").compareTo(totals.get(GstHead.CGST)));
+        assertEquals(0, new BigDecimal("90").compareTo(totals.get(GstHead.SGST)));
+        assertEquals(0, new BigDecimal("12").compareTo(totals.get(GstHead.CESS)));
+
+        Map<GstHead, BigDecimal> rateTotals = GstRuleSupport.rateHeadTotals(ctx, GstRuleSupport.gstEntries(v, ctx));
+        assertFalse(rateTotals.containsKey(GstHead.CESS));
     }
 
     @Test
@@ -71,10 +137,13 @@ class GstRuleSupportTest {
         ParsedVoucher v = voucher("Purchase", LocalDate.of(2026, 4, 10), "Acme", null);
         ParsedVoucherEntry cgst = entry(v, "Input CGST", "-900.00");
         ParsedVoucherEntry sgst = entry(v, "Input SGST", "-900.00");
-        Map<String, BigDecimal> totals = GstRuleSupport.headTotals(List.of(cgst, sgst));
-        assertEquals(0, new BigDecimal("900.00").compareTo(totals.get("CGST")));
-        assertEquals(0, new BigDecimal("900.00").compareTo(totals.get("SGST")));
-        assertEquals(0, BigDecimal.ZERO.compareTo(totals.getOrDefault("IGST", BigDecimal.ZERO)));
+        GstRuleContext ctx = ctx("27AAPFU0939F1ZV",
+                snapshot("Input CGST", LedgerCategory.GST),
+                snapshot("Input SGST", LedgerCategory.GST));
+        Map<GstHead, BigDecimal> totals = GstRuleSupport.headTotals(ctx, GstRuleSupport.gstEntries(v, ctx));
+        assertEquals(0, new BigDecimal("900.00").compareTo(totals.get(GstHead.CGST)));
+        assertEquals(0, new BigDecimal("900.00").compareTo(totals.get(GstHead.SGST)));
+        assertEquals(0, BigDecimal.ZERO.compareTo(totals.getOrDefault(GstHead.IGST, BigDecimal.ZERO)));
     }
 
     @Test
@@ -89,15 +158,16 @@ class GstRuleSupportTest {
     }
 
     @Test
-    void gstEntriesTreatNullCategoryAsOther() {
+    void gstEntriesFollowMappingNotCategory() {
         ParsedVoucher v = voucher("Purchase", LocalDate.of(2026, 4, 10), "Acme", null);
         entry(v, "CGST Output", "-900.00");
 
         GstRuleContext ctx = ctx("27AAPFU0939F1ZV",
                 snapshot("CGST Output", null)); // pre-Ga snapshot: category null
 
+        // gstEntries is mapping-driven now; the null-category snapshot still reads as OTHER
         List<ParsedVoucherEntry> gst = GstRuleSupport.gstEntries(v, ctx);
-        assertEquals(0, gst.size());
+        assertEquals(1, gst.size());
         assertEquals(LedgerCategory.OTHER, ctx.category("CGST Output"));
     }
 

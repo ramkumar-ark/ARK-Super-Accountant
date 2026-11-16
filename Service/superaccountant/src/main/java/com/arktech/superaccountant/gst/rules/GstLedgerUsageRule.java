@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.gst.rules;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
+import com.arktech.superaccountant.gst.mapping.GstHead;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
@@ -23,10 +24,10 @@ public class GstLedgerUsageRule implements GstDaybookRule {
             Boolean inter = GstRuleSupport.interState(ctx, v);
             if (inter == null) continue;
 
-            Map<String, BigDecimal> heads = GstRuleSupport.headTotals(GstRuleSupport.gstEntries(v, ctx));
-            BigDecimal cgstSgst = heads.getOrDefault("CGST", BigDecimal.ZERO)
-                    .add(heads.getOrDefault("SGST", BigDecimal.ZERO));
-            BigDecimal igst = heads.getOrDefault("IGST", BigDecimal.ZERO);
+            Map<GstHead, BigDecimal> heads = GstRuleSupport.rateHeadTotals(ctx, GstRuleSupport.gstEntries(v, ctx));
+            BigDecimal cgstSgst = heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO)
+                    .add(heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO));
+            BigDecimal igst = heads.getOrDefault(GstHead.IGST, BigDecimal.ZERO);
 
             if (!inter && igst.compareTo(BigDecimal.ZERO) > 0) {
                 findings.add(GstRuleSupport.finding(ctx, v, GstFindingType.WRONG_GST_LEDGER_STATE,

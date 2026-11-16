@@ -92,6 +92,34 @@ class GstAmountMismatchRuleTest {
     }
 
     @Test
+    void cessIsAHeadButNotRateCompared() {
+        // taxable 1000 @18% => CGST 90 + SGST 90; cess 120 on top must not count against the rate
+        GstRuleContext ctx = ctxWithTaxLedgers("27AAPFU0939F1ZV",
+                java.util.Map.of(
+                        "input cgst", mapping("Input CGST",
+                                com.arktech.superaccountant.gst.mapping.TaxLedgerRole.INPUT,
+                                com.arktech.superaccountant.gst.mapping.GstHead.CGST),
+                        "input sgst", mapping("Input SGST",
+                                com.arktech.superaccountant.gst.mapping.TaxLedgerRole.INPUT,
+                                com.arktech.superaccountant.gst.mapping.GstHead.SGST),
+                        "compensation cess", mapping("Compensation Cess",
+                                com.arktech.superaccountant.gst.mapping.TaxLedgerRole.INPUT,
+                                com.arktech.superaccountant.gst.mapping.GstHead.CESS)),
+                snapshot("Job Work Charges", LedgerCategory.EXPENSE),
+                snapshot("Input CGST", LedgerCategory.GST),
+                snapshot("Input SGST", LedgerCategory.GST),
+                snapshot("Compensation Cess", LedgerCategory.GST));
+
+        ParsedVoucher v = voucher("Purchase", D, "Acme", "27AABCU9603R1ZM");
+        entryWithRate(v, "Job Work Charges", "1000.00", "18", "Taxable");
+        entry(v, "Input CGST", "-90.00");
+        entry(v, "Input SGST", "-90.00");
+        entry(v, "Compensation Cess", "-120.00");
+
+        assertTrue(rule.execute(ctx, List.of(v)).isEmpty());
+    }
+
+    @Test
     void rule2_salesSideMismatch_taggedSales() {
         ParsedVoucher v = voucher("Sales", D, "Acme", "27AABCU9603R1ZM");
         entryWithRate(v, "Job Work Charges", "-10000.00", "18", "Taxable");

@@ -6,6 +6,8 @@ import com.arktech.superaccountant.gst.GstTestFixtures;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.gst.models.VoucherSide;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate;
+import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingService;
 import com.arktech.superaccountant.gst.repository.GstDaybookFindingRepository;
 import com.arktech.superaccountant.gst.rules.GstDaybookRule;
 import com.arktech.superaccountant.gst.rules.GstRuleContext;
@@ -33,6 +35,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,7 +73,7 @@ class GstAnalyzersTest {
     void outward_typesAndCode() {
         GstOutwardAnalyzer analyzer = new GstOutwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
         assertThat(analyzer.code()).isEqualTo("GST_OUTWARD");
         assertThat(analyzer.types()).containsExactly(WorkflowType.GSTR1);
     }
@@ -79,7 +82,7 @@ class GstAnalyzersTest {
     void inward_typesAndCode() {
         GstInwardAnalyzer analyzer = new GstInwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
         assertThat(analyzer.code()).isEqualTo("GST_INWARD");
         assertThat(analyzer.types()).containsExactly(WorkflowType.GSTR3B);
     }
@@ -93,7 +96,7 @@ class GstAnalyzersTest {
         emitted.add(finding(v, VoucherSide.OTHER, "Cash"));
         GstOutwardAnalyzer analyzer = new GstOutwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
 
         analyzer.analyze(ctx(WorkflowType.GSTR1));
 
@@ -115,7 +118,7 @@ class GstAnalyzersTest {
         emitted.add(finding(v, VoucherSide.OTHER, "Cash"));
         GstInwardAnalyzer analyzer = new GstInwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
 
         analyzer.analyze(ctx(WorkflowType.GSTR3B));
 
@@ -154,7 +157,7 @@ class GstAnalyzersTest {
 
         GstOutwardAnalyzer analyzer = new GstOutwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
 
         analyzer.analyze(ctx(WorkflowType.GSTR1));
 
@@ -177,7 +180,7 @@ class GstAnalyzersTest {
 
         GstOutwardAnalyzer analyzer = new GstOutwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
 
         analyzer.analyze(ctx(WorkflowType.GSTR1));
 
@@ -194,7 +197,7 @@ class GstAnalyzersTest {
         when(organizationRepository.findById(ORG_ID)).thenReturn(Optional.of(org));
         GstInwardAnalyzer analyzer = new GstInwardAnalyzer(parsedVoucherRepository, findingRepository,
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
-                new FindingLifecycleService());
+                new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
 
         analyzer.analyze(ctx(WorkflowType.GSTR3B));
 

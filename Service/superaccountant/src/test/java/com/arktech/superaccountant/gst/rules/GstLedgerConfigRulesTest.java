@@ -25,7 +25,7 @@ class GstLedgerConfigRulesTest {
 
     // --- rule 5 ---
     @Test void rule5_gstAmountParkedInNonGstLedger() {
-        GstRuleContext ctx = ctx(ORG, snapshot("CGST Reimbursement", LedgerCategory.OTHER));
+        GstRuleContext ctx = ctxWithTaxLedgers(ORG, java.util.Map.of(), snapshot("CGST Reimbursement", LedgerCategory.OTHER));
         ParsedVoucher v = voucher("Journal", D, null, null);
         entry(v, "CGST Reimbursement", "-500.00");
         List<GstDaybookFinding> f = rule5.execute(ctx, List.of(v));
@@ -35,6 +35,16 @@ class GstLedgerConfigRulesTest {
         assertEquals("CGST Reimbursement", f.get(0).getLedgerName());
         assertEquals(VoucherSide.OTHER, f.get(0).getVoucherSide());
     }
+    @Test void rule5_nonGstCategoryOutputIgstRaisesFindingButStaysOutOfTotals() {
+        GstRuleContext ctx = ctxWithTaxLedgers(ORG, java.util.Map.of(), snapshot("Output IGST", LedgerCategory.OTHER));
+        ParsedVoucher v = voucher("Sales", D, "Acme", null);
+        entry(v, "Output IGST", "-900.00");
+        List<GstDaybookFinding> f = rule5.execute(ctx, List.of(v));
+        assertEquals(1, f.size());
+        assertEquals(GstFindingType.GST_ON_NON_GST_LEDGER, f.get(0).getFindingType());
+        assertTrue(GstRuleSupport.gstEntries(v, ctx).isEmpty());
+        assertTrue(GstRuleSupport.headTotals(ctx, v.getEntries()).isEmpty());
+    }
     @Test void rule5_silentWhenCategoryIsGst() {
         GstRuleContext ctx = ctx(ORG, snapshot("Input CGST", LedgerCategory.GST));
         ParsedVoucher v = voucher("Purchase", D, "Acme", null);
@@ -42,7 +52,7 @@ class GstLedgerConfigRulesTest {
         assertTrue(rule5.execute(ctx, List.of(v)).isEmpty());
     }
     @Test void rule5_silentOnZeroAmount() {
-        GstRuleContext ctx = ctx(ORG, snapshot("IGST Refund", LedgerCategory.OTHER));
+        GstRuleContext ctx = ctxWithTaxLedgers(ORG, java.util.Map.of(), snapshot("IGST Refund", LedgerCategory.OTHER));
         ParsedVoucher v = voucher("Journal", D, null, null);
         entry(v, "IGST Refund", "0.00");
         assertTrue(rule5.execute(ctx, List.of(v)).isEmpty());
@@ -53,7 +63,7 @@ class GstLedgerConfigRulesTest {
         ParsedVoucher cancelled = voucher("Journal", D, null, null);
         cancelled.setCancelled(true);
         entry(cancelled, "CGST Reimbursement", "-100.00");
-        GstRuleContext ctx = ctx(ORG, snapshot("CGST Reimbursement", LedgerCategory.OTHER));
+        GstRuleContext ctx = ctxWithTaxLedgers(ORG, java.util.Map.of(), snapshot("CGST Reimbursement", LedgerCategory.OTHER));
         assertTrue(rule5.execute(ctx, List.of(missing, cancelled)).isEmpty());
     }
 

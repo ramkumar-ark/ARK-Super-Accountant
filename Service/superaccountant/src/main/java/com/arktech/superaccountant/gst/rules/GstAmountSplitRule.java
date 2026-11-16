@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.gst.rules;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
+import com.arktech.superaccountant.gst.mapping.GstHead;
 import com.arktech.superaccountant.gst.models.GstDaybookFinding;
 import com.arktech.superaccountant.gst.models.GstFindingType;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
@@ -25,10 +26,10 @@ public class GstAmountSplitRule implements GstDaybookRule {
         List<GstDaybookFinding> findings = new ArrayList<>();
         for (ParsedVoucher v : vouchers) {
             if (v.isCancelled() || v.getEntries() == null) continue;
-            Map<String, BigDecimal> heads = GstRuleSupport.headTotals(GstRuleSupport.gstEntries(v, ctx));
-            BigDecimal cgst = heads.getOrDefault("CGST", BigDecimal.ZERO);
-            BigDecimal sgst = heads.getOrDefault("SGST", BigDecimal.ZERO);
-            BigDecimal igst = heads.getOrDefault("IGST", BigDecimal.ZERO);
+            Map<GstHead, BigDecimal> heads = GstRuleSupport.rateHeadTotals(ctx, GstRuleSupport.gstEntries(v, ctx));
+            BigDecimal cgst = heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO);
+            BigDecimal sgst = heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO);
+            BigDecimal igst = heads.getOrDefault(GstHead.IGST, BigDecimal.ZERO);
 
             if (igst.compareTo(BigDecimal.ZERO) > 0
                     && (cgst.compareTo(BigDecimal.ZERO) > 0 || sgst.compareTo(BigDecimal.ZERO) > 0)) {
