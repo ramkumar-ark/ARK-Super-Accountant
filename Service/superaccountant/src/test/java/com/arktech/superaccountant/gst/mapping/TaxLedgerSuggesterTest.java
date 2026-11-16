@@ -24,4 +24,12 @@ class TaxLedgerSuggesterTest {
         assertEquals(new TaxLedgerSuggester.Suggestion(null, CESS), TaxLedgerSuggester.suggest("Compensation Cess"));
         assertEquals(new TaxLedgerSuggester.Suggestion(null, null), TaxLedgerSuggester.suggest("Duties & Taxes misc"));
     }
+
+    @Test
+    void cessMatchesWholeWordOnly() {
+        for (String name : new String[]{"Processing Charges", "Excess Freight", "Access Fee", "Success Fee"}) {
+            assertEquals(new TaxLedgerSuggester.Suggestion(null, null), TaxLedgerSuggester.suggest(name));
+        }
+        assertEquals(CESS, TaxLedgerSuggester.suggest("Output Cess 1%").head());
+    }
 }

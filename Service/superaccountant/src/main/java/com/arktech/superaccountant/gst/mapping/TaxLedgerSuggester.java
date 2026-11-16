@@ -2,6 +2,8 @@ package com.arktech.superaccountant.gst.mapping;
 
 public final class TaxLedgerSuggester {
 
+    private static final java.util.regex.Pattern CESS_TOKEN = java.util.regex.Pattern.compile("(?<![A-Z])CESS(?![A-Z])");
+
     private TaxLedgerSuggester() {
     }
 
@@ -26,7 +28,7 @@ public final class TaxLedgerSuggester {
         if (upper.contains("SGST") || upper.contains("UTGST")) {
             return GstHead.SGST;
         }
-        if (upper.contains("CESS")) {
+        if (CESS_TOKEN.matcher(upper).find()) {
             return GstHead.CESS;
         }
         return null;
