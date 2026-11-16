@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,6 +19,9 @@ public interface DayBookUploadJobRepository extends JpaRepository<DayBookUploadJ
     Optional<DayBookUploadJob> findTopByOrganizationIdOrderByCreatedAtDesc(UUID organizationId);
 
     Optional<DayBookUploadJob> findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(
+            UUID organizationId, UploadJobStatus status);
+
+    List<DayBookUploadJob> findAllByOrganizationIdAndStatusOrderByCreatedAtDesc(
             UUID organizationId, UploadJobStatus status);
 
     /**

@@ -12,6 +12,7 @@ import com.arktech.superaccountant.workflow.payload.response.BaselineStatusRespo
 import com.arktech.superaccountant.workflow.repository.BaselineImportRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowEventRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
+import com.arktech.superaccountant.workflow.seam.BaselineConfirmedEvent;
 import com.arktech.superaccountant.workflow.seam.BaselineGate;
 import com.arktech.superaccountant.workflow.seam.CompanyBlockerSource;
 import com.arktech.superaccountant.workflow.seam.SnapshotService;
@@ -19,6 +20,7 @@ import com.arktech.superaccountant.workflow.service.UploadNotFoundException;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,8 +54,15 @@ public class BaselineConfirmationService {
     @Autowired
     private SnapshotService snapshotService;
 
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
+
     @Autowired(required = false)
     private List<CompanyBlockerSource> blockerSources;
+
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<
+            com.arktech.superaccountant.workflow.seam.BaselineDiscrepancyCounter> discrepancyCounter;
 
     private List<String> confirmBlockers(UUID organizationId) {
         if (blockerSources == null) {
@@ -86,7 +95,12 @@ public class BaselineConfirmationService {
             types.add(new BaselineStatusResponse.TypeStatus(type.name(), unconfirmedRows, confirmedRows, latestEnd));
         }
         long imports = baselineImportRepository.countByWorkflowIdIn(
-                unconfirmed.stream().map(Workflow::getId).toList());
+                workflowRepository
+                        .findAllByOrganizationIdAndStageAndActiveTrue(organizationId, WorkflowStage.BASELINE)
+                        .stream().map(Workflow::getId).toList());
+        Integer discrepancyCount = discrepancyCounter.getIfAvailable() == null
+                ? null
+                : discrepancyCounter.getObject().openMaterialCount(organizationId);
         return new BaselineStatusResponse(
                 baselineGate.isConfirmed(organizationId),
                 rangeStart,
@@ -94,7 +108,7 @@ public class BaselineConfirmationService {
                 types,
                 confirmBlockers(organizationId),
                 imports > 0 ? "available" : "not available",
-                null);
+                discrepancyCount);
     }
 
     @Transactional
@@ -148,6 +162,7 @@ public class BaselineConfirmationService {
         for (Workflow row : latestEnding.values()) {
             snapshotService.freeze(row.getId(), organizationId, actor);
         }
+        eventPublisher.publishEvent(new BaselineConfirmedEvent(organizationId));
         return status(organizationId);
     }
 
