@@ -12,6 +12,7 @@ import com.arktech.superaccountant.workflow.payload.response.BaselineStatusRespo
 import com.arktech.superaccountant.workflow.repository.BaselineImportRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowEventRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
+import com.arktech.superaccountant.workflow.seam.BaselineConfirmedEvent;
 import com.arktech.superaccountant.workflow.seam.BaselineGate;
 import com.arktech.superaccountant.workflow.seam.CompanyBlockerSource;
 import com.arktech.superaccountant.workflow.seam.SnapshotService;
@@ -19,6 +20,7 @@ import com.arktech.superaccountant.workflow.service.UploadNotFoundException;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +53,9 @@ public class BaselineConfirmationService {
 
     @Autowired
     private SnapshotService snapshotService;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Autowired(required = false)
     private List<CompanyBlockerSource> blockerSources;
@@ -148,6 +153,7 @@ public class BaselineConfirmationService {
         for (Workflow row : latestEnding.values()) {
             snapshotService.freeze(row.getId(), organizationId, actor);
         }
+        eventPublisher.publishEvent(new BaselineConfirmedEvent(organizationId));
         return status(organizationId);
     }
 
