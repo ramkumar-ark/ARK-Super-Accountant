@@ -197,9 +197,9 @@ class FiledReturnBaselineIT {
         mastersJob.setStatus(UploadJobStatus.COMPLETED);
         mastersJob.setCreatedAt(Instant.now().minusSeconds(7200));
         mastersJob = uploadJobRepository.save(mastersJob);
-        gstLedger(mastersJob, orgId, "Output IGST");
-        gstLedger(mastersJob, orgId, "Output CGST");
-        gstLedger(mastersJob, orgId, "Output SGST");
+        for (String name : TaxMappingTestData.standardLedgerNames()) {
+            gstLedger(mastersJob, orgId, name);
+        }
         TaxMappingTestData.mapAll(orgId, mastersJob.getId(), taxLedgerMappingRepository, mastersService);
 
         DayBookUploadJob daybookJob = completedUpload(orgId,

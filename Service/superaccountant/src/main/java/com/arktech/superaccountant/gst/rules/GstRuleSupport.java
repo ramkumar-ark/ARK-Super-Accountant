@@ -53,13 +53,13 @@ public final class GstRuleSupport {
         return VoucherSide.OTHER;
     }
 
-    /** Entries whose saved mapping resolves to a role other than NOT_TAX. */
+    /** Entries whose saved mapping resolves to a voucher tax role (output/input/RCM); balance, TDS and NOT_TAX roles excluded. */
     public static List<ParsedVoucherEntry> gstEntries(ParsedVoucher voucher, GstRuleContext ctx) {
         if (voucher.getEntries() == null) return List.of();
         return voucher.getEntries().stream()
                 .filter(e -> {
                     TaxLedgerRole role = ctx.role(e.getLedgerName());
-                    return role != null && role != TaxLedgerRole.NOT_TAX;
+                    return role != null && role.isVoucherTax();
                 })
                 .toList();
     }

@@ -64,7 +64,7 @@ public class BooksGstExtractor {
                     case RCM_LIABILITY -> rcmPayable = rcmPayable.plus(head);
                     case INPUT -> voucherInput = voucherInput.plus(head);
                     case RCM_INPUT -> rcmInput = rcmInput.plus(head);
-                    case NOT_TAX -> { }
+                    case CASH_BALANCE, LIABILITY_BALANCE, CREDIT_BALANCE, GST_TDS, NOT_TAX -> { }
                 }
             }
 

@@ -32,4 +32,31 @@ class TaxLedgerSuggesterTest {
         }
         assertEquals(CESS, TaxLedgerSuggester.suggest("Output Cess 1%").head());
     }
+
+    @Test
+    void suggestsBalanceAndTdsAreas() {
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CASH_BALANCE, CGST),
+                TaxLedgerSuggester.suggest("CGST Cash Balance A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CASH_BALANCE, SGST),
+                TaxLedgerSuggester.suggest("SGST Electronic Cash Ledger"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.LIABILITY_BALANCE, IGST),
+                TaxLedgerSuggester.suggest("IGST Liability Balance A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CREDIT_BALANCE, CGST),
+                TaxLedgerSuggester.suggest("CGST Input Credit Balance"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CREDIT_BALANCE, SGST),
+                TaxLedgerSuggester.suggest("SGST ITC Balance"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.GST_TDS, IGST),
+                TaxLedgerSuggester.suggest("IGST TDS Receivable"));
+    }
+
+    @Test
+    void existingRolesUnaffectedByNewTokens() {
+        assertEquals(RCM_LIABILITY, TaxLedgerSuggester.suggest("CGST RCM Liability").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input CGST").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input CGST (ITC Eligible)").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input Tax Credit CGST").role());
+        assertEquals(INPUT, TaxLedgerSuggester.suggest("Input CGST Credit").role());
+        assertEquals(OUTPUT, TaxLedgerSuggester.suggest("Output SGST").role());
+        assertEquals(null, TaxLedgerSuggester.suggest("Credit Card Charges").role());
+    }
 }

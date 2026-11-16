@@ -4,6 +4,10 @@ public final class TaxLedgerSuggester {
 
     private static final java.util.regex.Pattern CESS_TOKEN = java.util.regex.Pattern.compile("(?<![A-Z])CESS(?![A-Z])");
 
+    private static final java.util.regex.Pattern TDS_TOKEN = java.util.regex.Pattern.compile("(?<![A-Z])TDS(?![A-Z])");
+
+    private static final java.util.regex.Pattern ITC_TOKEN = java.util.regex.Pattern.compile("(?<![A-Z])ITC(?![A-Z])");
+
     private TaxLedgerSuggester() {
     }
 
@@ -41,6 +45,18 @@ public final class TaxLedgerSuggester {
         }
         if (upper.contains("OUTPUT")) {
             return TaxLedgerRole.OUTPUT;
+        }
+        if (upper.contains("CASH")) {
+            return TaxLedgerRole.CASH_BALANCE;
+        }
+        if (upper.contains("LIABILITY")) {
+            return TaxLedgerRole.LIABILITY_BALANCE;
+        }
+        if (upper.contains("BALANCE") && (upper.contains("CREDIT") || ITC_TOKEN.matcher(upper).find())) {
+            return TaxLedgerRole.CREDIT_BALANCE;
+        }
+        if (TDS_TOKEN.matcher(upper).find()) {
+            return TaxLedgerRole.GST_TDS;
         }
         if (upper.contains("INPUT")) {
             return TaxLedgerRole.INPUT;

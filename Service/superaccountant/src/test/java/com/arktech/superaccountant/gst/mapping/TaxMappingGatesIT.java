@@ -130,11 +130,7 @@ class TaxMappingGatesIT {
     private void completeMapping() throws Exception {
         mockMvc.perform(put("/api/v1/gst/tax-ledger-mapping").with(user(accountant))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"items":[
-                      {"ledgerName":"Output CGST","role":"OUTPUT","head":"CGST"},
-                      {"ledgerName":"Output SGST","role":"OUTPUT","head":"SGST"}]}
-                    """))
+                .content(TaxMappingTestData.standardMappingItemsJson()))
                 .andExpect(status().isOk());
     }
 
@@ -161,8 +157,7 @@ class TaxMappingGatesIT {
     @Test
     void baselineConfirmRefusedWhileUnmapped() throws Exception {
         UploadJob job1 = mastersJob("masters-1.json");
-        gstSnapshot(job1, "Output CGST");
-        gstSnapshot(job1, "Output SGST");
+        TaxMappingTestData.standardLedgerNames().forEach(name -> gstSnapshot(job1, name));
         putStartGstr1();
         completedDayBookUpload();
 
@@ -184,8 +179,7 @@ class TaxMappingGatesIT {
     @Test
     void newGstLedgerInLaterMastersBlocksPrepare() throws Exception {
         UploadJob job1 = mastersJob("masters-1.json");
-        gstSnapshot(job1, "Output CGST");
-        gstSnapshot(job1, "Output SGST");
+        TaxMappingTestData.standardLedgerNames().forEach(name -> gstSnapshot(job1, name));
         completeMapping();
 
         putStartGstr1();

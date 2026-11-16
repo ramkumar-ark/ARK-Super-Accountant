@@ -135,7 +135,7 @@ class GstAnalysisMappingGateIT {
         job.setStatus(UploadJobStatus.COMPLETED);
         job.setCreatedAt(Instant.now());
         job = uploadJobRepository.save(job);
-        for (String name : List.of("Output CGST", "Output SGST")) {
+        for (String name : TaxMappingTestData.standardLedgerNames()) {
             UploadLedgerSnapshot s = new UploadLedgerSnapshot();
             s.setUploadJobId(job.getId());
             s.setOrganizationId(orgId);
@@ -148,11 +148,7 @@ class GstAnalysisMappingGateIT {
     private void completeMapping() throws Exception {
         mockMvc.perform(put("/api/v1/gst/tax-ledger-mapping").with(user(accountant))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"items":[
-                      {"ledgerName":"Output CGST","role":"OUTPUT","head":"CGST"},
-                      {"ledgerName":"Output SGST","role":"OUTPUT","head":"SGST"}]}
-                    """))
+                .content(TaxMappingTestData.standardMappingItemsJson()))
                 .andExpect(status().isOk());
     }
 
