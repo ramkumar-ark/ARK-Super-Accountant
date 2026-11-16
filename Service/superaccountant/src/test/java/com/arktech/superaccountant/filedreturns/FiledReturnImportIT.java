@@ -342,6 +342,18 @@ class FiledReturnImportIT {
     }
 
     @Test
+    void gstr1JsonUploadWithoutMultipartReturnsBadRequestWithCleanMessage() throws Exception {
+        Setup s = monthlySetup();
+
+        mockMvc.perform(post("/api/v1/filed-returns/gstr1/json")
+                .param("form", "GSTR1")
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Current request is not a multipart request"))
+                .andExpect(jsonPath("$.trace").doesNotExist());
+    }
+
+    @Test
     void pdfParseThenConfirmSavesPortalPdfSnapshot() throws Exception {
         Setup s = monthlySetup();
         byte[] pdf = gstr3bPdf(

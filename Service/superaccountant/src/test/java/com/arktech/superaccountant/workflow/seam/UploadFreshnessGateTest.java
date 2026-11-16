@@ -46,4 +46,20 @@ class UploadFreshnessGateTest {
 
         assertThat(gate.isStillLatest(UUID.randomUUID(), UUID.randomUUID())).isFalse();
     }
+
+    @Test
+    void isStillLatestForPeriod_trueWhenLatestCoveringJobMatches() {
+        UUID orgId = UUID.randomUUID();
+        UUID latestId = UUID.randomUUID();
+        java.time.LocalDate start = java.time.LocalDate.of(2026, 4, 1);
+        java.time.LocalDate end = java.time.LocalDate.of(2026, 4, 30);
+        DayBookUploadJob latest = new DayBookUploadJob();
+        latest.setId(latestId);
+        when(dayBookUploadJobRepository.findLatestCovering(
+                orgId, UploadJobStatus.COMPLETED, start, end)).thenReturn(Optional.of(latest));
+
+        assertThat(gate.isStillLatestForPeriod(orgId, latestId, start, end)).isTrue();
+        assertThat(gate.isStillLatestForPeriod(orgId, UUID.randomUUID(), start, end)).isFalse();
+        assertThat(gate.isStillLatestForPeriod(orgId, null, start, end)).isFalse();
+    }
 }

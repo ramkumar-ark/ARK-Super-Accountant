@@ -24,6 +24,21 @@ public interface DayBookUploadJobRepository extends JpaRepository<DayBookUploadJ
     List<DayBookUploadJob> findAllByOrganizationIdAndStatusOrderByCreatedAtDesc(
             UUID organizationId, UploadJobStatus status);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select j from DayBookUploadJob j
+            where j.organizationId = :organizationId
+              and j.status = :status
+              and j.coverageFrom <= :periodEnd
+              and j.coverageTo >= :periodStart
+            order by j.createdAt desc
+            limit 1
+            """)
+    Optional<DayBookUploadJob> findLatestCovering(
+            @org.springframework.data.repository.query.Param("organizationId") UUID organizationId,
+            @org.springframework.data.repository.query.Param("status") UploadJobStatus status,
+            @org.springframework.data.repository.query.Param("periodStart") java.time.LocalDate periodStart,
+            @org.springframework.data.repository.query.Param("periodEnd") java.time.LocalDate periodEnd);
+
     /**
      * Tenant-scoped lookup: verifies both ID and organization ownership before returning job.
      * Use this method on all read endpoints to prevent cross-tenant data access (T-4-01).

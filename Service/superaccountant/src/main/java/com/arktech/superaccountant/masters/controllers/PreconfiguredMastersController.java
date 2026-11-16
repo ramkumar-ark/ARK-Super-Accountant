@@ -205,7 +205,7 @@ public class PreconfiguredMastersController {
                 .build());
     }
 
-    @PreAuthorize("hasRole('ACCOUNTANT')")
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @PostMapping("/onboard")
     public ResponseEntity<?> onboard(
             @RequestBody OnboardRequest request,
