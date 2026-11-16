@@ -56,6 +56,12 @@ const mastersFinding = (overrides: Record<string, unknown>) => ({
   ...overrides,
 })
 
+const gstFinding = (overrides: Record<string, unknown>) => ({
+  ...finding,
+  source: 'GST',
+  ...overrides,
+})
+
 describe('WorkflowFindingsTab', () => {
   it('shows blocking count and lists findings', async () => {
     mockGet.mockResolvedValue({ data: { findings: [finding], blockingCount: 1 } })
@@ -65,6 +71,84 @@ describe('WorkflowFindingsTab', () => {
     await screen.findByText('Ledger name mismatch')
     expect(screen.getByText(/1 blocking finding/)).toBeInTheDocument()
     expect(screen.getByText('FAKE')).toBeInTheDocument()
+  })
+
+  it('filters by finding type and groups the rest under a type heading', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          gstFinding({ id: 'f1', findingType: 'GST_NOT_CHARGED', message: 'GST not charged A' }),
+          gstFinding({ id: 'f2', findingType: 'GST_NOT_CHARGED', message: 'GST not charged B' }),
+          gstFinding({ id: 'f3', findingType: 'PARTY_GSTIN_ISSUE', message: 'Party GSTIN invalid' }),
+        ],
+        blockingCount: 3,
+      },
+    })
+
+    renderTab()
+
+    await screen.findByText('GST not charged A')
+    expect(screen.getByRole('heading', { name: 'GST NOT CHARGED (2)' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'PARTY GSTIN ISSUE (1)' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'PARTY_GSTIN_ISSUE (1)' }))
+
+    expect(screen.getByText('Party GSTIN invalid')).toBeInTheDocument()
+    expect(screen.queryByText('GST not charged A')).not.toBeInTheDocument()
+    expect(screen.queryByText('GST not charged B')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'PARTY_GSTIN_ISSUE (1)' }))
+
+    expect(screen.getByText('GST not charged A')).toBeInTheDocument()
+    expect(screen.getByText('GST not charged B')).toBeInTheDocument()
+    expect(screen.getByText('Party GSTIN invalid')).toBeInTheDocument()
+  })
+
+  it('filters by severity and status', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          gstFinding({
+            id: 'f1',
+            findingType: 'GST_NOT_CHARGED',
+            severity: 'HIGH',
+            resolveStatus: 'OPEN',
+            message: 'Open high',
+          }),
+          gstFinding({
+            id: 'f2',
+            findingType: 'GST_NOT_CHARGED',
+            severity: 'HIGH',
+            resolveStatus: 'ACKNOWLEDGED',
+            message: 'Acknowledged high',
+            proposedValue: 'x',
+            submittedBy: 'op',
+          }),
+          gstFinding({
+            id: 'f3',
+            findingType: 'GST_NOT_CHARGED',
+            severity: 'LOW',
+            resolveStatus: 'OPEN',
+            message: 'Open low',
+          }),
+        ],
+        blockingCount: 3,
+      },
+    })
+
+    renderTab()
+
+    await screen.findByText('Open high')
+
+    await userEvent.click(screen.getByRole('button', { name: 'HIGH (2)' }))
+    expect(screen.getByText('Open high')).toBeInTheDocument()
+    expect(screen.getByText('Acknowledged high')).toBeInTheDocument()
+    expect(screen.queryByText('Open low')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'OPEN (2)' }))
+    expect(screen.getByText('Open high')).toBeInTheDocument()
+    expect(screen.queryByText('Acknowledged high')).not.toBeInTheDocument()
+    expect(screen.queryByText('Open low')).not.toBeInTheDocument()
   })
 
   it('shows "No findings" when empty', async () => {

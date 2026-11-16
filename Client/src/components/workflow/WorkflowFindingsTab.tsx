@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
 import type { ReactNode } from 'react'
@@ -55,6 +55,44 @@ export function WorkflowFindingsTab({
   }
 
   const findings = findingsQuery.data?.findings ?? []
+  const [typeFilter, setTypeFilter] = useState<string[]>([])
+  const [severityFilter, setSeverityFilter] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+
+  const filtered = useMemo(
+    () =>
+      findings.filter(
+        (f) =>
+          (typeFilter.length === 0 || typeFilter.includes(f.findingType)) &&
+          (severityFilter.length === 0 || severityFilter.includes(f.severity)) &&
+          (statusFilter.length === 0 || statusFilter.includes(f.resolveStatus)),
+      ),
+    [findings, typeFilter, severityFilter, statusFilter],
+  )
+
+  const groups = useMemo(() => {
+    const byType = new Map<string, WorkflowFinding[]>()
+    for (const finding of filtered) {
+      const group = byType.get(finding.findingType)
+      if (group) group.push(finding)
+      else byType.set(finding.findingType, [finding])
+    }
+    const blockingCount = (items: WorkflowFinding[]) => items.filter((f) => f.blocking).length
+    return [...byType.entries()].sort(
+      ([typeA, a], [typeB, b]) =>
+        blockingCount(b) - blockingCount(a) || typeA.localeCompare(typeB),
+    )
+  }, [filtered])
+
+  function toggleFilter(
+    current: string[],
+    setCurrent: (next: string[]) => void,
+    value: string,
+  ) {
+    setCurrent(
+      current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
+    )
+  }
 
   return (
     <div>
@@ -80,48 +118,144 @@ export function WorkflowFindingsTab({
       {!findingsQuery.isLoading && !findingsQuery.isError && findings.length === 0 && (
         <p className="text-sm text-[var(--color-text-muted)]">No findings</p>
       )}
-      <div className="flex flex-col gap-3">
-        {findings.map((f) => (
-          <div
-            key={f.id}
-            className={`bg-[var(--color-surface)] rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 ${f.blocking ? 'border-l-[var(--color-danger)]' : 'border-l-[var(--color-info)]'} p-4`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs px-2 py-0.5 rounded-full uppercase font-normal bg-[var(--color-danger-bg)] text-[var(--color-danger)]">
-                    {f.severity}
-                  </span>
-                  <span className="text-xs text-[var(--color-text-muted)]">{f.source}</span>
-                  {f.voucherNumber && (
-                    <span className="text-xs text-[var(--color-text-muted)] font-mono">{f.voucherNumber}</span>
-                  )}
-                </div>
-                {f.ledgerName && (
-                  <p className="text-sm font-semibold text-[var(--color-text-primary)]">{f.ledgerName}</p>
-                )}
-                <p className="text-sm text-[var(--color-text-secondary)]">{f.message}</p>
-                {f.source === 'MASTERS' && (
-                  <p className="mt-1 text-sm">
-                    <a
-                      href="/masters"
-                      aria-label={`Open ${f.ledgerName ?? f.id} in Masters`}
-                      className="text-[var(--color-primary)] underline"
-                    >
-                      Open in Masters
-                    </a>
-                    {f.resolveStatus === 'OPEN' && TYPED_INPUT_RULES.includes(f.findingType) && (
-                      <span className="ml-2 text-[var(--color-text-secondary)]">
-                        Enter the corrected value in Masters.
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-              <Panel finding={f} role={role} onAction={act} />
-            </div>
-          </div>
+      {findings.length > 0 && (
+        <div className="flex flex-col gap-2 mb-4">
+          <FilterGroup
+            title="Type"
+            values={countValues(findings, 'findingType')}
+            selected={typeFilter}
+            onToggle={(value) => toggleFilter(typeFilter, setTypeFilter, value)}
+          />
+          <FilterGroup
+            title="Severity"
+            values={countValues(findings, 'severity')}
+            selected={severityFilter}
+            onToggle={(value) => toggleFilter(severityFilter, setSeverityFilter, value)}
+          />
+          <FilterGroup
+            title="Status"
+            values={countValues(findings, 'resolveStatus')}
+            selected={statusFilter}
+            onToggle={(value) => toggleFilter(statusFilter, setStatusFilter, value)}
+          />
+        </div>
+      )}
+      {findings.length > 0 && filtered.length === 0 && (
+        <p className="text-sm text-[var(--color-text-muted)]">No findings match the filters.</p>
+      )}
+      <div className="flex flex-col gap-4">
+        {groups.map(([type, items]) => (
+          <section key={type} className="flex flex-col gap-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+              {type.replaceAll('_', ' ')} ({items.length})
+            </h4>
+            {items.map((f) => (
+              <FindingCard key={f.id} finding={f} role={role} onAction={act} />
+            ))}
+          </section>
         ))}
+      </div>
+    </div>
+  )
+}
+
+function countValues(
+  findings: WorkflowFinding[],
+  key: 'findingType' | 'severity' | 'resolveStatus',
+): Array<[string, number]> {
+  const counts = new Map<string, number>()
+  for (const finding of findings) {
+    const value = finding[key]
+    if (!value) continue
+    counts.set(value, (counts.get(value) ?? 0) + 1)
+  }
+  return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b))
+}
+
+function FilterGroup({
+  title,
+  values,
+  selected,
+  onToggle,
+}: {
+  title: string
+  values: Array<[string, number]>
+  selected: string[]
+  onToggle: (value: string) => void
+}): ReactNode {
+  if (values.length === 0) return null
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs uppercase text-[var(--color-text-muted)]">{title}</span>
+      {values.map(([value, count]) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={selected.includes(value)}
+          onClick={() => onToggle(value)}
+          className={`h-7 px-2 rounded-full border text-xs ${
+            selected.includes(value)
+              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+              : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)]'
+          }`}
+        >
+          {value} ({count})
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function FindingCard({
+  finding: f,
+  role,
+  onAction,
+}: {
+  finding: WorkflowFinding
+  role: ReviewRole
+  onAction: (
+    finding: WorkflowFinding,
+    action: 'ACKNOWLEDGE' | 'APPROVE' | 'REJECT',
+    body: { value?: string; note?: string },
+  ) => Promise<void>
+}): ReactNode {
+  return (
+    <div
+      className={`bg-[var(--color-surface)] rounded-[var(--radius-md)] border border-[var(--color-border)] border-l-4 ${f.blocking ? 'border-l-[var(--color-danger)]' : 'border-l-[var(--color-info)]'} p-4`}
+    >
+      <div className="flex items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs px-2 py-0.5 rounded-full uppercase font-normal bg-[var(--color-danger-bg)] text-[var(--color-danger)]">
+              {f.severity}
+            </span>
+            <span className="text-xs text-[var(--color-text-muted)]">{f.source}</span>
+            {f.voucherNumber && (
+              <span className="text-xs text-[var(--color-text-muted)] font-mono">{f.voucherNumber}</span>
+            )}
+          </div>
+          {f.ledgerName && (
+            <p className="text-sm font-semibold text-[var(--color-text-primary)]">{f.ledgerName}</p>
+          )}
+          <p className="text-sm text-[var(--color-text-secondary)]">{f.message}</p>
+          {f.source === 'MASTERS' && (
+            <p className="mt-1 text-sm">
+              <a
+                href="/masters"
+                aria-label={`Open ${f.ledgerName ?? f.id} in Masters`}
+                className="text-[var(--color-primary)] underline"
+              >
+                Open in Masters
+              </a>
+              {f.resolveStatus === 'OPEN' && TYPED_INPUT_RULES.includes(f.findingType) && (
+                <span className="ml-2 text-[var(--color-text-secondary)]">
+                  Enter the corrected value in Masters.
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+        <Panel finding={f} role={role} onAction={onAction} />
       </div>
     </div>
   )
