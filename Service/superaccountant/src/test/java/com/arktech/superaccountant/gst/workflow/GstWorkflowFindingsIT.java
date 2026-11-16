@@ -5,6 +5,7 @@ import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
 import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
+import com.arktech.superaccountant.gst.mapping.TaxMappingTestData;
 import com.arktech.superaccountant.login.models.ERole;
 import com.arktech.superaccountant.login.models.Role;
 import com.arktech.superaccountant.login.models.User;
@@ -83,6 +84,10 @@ class GstWorkflowFindingsIT {
     }
 
     @Autowired
+    com.arktech.superaccountant.gst.mapping.TaxLedgerMappingRepository taxLedgerMappingRepository;
+    @Autowired
+    com.arktech.superaccountant.masters.services.FindingOverrideMasterService mastersService;
+    @Autowired
     MockMvc mockMvc;
     ObjectMapper objectMapper = new ObjectMapper();
     @Autowired
@@ -124,6 +129,10 @@ class GstWorkflowFindingsIT {
         mastersJob.setCreatedAt(Instant.now().minusSeconds(7200));
         mastersJob = uploadJobRepository.save(mastersJob);
 
+        for (String name : TaxMappingTestData.standardLedgerNames()) {
+            snapshot(name, LedgerCategory.GST, null, null, null);
+        }
+        TaxMappingTestData.mapAll(orgId, mastersJob.getId(), taxLedgerMappingRepository, mastersService);
         snapshot("Rent", LedgerCategory.EXPENSE, true, GstApplicabilityType.TAXABLE, null);
         snapshot("Vendor X", LedgerCategory.PURCHASE, null, null, VENDOR_GSTIN);
         snapshot("Sales A/c", LedgerCategory.INCOME, false, GstApplicabilityType.NOT_APPLICABLE, null);

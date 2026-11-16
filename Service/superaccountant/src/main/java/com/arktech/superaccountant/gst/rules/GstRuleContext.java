@@ -39,10 +39,10 @@ public record GstRuleContext(
         return Optional.ofNullable(taxLedgers.get(ledgerName.trim().toLowerCase()));
     }
 
-    /** Mapped head of the ledger; null when unmapped or NOT_TAX. */
+    /** Mapped head of the ledger; null when unmapped or not a voucher tax role. */
     public GstHead head(String ledgerName) {
         return taxLedger(ledgerName)
-                .filter(m -> m.getRole() != TaxLedgerRole.NOT_TAX)
+                .filter(m -> m.getRole().isVoucherTax())
                 .map(TaxLedgerMapping::getHead)
                 .orElse(null);
     }

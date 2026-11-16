@@ -94,6 +94,98 @@ class TaxLedgerMappingGateTest {
         assertEquals(Optional.of("1 tax ledgers not mapped: Output SGST"), gate.blockerMessage(org));
     }
 
+    private static final List<TaxLedgerRole> REQUIRED_ROLES = List.of(TaxLedgerRole.OUTPUT, TaxLedgerRole.INPUT,
+            TaxLedgerRole.CASH_BALANCE, TaxLedgerRole.LIABILITY_BALANCE, TaxLedgerRole.CREDIT_BALANCE,
+            TaxLedgerRole.GST_TDS);
+
+    private static final List<GstHead> REQUIRED_HEADS = List.of(GstHead.IGST, GstHead.CGST, GstHead.SGST);
+
+    /** Stubs masters + mappings with the given (role, head) pairs, each as its own mapped GST ledger. */
+    private void stubMapped(List<TaxLedgerRole> roles, List<GstHead> heads) {
+        UUID jobId = UUID.randomUUID();
+        when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
+        Map<String, UploadLedgerSnapshot> snapshots = new java.util.LinkedHashMap<>();
+        Map<String, TaxLedgerMapping> mappings = new java.util.LinkedHashMap<>();
+        for (TaxLedgerRole role : roles) {
+            for (GstHead head : heads) {
+                String name = role + " " + head;
+                String key = name.toLowerCase();
+                snapshots.put(key, gstLedger(name));
+                TaxLedgerMapping m = new TaxLedgerMapping();
+                m.setLedgerName(name);
+                m.setLedgerKey(key);
+                m.setRole(role);
+                m.setHead(head);
+                mappings.put(key, m);
+            }
+        }
+        when(findingOverrideMasterService.snapshotsByName(jobId)).thenReturn(snapshots);
+        when(mappingService.mappingsByKey(org)).thenReturn(mappings);
+    }
+
+    @Test
+    void gstinCompanyWithNoGstLedgersIsBlocked() {
+        stubOrg(true);
+        UUID jobId = UUID.randomUUID();
+        when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
+        when(findingOverrideMasterService.snapshotsByName(jobId)).thenReturn(Map.of("sales", incomeLedger()));
+        when(mappingService.mappingsByKey(org)).thenReturn(Map.of());
+
+        assertFalse(gate.isComplete(org));
+        assertEquals(Optional.of("No GST tax ledgers found - check your masters"), gate.blockerMessage(org));
+    }
+
+    @Test
+    void noGstinCompanyWithNoGstLedgersStaysComplete() {
+        stubOrg(false);
+        UUID jobId = UUID.randomUUID();
+        when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
+        when(findingOverrideMasterService.snapshotsByName(jobId)).thenReturn(Map.of("sales", incomeLedger()));
+        when(mappingService.mappingsByKey(org)).thenReturn(Map.of());
+
+        assertTrue(gate.isComplete(org));
+    }
+
+    @Test
+    void gstinCompanyBlockedUntilEveryAreaHasEveryHead() {
+        stubOrg(true);
+        stubMapped(List.of(TaxLedgerRole.OUTPUT, TaxLedgerRole.INPUT), REQUIRED_HEADS);
+
+        assertFalse(gate.isComplete(org));
+        assertEquals(Optional.of("Missing GST ledger mappings: "
+                + "Cash balance IGST, Cash balance CGST, Cash balance SGST, "
+                + "Liability balance IGST, Liability balance CGST, Liability balance SGST, "
+                + "Credit balance IGST, Credit balance CGST, Credit balance SGST, "
+                + "GST TDS IGST, GST TDS CGST, GST TDS SGST"), gate.blockerMessage(org));
+    }
+
+    @Test
+    void missingSingleHeadIsNamedExactly() {
+        stubOrg(true);
+        stubMapped(REQUIRED_ROLES, List.of(GstHead.IGST, GstHead.CGST));
+
+        assertEquals(Optional.of("Missing GST ledger mappings: Output SGST, Input SGST, Cash balance SGST, "
+                + "Liability balance SGST, Credit balance SGST, GST TDS SGST"), gate.blockerMessage(org));
+    }
+
+    @Test
+    void completeWhenEveryAreaHasIgstCgstSgst() {
+        stubOrg(true);
+        stubMapped(REQUIRED_ROLES, REQUIRED_HEADS);
+
+        assertTrue(gate.isComplete(org));
+        assertEquals(Optional.empty(), gate.blockerMessage(org));
+    }
+
+    @Test
+    void rcmAndCessMappingsDoNotSatisfyRequirement() {
+        stubOrg(true);
+        stubMapped(List.of(TaxLedgerRole.RCM_INPUT, TaxLedgerRole.RCM_LIABILITY, TaxLedgerRole.NOT_TAX),
+                List.of(GstHead.IGST, GstHead.CGST, GstHead.SGST, GstHead.CESS));
+
+        assertTrue(gate.blockerMessage(org).orElseThrow().startsWith("Missing GST ledger mappings: Output IGST"));
+    }
+
     private static TaxLedgerMapping savedMapping() {
         TaxLedgerMapping mapping = new TaxLedgerMapping();
         mapping.setLedgerName("Output CGST");

@@ -1,6 +1,11 @@
 package com.arktech.superaccountant.gst.mapping;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -10,6 +15,21 @@ import org.springframework.stereotype.Service;
 public class TaxLedgerMappingGate {
 
     private static final String NO_MASTERS_BLOCKER = "No masters upload: tax ledgers cannot be mapped";
+
+    private static final String NO_GST_LEDGERS_BLOCKER = "No GST tax ledgers found - check your masters";
+
+    private static final List<GstHead> REQUIRED_HEADS = List.of(GstHead.IGST, GstHead.CGST, GstHead.SGST);
+
+    private static final Map<TaxLedgerRole, String> REQUIRED_AREAS = new LinkedHashMap<>();
+
+    static {
+        REQUIRED_AREAS.put(TaxLedgerRole.OUTPUT, "Output");
+        REQUIRED_AREAS.put(TaxLedgerRole.INPUT, "Input");
+        REQUIRED_AREAS.put(TaxLedgerRole.CASH_BALANCE, "Cash balance");
+        REQUIRED_AREAS.put(TaxLedgerRole.LIABILITY_BALANCE, "Liability balance");
+        REQUIRED_AREAS.put(TaxLedgerRole.CREDIT_BALANCE, "Credit balance");
+        REQUIRED_AREAS.put(TaxLedgerRole.GST_TDS, "GST TDS");
+    }
 
     private final TaxLedgerMappingService mappingService;
 
@@ -54,11 +74,43 @@ public class TaxLedgerMappingGate {
             return Optional.empty();
         }
         List<String> unmapped = unmappedLedgers(organizationId);
-        if (unmapped.isEmpty()) {
+        if (!unmapped.isEmpty()) {
+            String names = unmapped.stream().limit(5).collect(Collectors.joining(", "));
+            return Optional.of(unmapped.size() + " tax ledgers not mapped: " + names);
+        }
+        if (!hasGstin(organizationId)) {
             return Optional.empty();
         }
-        String names = unmapped.stream().limit(5).collect(Collectors.joining(", "));
-        return Optional.of(unmapped.size() + " tax ledgers not mapped: " + names);
+        return missingAreaHeads(organizationId, jobId.get());
+    }
+
+    /** A GSTIN company needs, per required area, at least one mapped ledger for each of IGST, CGST, SGST. */
+    private Optional<String> missingAreaHeads(UUID organizationId, UUID jobId) {
+        Set<String> gstKeys = findingOverrideMasterService.snapshotsByName(jobId).values().stream()
+                .filter(s -> s.getCategory() == com.arktech.superaccountant.masters.models.LedgerCategory.GST)
+                .map(s -> s.getLedgerName() == null ? null : s.getLedgerName().trim().toLowerCase())
+                .collect(Collectors.toSet());
+        if (gstKeys.isEmpty()) {
+            return Optional.of(NO_GST_LEDGERS_BLOCKER);
+        }
+        Set<String> covered = new HashSet<>();
+        mappingService.mappingsByKey(organizationId).forEach((key, mapping) -> {
+            if (gstKeys.contains(key) && mapping.getHead() != null) {
+                covered.add(mapping.getRole() + "/" + mapping.getHead());
+            }
+        });
+        List<String> missing = new ArrayList<>();
+        for (Map.Entry<TaxLedgerRole, String> area : REQUIRED_AREAS.entrySet()) {
+            for (GstHead head : REQUIRED_HEADS) {
+                if (!covered.contains(area.getKey() + "/" + head)) {
+                    missing.add(area.getValue() + " " + head);
+                }
+            }
+        }
+        if (missing.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of("Missing GST ledger mappings: " + String.join(", ", missing));
     }
 
     private List<com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> gstLedgerNamesWithoutSavedRow(
