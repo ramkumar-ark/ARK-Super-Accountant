@@ -4,5 +4,6 @@ public enum ReconStatus {
     NOT_IMPORTED,
     MAPPING_INCOMPLETE,
     NO_BOOKS,
-    RECONCILED
+    RECONCILED,
+    FAILED
 }

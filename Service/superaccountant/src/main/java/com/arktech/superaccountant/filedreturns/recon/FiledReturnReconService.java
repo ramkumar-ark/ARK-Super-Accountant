@@ -22,8 +22,11 @@ import com.arktech.superaccountant.workflow.repository.BaselineImportRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -83,6 +86,9 @@ public class FiledReturnReconService {
     @Autowired
     private BooksGstExtractor booksExtractor;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ReconOutcome reconcile(UUID organizationId, UUID baselineWorkflowId, String actor) {
         Workflow row = workflowRepository.findById(baselineWorkflowId)
@@ -128,17 +134,23 @@ public class FiledReturnReconService {
         return outcome(row, ReconStatus.RECONCILED, material, fresh.size() - material);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<ReconOutcome> reconcileAll(UUID organizationId, String actor) {
         List<ReconOutcome> outcomes = new ArrayList<>();
         for (Workflow row : reconRows(organizationId)) {
             try {
-                outcomes.add(reconcile(organizationId, row.getId(), actor));
+                outcomes.add(perRowTx().execute(
+                        status -> reconcile(organizationId, row.getId(), actor)));
             } catch (RuntimeException e) {
-                outcomes.add(outcome(row, ReconStatus.NOT_IMPORTED, 0, 0));
+                outcomes.add(outcome(row, ReconStatus.FAILED, 0, 0));
             }
         }
         return outcomes;
+    }
+
+    private TransactionTemplate perRowTx() {
+        TransactionTemplate template = new TransactionTemplate(transactionManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template;
     }
 
     private List<Workflow> reconRows(UUID organizationId) {
