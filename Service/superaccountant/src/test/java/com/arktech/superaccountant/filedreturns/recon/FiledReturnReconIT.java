@@ -118,11 +118,14 @@ class FiledReturnReconIT {
     @Autowired
     private FiledReturnSnapshotRepository snapshotRepository;
 
-    @Autowired
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
     private BaselineImportRepository baselineImportRepository;
 
     @Autowired
     private FiledReturnDiscrepancyRepository discrepancyRepository;
+
+    @Autowired
+    private FiledReturnReconService reconService;
 
     private static int counter = 0;
 
@@ -530,5 +533,31 @@ class FiledReturnReconIT {
         Workflow tds = baselineRow(s.orgId(), WorkflowType.TDS_PAYMENT, "2026-04");
         assertEquals(404, postReconcile(s.accountantJwt(), tds.getId())
                 .getResponse().getStatus());
+    }
+
+    @Test
+    void failingRowRollsBackAloneAndIsReportedFailed() throws Exception {
+        Setup s = setup();
+        importGstr1(s, 1700);
+        var before = discrepancyRepository.findByWorkflowIdAndSupersededAtIsNull(s.gstr1Row());
+        assertEquals(1, before.size());
+
+        // Fails after the row has already superseded and inserted its findings.
+        org.mockito.Mockito.doThrow(new IllegalStateException("boom"))
+                .when(baselineImportRepository).save(org.mockito.ArgumentMatchers.any());
+        java.util.List<ReconOutcome> outcomes;
+        try {
+            outcomes = reconService.reconcileAll(s.orgId(), "it");
+        } finally {
+            org.mockito.Mockito.reset(baselineImportRepository);
+        }
+
+        assertEquals(2, outcomes.size());
+        assertTrue(outcomes.stream().anyMatch(o -> o.status() == ReconStatus.FAILED));
+        assertTrue(outcomes.stream().anyMatch(o -> o.status() == ReconStatus.NOT_IMPORTED));
+        var after = discrepancyRepository.findByWorkflowIdAndSupersededAtIsNull(s.gstr1Row());
+        assertEquals(1, after.size());
+        assertEquals(before.get(0).getId(), after.get(0).getId());
+        assertNull(after.get(0).getSupersededAt());
     }
 }
