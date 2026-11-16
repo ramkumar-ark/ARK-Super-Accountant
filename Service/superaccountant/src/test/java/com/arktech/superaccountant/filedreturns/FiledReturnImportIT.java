@@ -445,4 +445,45 @@ class FiledReturnImportIT {
                 .content(gstr3bBody()))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void crossOrgSnapshotAndFileAreInvisibleAndMalformedInputGives422() throws Exception {
+        Setup a = monthlySetup();
+        Setup b = monthlySetup();
+        MvcResult saved = mockMvc.perform(post("/api/v1/filed-returns/gstr3b")
+                .header("Authorization", "Bearer " + a.accountantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(gstr3bBody()))
+                .andExpect(status().isCreated()).andReturn();
+        String snapId = objectMapper.readTree(saved.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(get("/api/v1/filed-returns/snapshots/{id}", snapId)
+                .header("Authorization", "Bearer " + a.accountantJwt()))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/filed-returns/snapshots/{id}", snapId)
+                .header("Authorization", "Bearer " + b.accountantJwt()))
+                .andExpect(status().isNotFound());
+
+        MockMultipartFile junk = new MockMultipartFile("file", "j.pdf", "application/pdf", gstr3bPdf("x"));
+        MvcResult up = mockMvc.perform(multipart("/api/v1/filed-returns/gstr3b/pdf").file(junk)
+                .header("Authorization", "Bearer " + a.accountantJwt()))
+                .andExpect(status().isUnprocessableEntity()).andReturn();
+        String fileId = objectMapper.readTree(up.getResponse().getContentAsString()).get("fileId").asText();
+        mockMvc.perform(post("/api/v1/filed-returns/gstr3b")
+                .header("Authorization", "Bearer " + b.accountantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"filingPeriod\":\"2026-04\",\"fileId\":\"" + fileId + "\",\"rows\":[]}"))
+                .andExpect(status().isUnprocessableEntity());
+
+        for (String body : List.of(
+                "{\"filingPeriod\":\"2024-13\",\"rows\":[]}",
+                "{\"rows\":[]}",
+                "{\"filingPeriod\":\"2026-04\"}",
+                "{\"filingPeriod\":\"2026-04\",\"rows\":[null]}")) {
+            mockMvc.perform(post("/api/v1/filed-returns/gstr3b")
+                    .header("Authorization", "Bearer " + a.accountantJwt())
+                    .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+    }
 }
