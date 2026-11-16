@@ -57,7 +57,7 @@ public class TdsWorkflowDetailService {
                             && workflow.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FILED) {
                         Organization org = organizationRepository.findById(workflow.getOrganizationId())
                                 .orElseThrow(() -> new IllegalStateException("Organization not found: " + workflow.getOrganizationId()));
-                        copyDeductorDetails(org, existing);
+                        existing.copyDeductorFrom(org);
                         return twenty6qDetailRepository.save(existing);
                     }
                     return existing;
@@ -68,7 +68,7 @@ public class TdsWorkflowDetailService {
 
                     Organization org = organizationRepository.findById(workflow.getOrganizationId())
                             .orElseThrow(() -> new IllegalStateException("Organization not found: " + workflow.getOrganizationId()));
-                    copyDeductorDetails(org, detail);
+                    detail.copyDeductorFrom(org);
 
                     if (workflow.getSupersedesWorkflowId() != null) {
                         workflowRepository.findById(workflow.getSupersedesWorkflowId())
@@ -78,15 +78,5 @@ public class TdsWorkflowDetailService {
 
                     return twenty6qDetailRepository.save(detail);
                 });
-    }
-
-    private void copyDeductorDetails(Organization org, Tds26qDetail detail) {
-        detail.setTan(org.getTan());
-        detail.setDeductorPan(org.getPan());
-        detail.setDeductorName(org.getName());
-        detail.setDeductorAddress(org.getRegisteredAddress());
-        detail.setDeductorType(org.getDeductorType());
-        detail.setResponsiblePersonName(org.getResponsiblePersonName());
-        detail.setResponsiblePersonDesignation(org.getResponsiblePersonDesignation());
     }
 }

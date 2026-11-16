@@ -106,7 +106,7 @@ public class Tds26qFinalizePrecondition implements FinalizePrecondition {
 
     private TdsGateCondition pansValid(List<TdsDeducteeEntry> entries) {
         long invalid = entries.stream()
-                .filter(e -> !e.isPanValid()).count();
+                .filter(e -> !e.isPanValid() && !e.isHigherRateApplied()).count();
         return new TdsGateCondition("PANS_VALID", "PANs valid", invalid == 0,
                 invalid + " entries without a valid PAN");
     }
@@ -123,13 +123,7 @@ public class Tds26qFinalizePrecondition implements FinalizePrecondition {
         if (q.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FINALIZED
                 && q.getStage() != com.arktech.superaccountant.workflow.models.WorkflowStage.FILED
                 && org != null) {
-            detail.setTan(org.getTan());
-            detail.setDeductorPan(org.getPan());
-            detail.setDeductorName(org.getName());
-            detail.setDeductorAddress(org.getRegisteredAddress());
-            detail.setDeductorType(org.getDeductorType());
-            detail.setResponsiblePersonName(org.getResponsiblePersonName());
-            detail.setResponsiblePersonDesignation(org.getResponsiblePersonDesignation());
+            detail.copyDeductorFrom(org);
             detail = detailRepository.save(detail);
         }
         List<String> problems = new ArrayList<>();

@@ -44,4 +44,14 @@ public class Tds26qDetail {
     /** Provisional Receipt Number of the original filing — required when this workflow supersedes another. */
     @Column(name = "original_receipt_number", length = 15)
     private String originalReceiptNumber;
+
+    public void copyDeductorFrom(com.arktech.superaccountant.masters.models.Organization org) {
+        this.tan = org.getTan();
+        this.deductorPan = org.getPan();
+        this.deductorName = org.getName();
+        this.deductorAddress = org.getRegisteredAddress();
+        this.deductorType = org.getDeductorType();
+        this.responsiblePersonName = org.getResponsiblePersonName();
+        this.responsiblePersonDesignation = org.getResponsiblePersonDesignation();
+    }
 }

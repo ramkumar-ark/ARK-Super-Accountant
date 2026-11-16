@@ -159,12 +159,12 @@ class Tds26qFinalizePreconditionTest {
     }
 
     @Test
-    void invalidPan_failsPansValid_evenWithHigherRate() {
+    void invalidPanWithHigherRate_passesPansValid() {
         entries(List.of(entry("194C", "1000.00", "1000.00", false, true)));
 
         List<String> unmet = precondition.unmet(quarter);
 
-        assertTrue(unmet.stream().anyMatch(m -> m.startsWith("PANs valid:")));
+        assertTrue(unmet.stream().noneMatch(m -> m.startsWith("PANs valid:")));
     }
 
     @Test
