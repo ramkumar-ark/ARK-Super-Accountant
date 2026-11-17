@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiErrorMessage } from '@/lib/apiError'
 import {
@@ -181,8 +182,18 @@ export function QuarterPreparePanel({ workflow, role }: Props) {
                 {condition.passed ? '✓' : '✗'}
               </span>{' '}
               {condition.label}: {condition.detail}
-              {condition.code === 'DEDUCTOR_COMPLETE' && !condition.passed
-                && ' Complete the deductor details in the deductor settings'}
+              {condition.code === 'DEDUCTOR_COMPLETE' && !condition.passed && (
+                <>
+                  {' '}
+                  Complete the deductor details in the{' '}
+                  <Link
+                    to="/settings/compliance"
+                    className="text-[var(--color-primary)] underline"
+                  >
+                    deductor settings
+                  </Link>
+                </>
+              )}
             </li>
           ))}
         </ul>

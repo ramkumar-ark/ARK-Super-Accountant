@@ -1,6 +1,7 @@
 import { useAuthStore } from '@/store/authStore'
 import { AppShell } from '@/components/AppShell'
 import { FilerProfileSection } from './FilerProfileSection'
+import { DeductorSection } from './DeductorSection'
 import { TaxLedgerMappingSection } from './TaxLedgerMappingSection'
 import { ResponsibilityStartSection } from './ResponsibilityStartSection'
 import { BaselineSection } from './BaselineSection'
@@ -14,6 +15,7 @@ export function CompliancePage() {
         <div className="max-w-4xl mx-auto p-6 space-y-10">
           <h1 className="text-xl font-semibold">Compliance settings</h1>
           <FilerProfileSection />
+          <DeductorSection />
           <TaxLedgerMappingSection />
           <ResponsibilityStartSection />
           <BaselineSection />

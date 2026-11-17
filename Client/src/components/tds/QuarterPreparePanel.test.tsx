@@ -15,6 +15,13 @@ import type {
 vi.mock('@/lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}))
 
 const mockGet = vi.mocked(api.get)
 const mockPost = vi.mocked(api.post)
@@ -261,6 +268,23 @@ describe('QuarterPreparePanel', () => {
     await waitFor(() => expect(downloads).toEqual(['26Q_CHEA12345B_FY2025_Q1.txt']))
     expect(createObjectURL).toHaveBeenCalled()
     clickSpy.mockRestore()
+  })
+
+  it('links the failed deductor gate condition to the deductor settings section', async () => {
+    routeApi({
+      gateConditions: [
+        { code: 'ALL_ENTRIES_MAPPED', label: 'All entries mapped', passed: true, detail: '0 entries unmapped' },
+        { code: 'CHALLANS_RECONCILE', label: 'Challans reconcile', passed: true, detail: '' },
+        { code: 'PANS_VALID', label: 'PANs valid', passed: true, detail: '' },
+        { code: 'DEDUCTOR_COMPLETE', label: 'Deductor complete', passed: false, detail: 'TAN missing' },
+        { code: 'HAS_CHALLAN', label: 'Has approved challan', passed: true, detail: '' },
+      ],
+    })
+    renderPanel()
+
+    expect(await screen.findByText(/Deductor complete/)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'deductor settings' })
+    expect(link).toHaveAttribute('href', '/settings/compliance')
   })
 
   it('hides the download button from operators', async () => {
