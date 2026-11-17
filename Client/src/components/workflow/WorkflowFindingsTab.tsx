@@ -62,9 +62,11 @@ export function WorkflowFindingsTab({
   }
 
   const findings = useMemo(() => findingsQuery.data?.findings ?? [], [findingsQuery.data])
+  const systemResolvedCount = findings.filter((f) => f.resolvedBy === 'system').length
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [severityFilter, setSeverityFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [autoResolvedOnly, setAutoResolvedOnly] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [bulkNote, setBulkNote] = useState('')
   const [bulkError, setBulkError] = useState('')
@@ -83,9 +85,10 @@ export function WorkflowFindingsTab({
         (f) =>
           (typeFilter.length === 0 || typeFilter.includes(f.findingType)) &&
           (severityFilter.length === 0 || severityFilter.includes(f.severity)) &&
-          (statusFilter.length === 0 || statusFilter.includes(f.resolveStatus)),
+          (statusFilter.length === 0 || statusFilter.includes(f.resolveStatus)) &&
+          (!autoResolvedOnly || f.resolvedBy === 'system'),
       ),
-    [findings, typeFilter, severityFilter, statusFilter],
+    [findings, typeFilter, severityFilter, statusFilter, autoResolvedOnly],
   )
 
   const selectedFindings = filtered.filter((f) => selectable(f) && selected.includes(f.id))
@@ -197,6 +200,14 @@ export function WorkflowFindingsTab({
             selected={statusFilter}
             onToggle={(value) => toggleFilter(statusFilter, setStatusFilter, value)}
           />
+          {systemResolvedCount > 0 && (
+            <FilterGroup
+              title="Re-upload"
+              values={[['Auto-resolved', systemResolvedCount]]}
+              selected={autoResolvedOnly ? ['Auto-resolved'] : []}
+              onToggle={() => setAutoResolvedOnly((current) => !current)}
+            />
+          )}
         </div>
       )}
       {findings.length > 0 && filtered.length === 0 && (
@@ -376,6 +387,11 @@ function FindingCard({
               {f.severity}
             </span>
             <span className="text-xs text-[var(--color-text-muted)]">{f.source}</span>
+            {f.resolvedBy === 'system' && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-info-bg)] text-[var(--color-info)]">
+                Auto-resolved by re-upload
+              </span>
+            )}
             {f.voucherNumber && (
               <span className="text-xs text-[var(--color-text-muted)] font-mono">{f.voucherNumber}</span>
             )}

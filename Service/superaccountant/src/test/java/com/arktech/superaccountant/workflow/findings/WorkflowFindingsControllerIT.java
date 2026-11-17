@@ -6,11 +6,15 @@ import com.arktech.superaccountant.login.models.User;
 import com.arktech.superaccountant.login.repository.RoleRepository;
 import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.review.FindingApplier;
 import com.arktech.superaccountant.review.ReviewableFinding;
+import com.arktech.superaccountant.tds.models.TdsFinding;
+import com.arktech.superaccountant.tds.models.TdsFindingType;
+import com.arktech.superaccountant.tds.repository.TdsFindingRepository;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -32,6 +36,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,6 +47,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -299,6 +305,8 @@ class WorkflowFindingsControllerIT {
     UserRepository userRepository;
     @Autowired
     WorkflowRepository workflowRepository;
+    @Autowired
+    TdsFindingRepository tdsFindingRepository;
 
     UUID orgId;
     Workflow workflow;
@@ -345,6 +353,54 @@ class WorkflowFindingsControllerIT {
     private FakeFinding seedFinding(boolean blocking) {
         FakeFinding f = new FakeFinding(UUID.randomUUID(), blocking, LocalDate.of(2025, 4, 5));
         FakeSourceConfig.FINDINGS.put(f.id, f);
+        return f;
+    }
+
+    @Test
+    void listFindings_exposesAutoResolvedByReuploadAndChangedEvidenceReset() throws Exception {
+        Workflow tdsWorkflow = new Workflow();
+        tdsWorkflow.setOrganizationId(orgId);
+        tdsWorkflow.setType(WorkflowType.TDS_PAYMENT);
+        tdsWorkflow.setPeriodStart(LocalDate.of(2025, 4, 1));
+        tdsWorkflow.setPeriodEnd(LocalDate.of(2025, 4, 30));
+        tdsWorkflow.setPeriodKey("2025-04");
+        tdsWorkflow.setFinancialYear(2025);
+        tdsWorkflow.setStage(WorkflowStage.FINDINGS_REVIEW);
+        tdsWorkflow.setCreatedBy("it");
+        workflowRepository.save(tdsWorkflow);
+
+        UUID carriedFrom = UUID.randomUUID();
+        TdsFinding autoResolved = tdsFinding(tdsWorkflow, carriedFrom);
+        autoResolved.setResolveStatus(ResolveStatus.RESOLVED);
+        autoResolved.setResolvedBy("system");
+        autoResolved.setResolveNote("No longer present after re-upload.");
+        autoResolved.setResolvedAt(Instant.now());
+        tdsFindingRepository.save(autoResolved);
+
+        TdsFinding reopened = tdsFinding(tdsWorkflow, carriedFrom);
+        tdsFindingRepository.save(reopened);
+
+        mockMvc.perform(get("/api/v1/workflows/" + tdsWorkflow.getId() + "/findings").with(user(accountant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.findings[?(@.resolvedBy == 'system')].resolveStatus", hasItem("RESOLVED")))
+                .andExpect(jsonPath("$.findings[?(@.resolvedBy == 'system')].resolveNote",
+                        hasItem("No longer present after re-upload.")))
+                .andExpect(jsonPath("$.findings[?(@.resolveStatus == 'OPEN')].carriedFromFindingId",
+                        hasItem(carriedFrom.toString())));
+    }
+
+    private TdsFinding tdsFinding(Workflow w, UUID carriedFrom) {
+        TdsFinding f = new TdsFinding();
+        f.setOrganizationId(orgId);
+        f.setWorkflowId(w.getId());
+        f.setUploadJobId(UUID.randomUUID());
+        f.setFindingType(TdsFindingType.PAN_MISSING);
+        f.setSeverity(FindingSeverity.ERROR);
+        f.setPartyLedgerName("ABC Contractors");
+        f.setVoucherDate(LocalDate.of(2025, 4, 10));
+        f.setVoucherNumber("V1");
+        f.setMessage("PAN is missing for ABC Contractors");
+        f.setCarriedFromFindingId(carriedFrom);
         return f;
     }
 
