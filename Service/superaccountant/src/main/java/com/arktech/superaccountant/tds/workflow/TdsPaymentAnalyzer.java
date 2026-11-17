@@ -82,16 +82,19 @@ public class TdsPaymentAnalyzer implements WorkflowAnalyzer {
         List<TdsFinding> ownPrevious = findingRepository
                 .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(workflow.getId());
         List<TdsFinding> previous = ownPrevious;
+        boolean predecessor = false;
         if (previous.isEmpty() && workflow.getSupersedesWorkflowId() != null) {
             previous = findingRepository
                     .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(
-                            workflow.getSupersedesWorkflowId())
-                    .stream().map(TdsPaymentAnalyzer::detachedCopy).collect(Collectors.toList());
+                            workflow.getSupersedesWorkflowId());
+            predecessor = true;
         }
         lifecycleService.reconcile(previous, fresh, now);
         if (!ownPrevious.isEmpty()) {
             ownPrevious.forEach(p -> p.setSupersededAt(now));
             findingRepository.saveAll(ownPrevious);
+        } else if (predecessor) {
+            findingRepository.saveAll(previous);
         }
         findingRepository.saveAll(fresh);
 
@@ -108,41 +111,5 @@ public class TdsPaymentAnalyzer implements WorkflowAnalyzer {
 
     private static boolean inPeriod(LocalDate date, LocalDate start, LocalDate end) {
         return date != null && !date.isBefore(start) && !date.isAfter(end);
-    }
-
-    /** Detached copy of another workflow's finding row; the stored row is never modified. */
-    static TdsFinding detachedCopy(TdsFinding source) {
-        TdsFinding copy = new TdsFinding();
-        copy.setId(source.getId());
-        copy.setOrganizationId(source.getOrganizationId());
-        copy.setWorkflowId(source.getWorkflowId());
-        copy.setUploadJobId(source.getUploadJobId());
-        copy.setFindingType(source.getFindingType());
-        copy.setSeverity(source.getSeverity());
-        copy.setPartyLedgerName(source.getPartyLedgerName());
-        copy.setVoucherId(source.getVoucherId());
-        copy.setVoucherDate(source.getVoucherDate());
-        copy.setVoucherNumber(source.getVoucherNumber());
-        copy.setRelatedVoucherIds(source.getRelatedVoucherIds());
-        copy.setSection(source.getSection());
-        copy.setExpectedAmount(source.getExpectedAmount());
-        copy.setActualAmount(source.getActualAmount());
-        copy.setMessage(source.getMessage());
-        copy.setSuggestedFix(source.getSuggestedFix());
-        copy.setEvidenceHash(source.getEvidenceHash());
-        copy.setFindingKey(source.getFindingKey());
-        copy.setSupersededAt(source.getSupersededAt());
-        copy.setCarriedFromFindingId(source.getCarriedFromFindingId());
-        copy.setResolveStatus(source.getResolveStatus());
-        copy.setResolveNote(source.getResolveNote());
-        copy.setResolvedBy(source.getResolvedBy());
-        copy.setResolvedAt(source.getResolvedAt());
-        copy.setProposedValue(source.getProposedValue());
-        copy.setSubmittedBy(source.getSubmittedBy());
-        copy.setSubmittedAt(source.getSubmittedAt());
-        copy.setReviewedBy(source.getReviewedBy());
-        copy.setReviewedAt(source.getReviewedAt());
-        copy.setReviewNote(source.getReviewNote());
-        return copy;
     }
 }
