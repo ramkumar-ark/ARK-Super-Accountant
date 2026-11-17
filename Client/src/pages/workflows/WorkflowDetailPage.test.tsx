@@ -299,6 +299,25 @@ describe('WorkflowDetailPage', () => {
     })
   })
 
+  it('tells the user the re-upload reset earlier results once it completes', async () => {
+    routeApi({
+      detailResponse: detail({ stage: 'FINDINGS_REVIEW', uploadJobId: 'job-1' }),
+      uploads: [uploadRow({ id: 'job-1', status: 'COMPLETED' })],
+    })
+    mockPost.mockResolvedValue({ data: { ...baseWorkflow({ stage: 'DATA_UPLOADED' }), warnings: [] } })
+    renderPage()
+
+    const input = await screen.findByTestId('workflow-file-input')
+    await userEvent.upload(input, new File(['{}'], 'apr.json', { type: 'application/json' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Upload and bind' }))
+
+    expect(
+      await screen.findByText(
+        'Upload replaced. Earlier findings and results were reset and the workflow is back at Data uploaded.',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('hides the upload step once the workflow is finalized', async () => {
     routeApi({ detailResponse: detail({ stage: 'FINALIZED' }) })
     renderPage()

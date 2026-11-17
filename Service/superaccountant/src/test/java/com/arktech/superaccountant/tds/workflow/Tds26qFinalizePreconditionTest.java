@@ -260,6 +260,20 @@ class Tds26qFinalizePreconditionTest {
     }
 
     @Test
+    void hasApprovedChallan_passesWithApprovedDetail() {
+        // quarter has 1 approved challan set up in setUp()
+        entries(List.of(entry("194C", "1000.00", "1000.00", true, false)));
+
+        List<TdsGateCondition> conditions = precondition.evaluate(quarter);
+        TdsGateCondition hasChallan = conditions.stream()
+                .filter(c -> "HAS_CHALLAN".equals(c.code()))
+                .findFirst().orElseThrow();
+
+        assertTrue(hasChallan.passed());
+        assertEquals("1 approved challan", hasChallan.detail());
+    }
+
+    @Test
     void conditionsInOldOrder() {
         TdsQuarterService emptyQuarter = mock(TdsQuarterService.class);
         when(emptyQuarter.approvedChallans(quarter)).thenReturn(List.of());

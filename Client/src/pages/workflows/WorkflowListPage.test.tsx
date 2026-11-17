@@ -16,7 +16,7 @@ vi.mock('@/components/AppShell', () => ({
   AppShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }))
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   useNavigate: () => vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
@@ -148,5 +148,24 @@ describe('WorkflowListPage', () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
     renderPage()
     expect(await screen.findByText('No workflows yet.')).toBeInTheDocument()
+  })
+
+  it('list_when403Forbidden_showsAccessDeniedAndOrgPrompt', async () => {
+    const error403 = {
+      response: {
+        status: 403,
+        data: { error: 'Access denied to this organization' },
+      },
+    }
+    vi.mocked(api.get).mockRejectedValue(error403)
+    renderPage()
+
+    expect(
+      await screen.findByText(/Access denied to this organization/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('No workflows yet.')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: /select or setup an organization/i }),
+    ).toHaveAttribute('href', '/organization/setup')
   })
 })

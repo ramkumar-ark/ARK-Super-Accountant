@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
@@ -116,7 +116,28 @@ export function WorkflowListPage() {
         </div>
 
         {isLoading && <p className="text-sm text-[var(--color-text-muted)]">Loading workflows…</p>}
-        {error && <p className="text-sm text-[var(--color-danger)]">Could not load workflows.</p>}
+        {error && (
+          <div className="rounded-[var(--radius-md)] border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] p-4 text-sm text-[var(--color-danger)] flex flex-col gap-2">
+            <p>
+              {(error as { response?: { status?: number; data?: { error?: string } } }).response?.status === 403
+                ? (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
+                  'Access denied to this organization.'
+                : 'Could not load workflows.'}
+            </p>
+            {(error as { response?: { status?: number } }).response?.status === 403 && (
+              <p className="text-xs text-[var(--color-text-secondary)]">
+                Please{' '}
+                <Link
+                  to="/organization/setup"
+                  className="font-medium text-[var(--color-primary)] underline hover:text-[var(--color-primary-hover)]"
+                >
+                  select or setup an organization
+                </Link>{' '}
+                to continue.
+              </p>
+            )}
+          </div>
+        )}
 
         {!isLoading && !error && data?.length === 0 && (
           <p className="text-sm text-[var(--color-text-muted)]">No workflows yet.</p>

@@ -33,6 +33,7 @@ export function WorkflowUploadStep({
   const [usingUpload, setUsingUpload] = useState(false)
   const [warnings, setWarnings] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [resetNotice, setResetNotice] = useState(false)
 
   useEffect(() => {
     setCoverageFrom(requiredFrom)
@@ -59,6 +60,7 @@ export function WorkflowUploadStep({
     }
     setError('')
     setWarnings([])
+    setResetNotice(false)
     setFile(selected)
   }
 
@@ -69,6 +71,7 @@ export function WorkflowUploadStep({
     try {
       const result = await uploadToWorkflow(workflowId, file, coverageFrom, coverageTo)
       setWarnings(result.warnings ?? [])
+      setResetNotice(Boolean(latestCompleted))
       setFile(null)
       await invalidateWorkflow(queryClient, workflowId)
     } catch (err) {
@@ -100,7 +103,7 @@ export function WorkflowUploadStep({
         <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Day book upload</h2>
         {beforePrepare && (
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            Replacing the upload returns the workflow to Data uploaded.
+            Replacing the upload resets earlier results and returns the workflow to Data uploaded.
           </p>
         )}
       </div>
@@ -163,6 +166,13 @@ export function WorkflowUploadStep({
       {error && (
         <p role="alert" className="text-sm text-[var(--color-danger)]">
           {error}
+        </p>
+      )}
+
+      {resetNotice && (
+        <p role="status" className="text-sm text-[var(--color-text-secondary)]">
+          Upload replaced. Earlier findings and results were reset and the workflow is back at Data
+          uploaded.
         </p>
       )}
 

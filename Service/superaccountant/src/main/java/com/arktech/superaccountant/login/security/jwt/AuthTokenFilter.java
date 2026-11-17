@@ -2,6 +2,7 @@ package com.arktech.superaccountant.login.security.jwt;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.login.security.services.UserDetailsServiceImpl;
+import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +26,11 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
 
+    @Autowired
+    private UserOrganizationRepository userOrganizationRepository;
+
+    private static final String ORG_SCOPED_PATH = "/api/v1/workflows";
+
     private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
 
     @Override
@@ -40,7 +46,15 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 // Extract active org from JWT claim and set on principal
                 String orgIdClaim = jwtUtils.getOrganizationIdFromJwtToken(jwt);
                 if (orgIdClaim != null) {
-                    userDetails.setOrganizationId(UUID.fromString(orgIdClaim));
+                    UUID orgId = UUID.fromString(orgIdClaim);
+                    userDetails.setOrganizationId(orgId);
+                    if (request.getRequestURI().startsWith(ORG_SCOPED_PATH)
+                            && userOrganizationRepository.findByUserIdAndOrganizationId(userDetails.getId(), orgId).isEmpty()) {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"Access denied to this organization\"}");
+                        return;
+                    }
                 }
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
