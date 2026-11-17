@@ -131,3 +131,31 @@ export function getGate(workflowId: string): Promise<TdsGateCondition[]> {
 export function downloadExport(workflowId: string) {
   return api.get(`/v1/workflows/${workflowId}/tds/export`, { responseType: 'blob' })
 }
+
+export interface DeductorDetails {
+  tan: string
+  deductorType: string
+  responsiblePersonName: string
+  responsiblePersonDesignation: string
+}
+
+export function getOrganization(orgId: string): Promise<DeductorDetails & Record<string, unknown>> {
+  return api.get(`/organizations/${orgId}`).then((res) => res.data)
+}
+
+export function updateDeductor(orgId: string, body: DeductorDetails): Promise<unknown> {
+  return api.patch(`/organizations/${orgId}/deductor`, body).then((res) => res.data)
+}
+
+export interface PanOverride {
+  partyLedgerName: string
+  pan: string
+  approvedBy: string | null
+  approvedAt: string | null
+  mastersPan: string | null
+  mastersDiffers: boolean
+}
+
+export function listPanOverrides(): Promise<PanOverride[]> {
+  return api.get('/v1/tds/pan-overrides').then((res) => res.data)
+}
