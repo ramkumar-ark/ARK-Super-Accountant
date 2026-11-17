@@ -5,8 +5,8 @@ import com.arktech.superaccountant.workflow.models.WorkflowType;
 import java.util.Set;
 
 /**
- * SPI for per-module analysis of a bound upload. Implemented later by Gb (GST) and Tb (TDS);
- * wave 2 registers no production implementation, so an empty analyzer set counts as done.
+ * SPI for per-module analysis of a bound upload. The GST (Gb) and TDS (Tb) analyzers are the
+ * production implementations; a workflow type with no matching analyzer counts as done.
  */
 public interface WorkflowAnalyzer {
     /** Stable id stored on the run, e.g. "GST_DAYBOOK". */
