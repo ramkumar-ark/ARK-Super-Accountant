@@ -100,7 +100,7 @@ export function WorkflowUploadStep({
         <h2 className="text-sm font-semibold text-[var(--color-text-primary)]">Day book upload</h2>
         {beforePrepare && (
           <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-            Replacing the upload returns the workflow to Data uploaded.
+            Replacing the upload resets earlier results and returns the workflow to Data uploaded.
           </p>
         )}
       </div>

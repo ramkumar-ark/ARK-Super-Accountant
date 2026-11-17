@@ -42,6 +42,9 @@ class WorkflowControllerIT {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private com.arktech.superaccountant.login.security.jwt.JwtUtils jwtUtils;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String signupAndLogin(String username, String email) throws Exception {
@@ -247,5 +250,25 @@ class WorkflowControllerIT {
                 .header("Authorization", "Bearer " + ownerJwt))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].kind").value("STARTED"));
+    }
+
+    @Test
+    void list_staleTokenForNonMemberOrg_returns403() throws Exception {
+        String owner1Jwt = signupAndLogin("wfownerA", "wfownerA@test.com");
+        UUID orgAId = createOrganization(owner1Jwt);
+        owner1Jwt = selectOrg(owner1Jwt, orgAId);
+
+        String owner2Jwt = signupAndLogin("wfownerB", "wfownerB@test.com");
+        UUID orgBId = createOrganization(owner2Jwt);
+        owner2Jwt = selectOrg(owner2Jwt, orgBId);
+
+        // User A generates token for Org B without being a member of Org B
+        // (e.g. stale token or tampered org claim)
+        String stolenJwt = jwtUtils.generateJwtTokenForUser("wfownerA", orgBId);
+
+        mockMvc.perform(get("/api/v1/workflows")
+                .header("Authorization", "Bearer " + stolenJwt))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Access denied to this organization"));
     }
 }

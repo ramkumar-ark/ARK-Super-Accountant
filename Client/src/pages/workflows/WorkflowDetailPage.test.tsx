@@ -299,6 +299,17 @@ describe('WorkflowDetailPage', () => {
     })
   })
 
+  it('shows re-upload reset warning when workflow already has an upload bound', async () => {
+    routeApi({ detailResponse: detail({ stage: 'FINDINGS_REVIEW', uploadJobId: 'job-1' }) })
+    renderPage()
+
+    expect(
+      await screen.findByText(
+        'Replacing the upload resets earlier results and returns the workflow to Data uploaded.',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('hides the upload step once the workflow is finalized', async () => {
     routeApi({ detailResponse: detail({ stage: 'FINALIZED' }) })
     renderPage()

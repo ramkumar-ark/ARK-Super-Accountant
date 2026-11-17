@@ -216,7 +216,7 @@ public class WorkflowService {
         Workflow w = get(organizationId, id);
         if (w.getStage() != WorkflowStage.FINDINGS_REVIEW) {
             throw new WorkflowConflictException(
-                    "Only a workflow in FINDINGS_REVIEW can move to PREPARE");
+                    "Workflow is in " + w.getStage() + " stage; only a workflow in FINDINGS_REVIEW can move to PREPARE");
         }
         requireZeroBlocking(w);
         if (!baselineGate.isConfirmed(organizationId)) {

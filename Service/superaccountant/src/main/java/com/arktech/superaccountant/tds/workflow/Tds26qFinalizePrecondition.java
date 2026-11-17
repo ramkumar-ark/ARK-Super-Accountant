@@ -149,8 +149,11 @@ public class Tds26qFinalizePrecondition implements FinalizePrecondition {
     }
 
     private TdsGateCondition hasChallan(List<TdsChallan> approved) {
-        return new TdsGateCondition("HAS_CHALLAN", "Has approved challan", !approved.isEmpty(),
-                "The quarter has no approved challan");
+        boolean passed = !approved.isEmpty();
+        String detail = passed
+                ? approved.size() + " approved challan" + (approved.size() == 1 ? "" : "s")
+                : "The quarter has no approved challan";
+        return new TdsGateCondition("HAS_CHALLAN", "Has approved challan", passed, detail);
     }
 
     private int fyOf(Workflow q, int fyStartMonth) {

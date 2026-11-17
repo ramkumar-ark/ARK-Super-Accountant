@@ -419,6 +419,18 @@ class WorkflowServiceTest {
     // ---------- advance ----------
 
     @Test
+    void advance_whenAlreadyInPrepare_failsWithCurrentStageMessage() {
+        Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-04");
+        w.setStage(WorkflowStage.PREPARE);
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+
+        WorkflowConflictException ex = assertThrows(WorkflowConflictException.class,
+                () -> service.advanceToPrepare(orgId, actor, w.getId()));
+        assertEquals("Workflow is in PREPARE stage; only a workflow in FINDINGS_REVIEW can move to PREPARE",
+                ex.getMessage());
+    }
+
+    @Test
     void advance_requiresFindingsReviewAndBaseline() {
         Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-04");
         w.setStage(WorkflowStage.DATA_UPLOADED);

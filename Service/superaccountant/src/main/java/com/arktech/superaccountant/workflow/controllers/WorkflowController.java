@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.workflow.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
 import com.arktech.superaccountant.workflow.analysis.AnalyzerCatalog;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowEvent;
@@ -44,15 +45,30 @@ public class WorkflowController {
     @Autowired
     private com.arktech.superaccountant.workflow.seam.BaselineGate baselineGate;
 
+    @Autowired
+    private UserOrganizationRepository userOrganizationRepository;
+
+    private ResponseEntity<?> checkOrgMembership(UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        if (userOrganizationRepository.findByUserIdAndOrganizationId(principal.getId(), orgId).isEmpty()) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied to this organization"));
+        }
+        return null;
+    }
+
     @GetMapping
     public ResponseEntity<?> list(@AuthenticationPrincipal UserDetailsImpl principal,
                                   @RequestParam(required = false) String type,
                                   @RequestParam(required = false) Integer fy,
                                   @RequestParam(required = false) String stage) {
-        UUID orgId = principal.getOrganizationId();
-        if (orgId == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        ResponseEntity<?> membershipCheck = checkOrgMembership(principal);
+        if (membershipCheck != null) {
+            return membershipCheck;
         }
+        UUID orgId = principal.getOrganizationId();
         return ResponseEntity.ok(workflowService.list(orgId, type, fy, stage)
                 .stream().map(WorkflowResponse::from).toList());
     }
