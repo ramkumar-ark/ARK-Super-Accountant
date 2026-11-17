@@ -299,13 +299,21 @@ describe('WorkflowDetailPage', () => {
     })
   })
 
-  it('shows re-upload reset warning when workflow already has an upload bound', async () => {
-    routeApi({ detailResponse: detail({ stage: 'FINDINGS_REVIEW', uploadJobId: 'job-1' }) })
+  it('tells the user the re-upload reset earlier results once it completes', async () => {
+    routeApi({
+      detailResponse: detail({ stage: 'FINDINGS_REVIEW', uploadJobId: 'job-1' }),
+      uploads: [uploadRow({ id: 'job-1', status: 'COMPLETED' })],
+    })
+    mockPost.mockResolvedValue({ data: { ...baseWorkflow({ stage: 'DATA_UPLOADED' }), warnings: [] } })
     renderPage()
+
+    const input = await screen.findByTestId('workflow-file-input')
+    await userEvent.upload(input, new File(['{}'], 'apr.json', { type: 'application/json' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Upload and bind' }))
 
     expect(
       await screen.findByText(
-        'Replacing the upload resets earlier results and returns the workflow to Data uploaded.',
+        'Upload replaced. Earlier findings and results were reset and the workflow is back at Data uploaded.',
       ),
     ).toBeInTheDocument()
   })

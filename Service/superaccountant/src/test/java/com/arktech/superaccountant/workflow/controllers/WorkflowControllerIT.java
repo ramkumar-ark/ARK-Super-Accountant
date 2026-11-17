@@ -271,4 +271,22 @@ class WorkflowControllerIT {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("Access denied to this organization"));
     }
+
+    @Test
+    void get_staleTokenForNonMemberOrg_returns403() throws Exception {
+        String ownerJwt = signupAndLogin("wfownerC", "wfownerC@test.com");
+        UUID orgAId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgAId);
+
+        String otherJwt = signupAndLogin("wfownerD", "wfownerD@test.com");
+        UUID orgBId = createOrganization(otherJwt);
+        selectOrg(otherJwt, orgBId);
+
+        String foreignJwt = jwtUtils.generateJwtTokenForUser("wfownerC", orgBId);
+
+        mockMvc.perform(get("/api/v1/workflows/{id}", UUID.randomUUID())
+                .header("Authorization", "Bearer " + foreignJwt))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Access denied to this organization"));
+    }
 }
