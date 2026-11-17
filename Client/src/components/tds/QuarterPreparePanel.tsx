@@ -17,6 +17,7 @@ import {
   type QuarterChallans,
   type TdsDeducteeEntry,
 } from '@/lib/tdsApi'
+import { PanOverridePanel } from './PanOverridePanel'
 
 const buttonClass =
   'inline-flex h-9 w-fit items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50'
@@ -351,6 +352,8 @@ export function QuarterPreparePanel({ workflow, role }: Props) {
           </p>
         )}
       </div>
+
+      <PanOverridePanel />
     </section>
   )
 }

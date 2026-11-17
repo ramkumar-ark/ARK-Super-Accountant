@@ -146,3 +146,16 @@ export function getOrganization(orgId: string): Promise<DeductorDetails & Record
 export function updateDeductor(orgId: string, body: DeductorDetails): Promise<unknown> {
   return api.patch(`/organizations/${orgId}/deductor`, body).then((res) => res.data)
 }
+
+export interface PanOverride {
+  partyLedgerName: string
+  pan: string
+  approvedBy: string | null
+  approvedAt: string | null
+  mastersPan: string | null
+  mastersDiffers: boolean
+}
+
+export function listPanOverrides(): Promise<PanOverride[]> {
+  return api.get('/v1/tds/pan-overrides').then((res) => res.data)
+}

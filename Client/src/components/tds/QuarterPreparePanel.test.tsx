@@ -139,6 +139,7 @@ function routeApi({
       return Promise.resolve({ data: months })
     }
     if (url === '/v1/workflows/wf-1/tds/gate') return Promise.resolve({ data: gateConditions })
+    if (url === '/v1/tds/pan-overrides') return Promise.resolve({ data: [] })
     if (url === '/v1/workflows/wf-1/tds/export' && exportResponse) {
       return Promise.resolve(exportResponse)
     }
