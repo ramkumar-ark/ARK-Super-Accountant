@@ -82,20 +82,14 @@ public class TdsPaymentAnalyzer implements WorkflowAnalyzer {
         List<TdsFinding> ownPrevious = findingRepository
                 .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(workflow.getId());
         List<TdsFinding> previous = ownPrevious;
-        boolean predecessor = false;
         if (previous.isEmpty() && workflow.getSupersedesWorkflowId() != null) {
             previous = findingRepository
                     .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(
                             workflow.getSupersedesWorkflowId());
-            predecessor = true;
         }
         lifecycleService.reconcile(previous, fresh, now);
-        if (!ownPrevious.isEmpty()) {
-            ownPrevious.forEach(p -> p.setSupersededAt(now));
-            findingRepository.saveAll(ownPrevious);
-        } else if (predecessor) {
-            findingRepository.saveAll(previous);
-        }
+        previous.forEach(p -> p.setSupersededAt(now));
+        findingRepository.saveAll(previous);
         findingRepository.saveAll(fresh);
 
         TdsPaymentDetail detail = detailService.ensurePaymentDetail(workflow);

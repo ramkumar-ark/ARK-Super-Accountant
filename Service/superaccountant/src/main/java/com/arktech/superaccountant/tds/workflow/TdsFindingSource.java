@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Component
 public class TdsFindingSource implements WorkflowFindingSource {
@@ -46,9 +47,11 @@ public class TdsFindingSource implements WorkflowFindingSource {
 
     @Override
     public List<WorkflowFindingView> list(Workflow w) {
-        return findingRepository
-                .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(w.getId())
-                .stream().map(this::view).toList();
+        List<TdsFinding> current = findingRepository
+                .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(w.getId());
+        List<TdsFinding> autoResolved = findingRepository
+                .findAutoResolvedByReupload(w.getId(), w.getSupersedesWorkflowId());
+        return Stream.concat(current.stream(), autoResolved.stream()).map(this::view).toList();
     }
 
     @Override

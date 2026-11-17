@@ -22,6 +22,13 @@ public interface TdsFindingRepository extends JpaRepository<TdsFinding, UUID> {
 
     List<TdsFinding> findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(UUID workflowId);
 
+    @Query("SELECT f FROM TdsFinding f WHERE f.resolvedBy = 'system' AND f.resolveStatus = "
+            + "com.arktech.superaccountant.masters.models.ResolveStatus.RESOLVED AND "
+            + "((f.workflowId = :workflowId AND f.supersededAt IS NOT NULL) "
+            + "OR f.workflowId = :predecessorId) ORDER BY f.voucherDate ASC")
+    List<TdsFinding> findAutoResolvedByReupload(@Param("workflowId") UUID workflowId,
+                                                @Param("predecessorId") UUID predecessorId);
+
     long countByWorkflowIdAndSupersededAtIsNullAndResolveStatusNotIn(UUID workflowId,
                                                                     Collection<ResolveStatus> statuses);
 
