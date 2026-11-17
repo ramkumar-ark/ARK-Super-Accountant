@@ -158,6 +158,41 @@ describe('WorkflowFindingsTab', () => {
     expect(screen.queryByText('Open low')).not.toBeInTheDocument()
   })
 
+  it('shows auto-resolved findings with a re-upload badge and no review actions', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        findings: [
+          tdsFinding({
+            id: 'f1',
+            findingType: 'PAN_MISSING',
+            resolveStatus: 'RESOLVED',
+            blocking: false,
+            resolvedBy: 'system',
+            resolveNote: 'No longer present after re-upload.',
+            message: 'Auto resolved one',
+          }),
+          tdsFinding({
+            id: 'f2',
+            findingType: 'PAN_MISSING',
+            resolveStatus: 'OPEN',
+            message: 'Still open',
+          }),
+        ],
+        blockingCount: 1,
+      },
+    })
+
+    renderTab()
+
+    await screen.findByText('Auto resolved one')
+
+    await userEvent.click(screen.getByRole('button', { name: /Auto-resolved/ }))
+
+    expect(screen.getByText('Auto-resolved by re-upload')).toBeInTheDocument()
+    expect(screen.queryByText('Still open')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Override Value/ })).not.toBeInTheDocument()
+  })
+
   it('bulk acknowledges the selected open findings', async () => {
     mockGet.mockResolvedValue({
       data: {

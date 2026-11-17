@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.masters.models.Organization;
+import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
 import com.arktech.superaccountant.tds.models.Tds26qDetail;
@@ -8,8 +9,10 @@ import com.arktech.superaccountant.tds.models.TdsChallan;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.repository.Tds26qDetailRepository;
 import com.arktech.superaccountant.tds.repository.TdsDeducteeEntryRepository;
+import com.arktech.superaccountant.tds.repository.TdsFindingRepository;
 import com.arktech.superaccountant.tds.services.TdsQuarterService;
 import com.arktech.superaccountant.workflow.models.Workflow;
+import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.seam.FinalizePrecondition;
@@ -17,9 +20,10 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -29,22 +33,28 @@ import java.util.UUID;
 @Component
 public class Tds26qFinalizePrecondition implements FinalizePrecondition {
 
+    private static final Set<ResolveStatus> TERMINAL =
+            EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED);
+
     private final TdsDeducteeEntryRepository entryRepository;
     private final TdsQuarterService quarterService;
     private final Tds26qDetailRepository detailRepository;
     private final OrganizationRepository organizationRepository;
     private final WorkflowRepository workflowRepository;
+    private final TdsFindingRepository findingRepository;
 
     public Tds26qFinalizePrecondition(TdsDeducteeEntryRepository entryRepository,
                                       TdsQuarterService quarterService,
                                       Tds26qDetailRepository detailRepository,
                                       OrganizationRepository organizationRepository,
-                                      WorkflowRepository workflowRepository) {
+                                      WorkflowRepository workflowRepository,
+                                      TdsFindingRepository findingRepository) {
         this.entryRepository = entryRepository;
         this.quarterService = quarterService;
         this.detailRepository = detailRepository;
         this.organizationRepository = organizationRepository;
         this.workflowRepository = workflowRepository;
+        this.findingRepository = findingRepository;
     }
 
     @Override
@@ -71,6 +81,7 @@ public class Tds26qFinalizePrecondition implements FinalizePrecondition {
         conditions.add(pansValid(entries));
         conditions.add(deductorComplete(q));
         conditions.add(hasChallan(approved));
+        conditions.add(paymentMonthsFinalized(q));
         return conditions;
     }
 
@@ -154,6 +165,29 @@ public class Tds26qFinalizePrecondition implements FinalizePrecondition {
                 ? approved.size() + " approved challan" + (approved.size() == 1 ? "" : "s")
                 : "The quarter has no approved challan";
         return new TdsGateCondition("HAS_CHALLAN", "Has approved challan", passed, detail);
+    }
+
+    private TdsGateCondition paymentMonthsFinalized(Workflow q) {
+        List<Workflow> months = quarterService.paymentWorkflows(q);
+        List<String> problems = new ArrayList<>();
+        if (months.size() < 3) {
+            problems.add(months.size() + " of 3 payment months present");
+        }
+        for (Workflow month : months) {
+            if (month.getStage() != WorkflowStage.FINALIZED
+                    && month.getStage() != WorkflowStage.FILED) {
+                problems.add(month.getPeriodKey() + " is not finalized");
+            }
+            long blocking = findingRepository
+                    .countByWorkflowIdAndSupersededAtIsNullAndResolveStatusNotIn(
+                            month.getId(), TERMINAL);
+            if (blocking > 0) {
+                problems.add(month.getPeriodKey() + ": " + blocking
+                        + (blocking == 1 ? " blocking finding" : " blocking findings"));
+            }
+        }
+        return new TdsGateCondition("PAYMENT_MONTHS_FINALIZED", "Payment months finalized",
+                problems.isEmpty(), String.join("; ", problems));
     }
 
     private int fyOf(Workflow q, int fyStartMonth) {

@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Tells the UI whether any analyzer is registered for a workflow type.
- * No production analyzer exists yet, so every type reports false.
+ * Tells the UI whether any analyzer is registered for a workflow type. The production catalog
+ * registers the GST and TDS analyzers, so their workflow types report true.
  */
 @Component
 public class AnalyzerCatalog {

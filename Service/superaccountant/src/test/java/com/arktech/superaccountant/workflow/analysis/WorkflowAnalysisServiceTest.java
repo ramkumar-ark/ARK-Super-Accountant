@@ -16,7 +16,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -197,5 +201,58 @@ class WorkflowAnalysisServiceTest {
 
         assertThatThrownBy(() -> service.run(workflow.getOrganizationId(), workflow.getId(), "acct"))
                 .isInstanceOf(WorkflowConflictException.class);
+    }
+
+    @Test
+    void staleRunningRow_isFailedAndRetryable() {
+        Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
+        service = new WorkflowAnalysisService(workflowRepository, eventRepository, runRepository,
+                mastersJobGate, txManager, List.of(gstrAnalyzer), clock, Duration.ofMinutes(15));
+        WorkflowAnalysisRun stale = runningRun(clock.instant().minus(Duration.ofMinutes(16)));
+        when(runRepository.findByWorkflowIdOrderByStartedAtAsc(workflow.getId()))
+                .thenReturn(List.of(stale));
+
+        Workflow result = service.run(workflow.getOrganizationId(), workflow.getId(), "acct");
+
+        assertThat(stale.getStatus()).isEqualTo(AnalysisRunStatus.FAILED);
+        assertThat(stale.getErrorMessage()).contains("timed out");
+        assertThat(stale.getFinishedAt()).isEqualTo(clock.instant());
+        assertThat(result.getStage()).isEqualTo(WorkflowStage.FINDINGS_REVIEW);
+        ArgumentCaptor<WorkflowAnalysisRun> runs = ArgumentCaptor.forClass(WorkflowAnalysisRun.class);
+        verify(runRepository, org.mockito.Mockito.times(3)).save(runs.capture());
+        assertThat(runs.getAllValues().get(0)).isSameAs(stale);
+        WorkflowAnalysisRun freshRun = runs.getAllValues().get(1);
+        assertThat(freshRun).isSameAs(runs.getAllValues().get(2));
+        assertThat(freshRun.getStatus()).isEqualTo(AnalysisRunStatus.DONE);
+        assertThat(freshRun.getStartedAt()).isEqualTo(clock.instant());
+    }
+
+    @Test
+    void freshRunningRow_blocksConcurrentStart() {
+        Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
+        service = new WorkflowAnalysisService(workflowRepository, eventRepository, runRepository,
+                mastersJobGate, txManager, List.of(gstrAnalyzer), clock, Duration.ofMinutes(15));
+        WorkflowAnalysisRun running = runningRun(clock.instant().minus(Duration.ofMinutes(1)));
+        when(runRepository.findByWorkflowIdOrderByStartedAtAsc(workflow.getId()))
+                .thenReturn(List.of(running));
+
+        assertThatThrownBy(() -> service.run(workflow.getOrganizationId(), workflow.getId(), "acct"))
+                .isInstanceOf(WorkflowConflictException.class)
+                .hasMessage("Analysis is already running for this workflow");
+
+        assertThat(running.getStatus()).isEqualTo(AnalysisRunStatus.RUNNING);
+        assertThat(workflow.getStage()).isEqualTo(WorkflowStage.DATA_UPLOADED);
+        verify(gstrAnalyzer, never()).analyze(any(AnalysisContext.class));
+        verify(runRepository, never()).save(any());
+    }
+
+    private WorkflowAnalysisRun runningRun(Instant startedAt) {
+        WorkflowAnalysisRun run = new WorkflowAnalysisRun();
+        run.setWorkflowId(workflow.getId());
+        run.setAnalyzerCode("GST_DAYBOOK");
+        run.setUploadJobId(workflow.getUploadJobId());
+        run.setStatus(AnalysisRunStatus.RUNNING);
+        run.setStartedAt(startedAt);
+        return run;
     }
 }

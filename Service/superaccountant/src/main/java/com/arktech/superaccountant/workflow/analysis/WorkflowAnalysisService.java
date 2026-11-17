@@ -11,6 +11,8 @@ import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +20,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +44,8 @@ public class WorkflowAnalysisService {
     private final MastersJobGate mastersJobGate;
     private final PlatformTransactionManager txManager;
     private final List<WorkflowAnalyzer> analyzers;
+    private final Clock clock;
+    private final Duration runningTimeout;
 
     public WorkflowAnalysisService(WorkflowRepository workflowRepository,
                                    WorkflowEventRepository eventRepository,
@@ -47,12 +53,38 @@ public class WorkflowAnalysisService {
                                    MastersJobGate mastersJobGate,
                                    PlatformTransactionManager txManager,
                                    List<WorkflowAnalyzer> analyzers) {
+        this(workflowRepository, eventRepository, runRepository, mastersJobGate, txManager,
+                analyzers, Clock.systemUTC(), Duration.ofMinutes(15));
+    }
+
+    @Autowired
+    public WorkflowAnalysisService(WorkflowRepository workflowRepository,
+                                   WorkflowEventRepository eventRepository,
+                                   WorkflowAnalysisRunRepository runRepository,
+                                   MastersJobGate mastersJobGate,
+                                   PlatformTransactionManager txManager,
+                                   List<WorkflowAnalyzer> analyzers,
+                                   @Value("${workflow.analysis.running-timeout:PT15M}") Duration runningTimeout) {
+        this(workflowRepository, eventRepository, runRepository, mastersJobGate, txManager,
+                analyzers, Clock.systemUTC(), runningTimeout);
+    }
+
+    WorkflowAnalysisService(WorkflowRepository workflowRepository,
+                            WorkflowEventRepository eventRepository,
+                            WorkflowAnalysisRunRepository runRepository,
+                            MastersJobGate mastersJobGate,
+                            PlatformTransactionManager txManager,
+                            List<WorkflowAnalyzer> analyzers,
+                            Clock clock,
+                            Duration runningTimeout) {
         this.workflowRepository = workflowRepository;
         this.eventRepository = eventRepository;
         this.runRepository = runRepository;
         this.mastersJobGate = mastersJobGate;
         this.txManager = txManager;
         this.analyzers = analyzers == null ? List.of() : analyzers;
+        this.clock = clock;
+        this.runningTimeout = runningTimeout;
     }
 
     // REQUIRES_NEW: the AFTER_COMMIT upload-bound listener fires while the binding transaction is
@@ -69,6 +101,8 @@ public class WorkflowAnalysisService {
         }
         UUID uploadJobId = workflow.getUploadJobId();
         UUID mastersJobId = mastersJobGate.latestCompletedMastersJob(organizationId).orElse(null);
+        Instant now = clock.instant();
+        reclaimOrRejectRunning(workflowId, now);
 
         List<WorkflowAnalyzer> matching = analyzers.stream()
                 .filter(a -> a.types().contains(workflow.getType()))
@@ -81,7 +115,7 @@ public class WorkflowAnalysisService {
             run.setUploadJobId(uploadJobId);
             run.setMastersJobId(mastersJobId);
             run.setStatus(AnalysisRunStatus.RUNNING);
-            run.setStartedAt(Instant.now());
+            run.setStartedAt(now);
             saveRunInNewTransaction(run);
 
             AnalysisContext ctx = new AnalysisContext(workflowId, organizationId, workflow.getType(),
@@ -94,7 +128,7 @@ public class WorkflowAnalysisService {
                 run.setStatus(AnalysisRunStatus.FAILED);
                 run.setErrorMessage(e.getMessage());
             }
-            run.setFinishedAt(Instant.now());
+            run.setFinishedAt(clock.instant());
             saveRunInNewTransaction(run);
             allDone = allDone && run.getStatus() == AnalysisRunStatus.DONE;
         }
@@ -118,6 +152,22 @@ public class WorkflowAnalysisService {
             eventRepository.save(event);
         }
         return reloaded;
+    }
+
+    private void reclaimOrRejectRunning(UUID workflowId, Instant now) {
+        Instant staleBefore = now.minus(runningTimeout);
+        for (WorkflowAnalysisRun run : runRepository.findByWorkflowIdOrderByStartedAtAsc(workflowId)) {
+            if (run.getStatus() != AnalysisRunStatus.RUNNING) {
+                continue;
+            }
+            if (!run.getStartedAt().isBefore(staleBefore)) {
+                throw new WorkflowConflictException("Analysis is already running for this workflow");
+            }
+            run.setStatus(AnalysisRunStatus.FAILED);
+            run.setErrorMessage("Analysis run timed out after " + runningTimeout);
+            run.setFinishedAt(now);
+            saveRunInNewTransaction(run);
+        }
     }
 
     private void saveRunInNewTransaction(WorkflowAnalysisRun run) {

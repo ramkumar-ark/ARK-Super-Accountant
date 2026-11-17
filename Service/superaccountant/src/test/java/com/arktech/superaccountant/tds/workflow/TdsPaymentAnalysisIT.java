@@ -81,6 +81,8 @@ class TdsPaymentAnalysisIT {
     @Autowired DayBookUploadJobRepository dayBookJobRepository;
     @Autowired ParsedVoucherRepository parsedVoucherRepository;
     @Autowired TdsFindingRepository findingRepository;
+    @Autowired TdsFindingSource findingSource;
+    @Autowired org.springframework.transaction.support.TransactionTemplate tx;
     @Autowired TdsPaymentDetailRepository paymentDetailRepository;
 
     UUID orgId;
@@ -165,6 +167,15 @@ class TdsPaymentAnalysisIT {
     }
 
     private Workflow seedWorkflow() {
+        return seedWorkflow(dayBookJobId, null);
+    }
+
+    private Workflow seedWorkflow(UUID uploadJobId, UUID supersedesWorkflowId) {
+        if (supersedesWorkflowId != null) {
+            Workflow previous = workflowRepository.findById(supersedesWorkflowId).orElseThrow();
+            previous.setActive(false);
+            workflowRepository.save(previous);
+        }
         Workflow w = new Workflow();
         w.setOrganizationId(orgId);
         w.setType(WorkflowType.TDS_PAYMENT);
@@ -173,9 +184,50 @@ class TdsPaymentAnalysisIT {
         w.setPeriodKey("2025-04");
         w.setFinancialYear(2025);
         w.setStage(WorkflowStage.DATA_UPLOADED);
-        w.setUploadJobId(dayBookJobId);
+        w.setUploadJobId(uploadJobId);
+        w.setSupersedesWorkflowId(supersedesWorkflowId);
         w.setCreatedBy("it");
         return workflowRepository.save(w);
+    }
+
+    private UUID newDayBookJob(String fileName) {
+        DayBookUploadJob job = new DayBookUploadJob();
+        job.setOrganizationId(orgId);
+        job.setFileName(fileName);
+        job.setStatus(UploadJobStatus.COMPLETED);
+        job.setUploadedBy("it");
+        return dayBookJobRepository.save(job).getId();
+    }
+
+    private void addVoucher(UUID jobId, String guid, String number, String party,
+                            BigDecimal base, BigDecimal tds, String contentHash) {
+        ParsedVoucher v = new ParsedVoucher();
+        v.setUploadJobId(jobId);
+        v.setOrganizationId(orgId);
+        v.setVoucherGuid(guid);
+        v.setVoucherNumber(number);
+        v.setVoucherTypeName("Journal");
+        v.setVoucherDate(LocalDate.of(2025, 4, 10));
+        v.setPartyLedgerName(party);
+        v.setContentHash(contentHash);
+        v.setCancelled(false);
+        List<ParsedVoucherEntry> entries = new ArrayList<>();
+        entry(v, entries, "Subcontractor Charges", base, true, false);
+        entry(v, entries, party, base.add(tds), false, true);
+        entry(v, entries, "TDS Payable 194C", tds, false, false);
+        v.setEntries(entries);
+        parsedVoucherRepository.save(v);
+    }
+
+    private List<TdsFinding> currentFindings(UUID workflowId) {
+        return findingRepository
+                .findByWorkflowIdAndSupersededAtIsNullOrderByVoucherDateAsc(workflowId);
+    }
+
+    private TdsFinding finding(List<TdsFinding> findings, String party, TdsFindingType type) {
+        return findings.stream()
+                .filter(f -> type == f.getFindingType() && party.equals(f.getPartyLedgerName()))
+                .findFirst().orElseThrow();
     }
 
     @Test
@@ -223,5 +275,113 @@ class TdsPaymentAnalysisIT {
                 .toList();
         assertEquals(1, panMissing.size());
         assertEquals(ResolveStatus.APPROVED, panMissing.get(0).getResolveStatus());
+    }
+
+    @Test
+    void predecessorFindings_areResolvedOrDiscardedOnReupload() {
+        snapshot(mastersJobId, "XYZ Enterprises", LedgerCategory.CREDITOR, null, null, null);
+        addVoucher(dayBookJobId, "dv-2", "V2", "XYZ Enterprises",
+                new BigDecimal("50000"), new BigDecimal("-1000"), "c".repeat(64));
+        Workflow a = seedWorkflow();
+        analysisService.run(orgId, a.getId(), "it");
+
+        List<TdsFinding> first = currentFindings(a.getId());
+        TdsFinding abcPan = finding(first, "ABC Contractors", TdsFindingType.PAN_MISSING);
+        TdsFinding xyzPan = finding(first, "XYZ Enterprises", TdsFindingType.PAN_MISSING);
+        abcPan.setResolveStatus(ResolveStatus.APPROVED);
+        findingRepository.save(abcPan);
+        Workflow finalized = workflowRepository.findById(a.getId()).orElseThrow();
+        finalized.setStage(WorkflowStage.FINALIZED);
+        workflowRepository.save(finalized);
+
+        UUID jobB = newDayBookJob("daybook-b.xml");
+        addVoucher(jobB, "dv-1", "V1", "ABC Contractors",
+                new BigDecimal("100000"), new BigDecimal("-1000"), "a".repeat(64));
+        Workflow b = seedWorkflow(jobB, a.getId());
+        analysisService.run(orgId, b.getId(), "it");
+
+        TdsFinding abcReloaded = findingRepository.findById(abcPan.getId()).orElseThrow();
+        assertEquals(ResolveStatus.APPROVED, abcReloaded.getResolveStatus());
+        TdsFinding xyzReloaded = findingRepository.findById(xyzPan.getId()).orElseThrow();
+        assertEquals(ResolveStatus.RESOLVED, xyzReloaded.getResolveStatus());
+        assertEquals("system", xyzReloaded.getResolvedBy());
+        assertTrue(xyzReloaded.getResolveNote().toLowerCase().contains("re-upload"));
+
+        TdsFinding carried = finding(currentFindings(b.getId()), "ABC Contractors",
+                TdsFindingType.PAN_MISSING);
+        assertEquals(ResolveStatus.APPROVED, carried.getResolveStatus());
+        assertEquals(abcPan.getId(), carried.getCarriedFromFindingId());
+    }
+
+    @Test
+    void predecessorChangedEvidence_resetsToOpenWithoutReviewState() {
+        Workflow a = seedWorkflow();
+        analysisService.run(orgId, a.getId(), "it");
+        TdsFinding abcPan = finding(currentFindings(a.getId()), "ABC Contractors",
+                TdsFindingType.PAN_MISSING);
+        abcPan.setResolveStatus(ResolveStatus.APPROVED);
+        abcPan.setProposedValue("AAAPL1234C");
+        findingRepository.save(abcPan);
+
+        UUID jobC = newDayBookJob("daybook-c.xml");
+        addVoucher(jobC, "dv-1", "V1", "ABC Contractors",
+                new BigDecimal("120000"), new BigDecimal("-1000"), "d".repeat(64));
+        Workflow c = seedWorkflow(jobC, a.getId());
+        analysisService.run(orgId, c.getId(), "it");
+
+        TdsFinding reopened = finding(currentFindings(c.getId()), "ABC Contractors",
+                TdsFindingType.PAN_MISSING);
+        assertEquals(ResolveStatus.OPEN, reopened.getResolveStatus());
+        assertEquals(null, reopened.getProposedValue());
+        assertEquals(abcPan.getId(), reopened.getCarriedFromFindingId());
+        assertEquals(ResolveStatus.APPROVED,
+                findingRepository.findById(abcPan.getId()).orElseThrow().getResolveStatus());
+    }
+
+    @Test
+    void reupload_listsPredecessorAndSupersededAutoResolvedFindingsReadOnly() {
+        snapshot(mastersJobId, "XYZ Enterprises", LedgerCategory.CREDITOR, null, null, null);
+        snapshot(mastersJobId, "QRS Traders", LedgerCategory.CREDITOR, null, null, null);
+        addVoucher(dayBookJobId, "dv-2", "V2", "XYZ Enterprises",
+                new BigDecimal("50000"), new BigDecimal("-1000"), "c".repeat(64));
+        Workflow a = seedWorkflow();
+        analysisService.run(orgId, a.getId(), "it");
+        TdsFinding xyzPan = finding(currentFindings(a.getId()), "XYZ Enterprises",
+                TdsFindingType.PAN_MISSING);
+
+        UUID jobB = newDayBookJob("daybook-b.xml");
+        addVoucher(jobB, "dv-1", "V1", "ABC Contractors",
+                new BigDecimal("100000"), new BigDecimal("-1000"), "a".repeat(64));
+        addVoucher(jobB, "dv-3", "V3", "QRS Traders",
+                new BigDecimal("70000"), new BigDecimal("-1000"), "e".repeat(64));
+        Workflow b = seedWorkflow(jobB, a.getId());
+        analysisService.run(orgId, b.getId(), "it");
+        TdsFinding qrsPan = finding(currentFindings(b.getId()), "QRS Traders",
+                TdsFindingType.PAN_MISSING);
+
+        parsedVoucherRepository.findAll().stream()
+                .filter(v -> jobB.equals(v.getUploadJobId()) && "dv-3".equals(v.getVoucherGuid()))
+                .forEach(parsedVoucherRepository::delete);
+        Workflow reset = workflowRepository.findById(b.getId()).orElseThrow();
+        reset.setStage(WorkflowStage.DATA_UPLOADED);
+        workflowRepository.save(reset);
+        analysisService.run(orgId, b.getId(), "it");
+
+        Workflow reloaded = workflowRepository.findById(b.getId()).orElseThrow();
+        var listed = findingSource.list(reloaded);
+        var autoResolvedIds = listed.stream()
+                .filter(v -> "system".equals(v.resolvedBy()))
+                .map(v -> v.id())
+                .toList();
+        assertTrue(autoResolvedIds.contains(xyzPan.getId()));
+        assertTrue(autoResolvedIds.contains(qrsPan.getId()));
+        assertTrue(listed.stream().filter(v -> "system".equals(v.resolvedBy()))
+                .noneMatch(v -> v.blocking()));
+
+        long blockingBefore = findingSource.blockingCount(reloaded);
+        assertEquals(currentFindings(b.getId()).stream()
+                .filter(f -> f.getResolveStatus() == ResolveStatus.OPEN).count(), blockingBefore);
+        assertTrue(Boolean.TRUE.equals(tx.execute(st -> findingSource.lockForUpdate(reloaded, xyzPan.getId()).isEmpty())));
+        assertTrue(Boolean.TRUE.equals(tx.execute(st -> findingSource.lockForUpdate(reloaded, qrsPan.getId()).isEmpty())));
     }
 }

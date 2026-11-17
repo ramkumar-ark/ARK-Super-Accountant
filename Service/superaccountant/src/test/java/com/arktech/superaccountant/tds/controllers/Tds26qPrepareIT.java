@@ -472,6 +472,74 @@ class Tds26qPrepareIT {
     }
 
     @Test
+    void gate_followsPaymentMonthFindings_forExportAndFinalize() throws Exception {
+        Workflow quarter = seedQuarter();
+        Workflow april = seedPaymentWorkflow("2025-04", "2025-04", true, 111);
+        seedPaymentWorkflow("2025-05", "2025-05", true, 222);
+        seedPaymentWorkflow("2025-06", "2025-06", true, 333);
+        TdsDeducteeEntry e1 = seedEntry(quarter);
+        TdsDeducteeEntry e2 = seedEntry(quarter);
+        TdsDeducteeEntry e3 = seedEntry(quarter);
+        post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
+                "{\"challanId\":\"" + challanIdsByPeriod.get("2025-04")
+                        + "\",\"entryIds\":[\"" + e1.getId() + "\"]}");
+        post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
+                "{\"challanId\":\"" + challanIdsByPeriod.get("2025-05")
+                        + "\",\"entryIds\":[\"" + e2.getId() + "\"]}");
+        post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
+                "{\"challanId\":\"" + challanIdsByPeriod.get("2025-06")
+                        + "\",\"entryIds\":[\"" + e3.getId() + "\"]}");
+
+        TdsFinding finding = new TdsFinding();
+        finding.setOrganizationId(orgId);
+        finding.setWorkflowId(april.getId());
+        finding.setUploadJobId(UUID.randomUUID());
+        finding.setFindingType(TdsFindingType.PAN_MISSING);
+        finding.setSeverity(com.arktech.superaccountant.masters.models.FindingSeverity.ERROR);
+        finding.setPartyLedgerName("ABC Contractors");
+        finding.setMessage("PAN is missing");
+        finding.setResolveStatus(ResolveStatus.ACKNOWLEDGED);
+        finding = findingRepository.save(finding);
+
+        String blockedExport = mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/v1/workflows/" + quarter.getId()
+                                + "/tds/export").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(blockedExport.contains("Payment months finalized"), blockedExport);
+        assertTrue(blockedExport.contains("2025-04"), blockedExport);
+
+        String blockedFinalize = mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.post("/api/v1/workflows/" + quarter.getId()
+                                + "/finalize")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(blockedFinalize.contains("Payment months finalized"), blockedFinalize);
+        assertTrue(blockedFinalize.contains("2025-04"), blockedFinalize);
+
+        finding.setResolveStatus(ResolveStatus.APPROVED);
+        findingRepository.save(finding);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/v1/workflows/" + quarter.getId()
+                                + "/tds/export").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isOk());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.post("/api/v1/workflows/" + quarter.getId()
+                                + "/finalize")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isOk());
+    }
+
+    @Test
     void paymentFinalize_openHigherRateNotAppliedFinding_conflicts() throws Exception {
         Workflow payment = new Workflow();
         payment.setOrganizationId(orgId);

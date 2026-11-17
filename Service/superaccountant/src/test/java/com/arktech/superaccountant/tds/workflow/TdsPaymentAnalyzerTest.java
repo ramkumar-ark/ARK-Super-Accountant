@@ -36,9 +36,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -104,8 +106,9 @@ class TdsPaymentAnalyzerTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<TdsFinding>> captor = ArgumentCaptor.forClass(List.class);
-        verify(findingRepository).saveAll(captor.capture());
-        List<TdsFinding> saved = captor.getValue();
+        verify(findingRepository, times(2)).saveAll(captor.capture());
+        assertTrue(captor.getAllValues().get(0).isEmpty());
+        List<TdsFinding> saved = captor.getAllValues().get(1);
         assertEquals(1, saved.size());
         TdsFinding f = saved.get(0);
         assertNotNull(f.getFindingKey());
