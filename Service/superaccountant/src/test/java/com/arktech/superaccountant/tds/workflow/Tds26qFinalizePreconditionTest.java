@@ -8,8 +8,10 @@ import com.arktech.superaccountant.tds.models.TdsChallanStatus;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.repository.Tds26qDetailRepository;
 import com.arktech.superaccountant.tds.repository.TdsDeducteeEntryRepository;
+import com.arktech.superaccountant.tds.repository.TdsFindingRepository;
 import com.arktech.superaccountant.tds.services.TdsQuarterService;
 import com.arktech.superaccountant.workflow.models.Workflow;
+import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +43,7 @@ class Tds26qFinalizePreconditionTest {
 
     private TdsDeducteeEntryRepository entryRepository;
     private Tds26qDetailRepository detailRepository;
+    private TdsFindingRepository findingRepository;
     private Tds26qFinalizePrecondition precondition;
     private Workflow quarter;
 
@@ -48,11 +51,12 @@ class Tds26qFinalizePreconditionTest {
     void setUp() {
         entryRepository = mock(TdsDeducteeEntryRepository.class);
         detailRepository = mock(Tds26qDetailRepository.class);
+        findingRepository = mock(TdsFindingRepository.class);
         TdsQuarterService quarterService = mock(TdsQuarterService.class);
         OrganizationRepository organizationRepository = mock(OrganizationRepository.class);
         WorkflowRepository workflowRepository = mock(WorkflowRepository.class);
         precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
-                detailRepository, organizationRepository, workflowRepository);
+                detailRepository, organizationRepository, workflowRepository, findingRepository);
 
         quarter = new Workflow();
         quarter.setId(quarterId);
@@ -78,6 +82,15 @@ class Tds26qFinalizePreconditionTest {
         approved.setTdsAmount(new BigDecimal("1000.00"));
         approved.setStatus(TdsChallanStatus.APPROVED);
         when(quarterService.approvedChallans(quarter)).thenReturn(List.of(approved));
+        List<Workflow> paymentMonths = new java.util.ArrayList<>();
+        for (String month : List.of("2025-04", "2025-05", "2025-06")) {
+            Workflow payment = new Workflow();
+            payment.setId(UUID.randomUUID());
+            payment.setPeriodKey(month);
+            payment.setStage(WorkflowStage.FINALIZED);
+            paymentMonths.add(payment);
+        }
+        when(quarterService.paymentWorkflows(quarter)).thenReturn(paymentMonths);
 
         Tds26qDetail detail = new Tds26qDetail();
         detail.setWorkflowId(quarterId);
@@ -148,7 +161,8 @@ class Tds26qFinalizePreconditionTest {
         TdsQuarterService quarterService = mock(TdsQuarterService.class);
         when(quarterService.approvedChallans(quarter)).thenReturn(List.of(nil));
         precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
-                detailRepository, mock(OrganizationRepository.class), mock(WorkflowRepository.class));
+                detailRepository, mock(OrganizationRepository.class), mock(WorkflowRepository.class),
+                findingRepository);
         TdsDeducteeEntry mapped = entry("194C", "1000.00", "1000.00", true, false);
         mapped.setTdsChallanId(nil.getId());
         entries(List.of(mapped));
@@ -183,7 +197,7 @@ class Tds26qFinalizePreconditionTest {
         when(quarterService.approvedChallans(quarter)).thenReturn(List.of());
 
         precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
-                detailRepository, orgRepo, mock(WorkflowRepository.class));
+                detailRepository, orgRepo, mock(WorkflowRepository.class), findingRepository);
 
         Tds26qDetail detail = new Tds26qDetail();
         detail.setWorkflowId(quarterId);
@@ -216,7 +230,7 @@ class Tds26qFinalizePreconditionTest {
         when(quarterService.approvedChallans(quarter)).thenReturn(List.of());
 
         precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
-                detailRepository, orgRepo, mock(WorkflowRepository.class));
+                detailRepository, orgRepo, mock(WorkflowRepository.class), findingRepository);
 
         Tds26qDetail detail = new Tds26qDetail();
         detail.setWorkflowId(quarterId);
@@ -250,7 +264,8 @@ class Tds26qFinalizePreconditionTest {
         TdsQuarterService quarterService = mock(TdsQuarterService.class);
         when(quarterService.approvedChallans(quarter)).thenReturn(List.of());
         precondition = new Tds26qFinalizePrecondition(entryRepository, quarterService,
-                detailRepository, mock(OrganizationRepository.class), mock(WorkflowRepository.class));
+                detailRepository, mock(OrganizationRepository.class), mock(WorkflowRepository.class),
+                findingRepository);
         entries(List.of());
 
         List<String> unmet = precondition.unmet(quarter);
@@ -278,14 +293,15 @@ class Tds26qFinalizePreconditionTest {
         TdsQuarterService emptyQuarter = mock(TdsQuarterService.class);
         when(emptyQuarter.approvedChallans(quarter)).thenReturn(List.of());
         precondition = new Tds26qFinalizePrecondition(entryRepository, emptyQuarter,
-                detailRepository, mock(OrganizationRepository.class), mock(WorkflowRepository.class));
+                detailRepository, mock(OrganizationRepository.class), mock(WorkflowRepository.class),
+                findingRepository);
         entries(List.of());
 
         List<String> codes = precondition.evaluate(quarter).stream()
                 .map(TdsGateCondition::code).toList();
 
         assertEquals(List.of("ALL_ENTRIES_MAPPED", "CHALLANS_RECONCILE", "PANS_VALID",
-                "DEDUCTOR_COMPLETE", "HAS_CHALLAN"), codes);
+                "DEDUCTOR_COMPLETE", "HAS_CHALLAN", "PAYMENT_MONTHS_FINALIZED"), codes);
         assertFalse(precondition.evaluate(quarter).get(4).passed());
     }
 }
