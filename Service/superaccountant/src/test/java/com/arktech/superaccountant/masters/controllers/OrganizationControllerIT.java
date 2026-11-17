@@ -19,6 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -92,6 +93,28 @@ class OrganizationControllerIT {
                 .andExpect(jsonPath("$[0].username").value("owner1"))
                 .andExpect(jsonPath("$[0].email").value("owner1@test.com"))
                 .andExpect(jsonPath("$[0].role").value("ROLE_OWNER"));
+    }
+
+    @Test
+    void getOrganization_afterDeductorPatch_returnsStoredDeductorFields() throws Exception {
+        String jwt = signupAndLogin("dedowner", "dedowner@test.com", "owner");
+        UUID orgId = createOrganization(jwt);
+
+        mockMvc.perform(patch("/api/organizations/{id}/deductor", orgId)
+                .header("Authorization", "Bearer " + jwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"tan":"AAAA12345A","deductorType":"K","responsiblePersonName":"Ravi Kumar","responsiblePersonDesignation":"Proprietor"}
+                    """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/organizations/{id}", orgId)
+                .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tan").value("AAAA12345A"))
+                .andExpect(jsonPath("$.deductorType").value("K"))
+                .andExpect(jsonPath("$.responsiblePersonName").value("Ravi Kumar"))
+                .andExpect(jsonPath("$.responsiblePersonDesignation").value("Proprietor"));
     }
 
     @Test

@@ -91,14 +91,18 @@ public class OrganizationController {
         }
 
         return organizationRepository.findById(id)
-                .map(org -> ResponseEntity.ok(Map.of(
-                        "id", org.getId(),
-                        "name", org.getName(),
-                        "gstin", org.getGstin() != null ? org.getGstin() : "",
-                        "pan", org.getPan() != null ? org.getPan() : "",
-                        "registeredAddress", org.getRegisteredAddress() != null ? org.getRegisteredAddress() : "",
-                        "financialYearStart", org.getFinancialYearStart(),
-                        "createdAt", org.getCreatedAt()
+                .map(org -> ResponseEntity.ok(Map.ofEntries(
+                        Map.entry("id", org.getId()),
+                        Map.entry("name", org.getName()),
+                        Map.entry("gstin", org.getGstin() != null ? org.getGstin() : ""),
+                        Map.entry("pan", org.getPan() != null ? org.getPan() : ""),
+                        Map.entry("registeredAddress", org.getRegisteredAddress() != null ? org.getRegisteredAddress() : ""),
+                        Map.entry("financialYearStart", org.getFinancialYearStart()),
+                        Map.entry("tan", org.getTan() != null ? org.getTan() : ""),
+                        Map.entry("deductorType", org.getDeductorType() != null ? org.getDeductorType() : ""),
+                        Map.entry("responsiblePersonName", org.getResponsiblePersonName() != null ? org.getResponsiblePersonName() : ""),
+                        Map.entry("responsiblePersonDesignation", org.getResponsiblePersonDesignation() != null ? org.getResponsiblePersonDesignation() : ""),
+                        Map.entry("createdAt", org.getCreatedAt())
                 )))
                 .orElse(ResponseEntity.notFound().build());
     }
