@@ -21,8 +21,6 @@ Super Accountant/
 └── Client/                    # React 19 + Vite 8 frontend (TypeScript)
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed breakdown.
-
 ## Quick start
 
 **Prerequisites:** Java 25, Node.js 18+, PostgreSQL 15+ running on port 5432.
@@ -48,7 +46,7 @@ npm run dev
 The backend requires `DB_PASSWORD` and refuses to start without it. `DB_URL` and `DB_USERNAME` default to
 `jdbc:postgresql://localhost:5432/superaccountant` and `postgres`; override them for a non-local database.
 
-Open [http://localhost:5173](http://localhost:5173). See [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) for a full walkthrough.
+Open [http://localhost:5173](http://localhost:5173).
 
 ## Roles
 
@@ -68,12 +66,3 @@ Open [http://localhost:5173](http://localhost:5173). See [docs/GETTING-STARTED.m
 | Frontend | React 19, TypeScript, Vite 8, TanStack Router, Zustand, Axios |
 | Styling | Tailwind CSS 4 |
 | Testing | Vitest + Testing Library (frontend), Maven Surefire + Failsafe with Testcontainers (backend) |
-
-## Documentation
-
-- [ARCHITECTURE](docs/ARCHITECTURE.md) — System design, data model, security model
-- [GETTING-STARTED](docs/GETTING-STARTED.md) — First-time setup and onboarding walkthrough
-- [DEVELOPMENT](docs/DEVELOPMENT.md) — Development workflow, conventions, debugging
-- [TESTING](docs/TESTING.md) — Test strategy and how to run tests
-- [CONFIGURATION](docs/CONFIGURATION.md) — All configuration variables and their purpose
-- [API](docs/API.md) — Full REST API reference
