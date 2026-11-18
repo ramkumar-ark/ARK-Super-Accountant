@@ -51,7 +51,7 @@ public class TamperFindingSource implements WorkflowFindingSource {
 
     @Override
     public long blockingCount(Workflow w) {
-        return relevantFindings(w).size();
+        return list(w).stream().filter(WorkflowFindingView::blocking).count();
     }
 
     @Override
@@ -103,11 +103,13 @@ public class TamperFindingSource implements WorkflowFindingSource {
         return tamperFindingRepository
                 .findByOrganizationIdAndResolveStatusNotIn(w.getOrganizationId(), TERMINAL)
                 .stream()
-                .filter(f -> affectedTypes(f).contains(w.getType())
-                        && w.getStage() != WorkflowStage.FINALIZED
-                        && w.getStage() != WorkflowStage.FILED
-                        && f.getChangeDate() != null
-                        && !w.getPeriodEnd().isBefore(f.getChangeDate()))
+                .filter(f -> f.getChangeKind() == TamperChangeKind.RETRO_FLAGGED
+                        ? affectsWorkflow(f, w)
+                        : affectedTypes(f).contains(w.getType())
+                                && w.getStage() != WorkflowStage.FINALIZED
+                                && w.getStage() != WorkflowStage.FILED
+                                && f.getChangeDate() != null
+                                && !w.getPeriodEnd().isBefore(f.getChangeDate()))
                 .toList();
     }
 
@@ -135,11 +137,14 @@ public class TamperFindingSource implements WorkflowFindingSource {
 
     private WorkflowFindingView view(TamperFinding f, Workflow w) {
         boolean blocking = w != null
-                && affectedTypes(f).contains(w.getType())
-                && w.getStage() != WorkflowStage.FINALIZED
-                && w.getStage() != WorkflowStage.FILED
-                && f.getChangeDate() != null
-                && !w.getPeriodEnd().isBefore(f.getChangeDate());
+                && !TERMINAL.contains(f.getResolveStatus())
+                && (f.getChangeKind() == TamperChangeKind.RETRO_FLAGGED
+                        ? affectsWorkflow(f, w)
+                        : affectedTypes(f).contains(w.getType())
+                                && w.getStage() != WorkflowStage.FINALIZED
+                                && w.getStage() != WorkflowStage.FILED
+                                && f.getChangeDate() != null
+                                && !w.getPeriodEnd().isBefore(f.getChangeDate()));
         String evidenceOld = isMastersFinding(f) ? f.getOldValue() : f.getOldHash();
         String evidenceNew = isMastersFinding(f) ? f.getNewValue() : f.getNewHash();
         return new WorkflowFindingView(f.getId(), "TAMPER", "TAMPER_" + f.getChangeKind(), "HIGH", blocking,
