@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gstr1.services;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -41,6 +42,79 @@ public final class Gstr1Rules {
     /** Invoice-number shape accepted for GSTR-1 reporting. */
     public static final Pattern INVOICE_NUMBER_PATTERN =
             Pattern.compile("^[A-Za-z0-9/-]{1,16}$");
+
+    private static final Map<String, String> STATE_NAME_TO_CODE = Map.ofEntries(
+            Map.entry("jammu and kashmir", "01"),
+            Map.entry("himachal pradesh", "02"),
+            Map.entry("punjab", "03"),
+            Map.entry("chandigarh", "04"),
+            Map.entry("uttarakhand", "05"),
+            Map.entry("haryana", "06"),
+            Map.entry("delhi", "07"),
+            Map.entry("nct of delhi", "07"),
+            Map.entry("rajasthan", "08"),
+            Map.entry("uttar pradesh", "09"),
+            Map.entry("bihar", "10"),
+            Map.entry("sikkim", "11"),
+            Map.entry("arunachal pradesh", "12"),
+            Map.entry("nagaland", "13"),
+            Map.entry("manipur", "14"),
+            Map.entry("mizoram", "15"),
+            Map.entry("tripura", "16"),
+            Map.entry("meghalaya", "17"),
+            Map.entry("assam", "18"),
+            Map.entry("west bengal", "19"),
+            Map.entry("jharkhand", "20"),
+            Map.entry("odisha", "21"),
+            Map.entry("orissa", "21"),
+            Map.entry("chhattisgarh", "22"),
+            Map.entry("madhya pradesh", "23"),
+            Map.entry("gujarat", "24"),
+            Map.entry("dadra and nagar haveli and daman and diu", "26"),
+            Map.entry("daman and diu", "26"),
+            Map.entry("dadra and nagar haveli", "26"),
+            Map.entry("maharashtra", "27"),
+            Map.entry("karnataka", "29"),
+            Map.entry("goa", "30"),
+            Map.entry("lakshadweep", "31"),
+            Map.entry("kerala", "32"),
+            Map.entry("tamil nadu", "33"),
+            Map.entry("puducherry", "34"),
+            Map.entry("pondicherry", "34"),
+            Map.entry("andaman and nicobar islands", "35"),
+            Map.entry("telangana", "36"),
+            Map.entry("andhra pradesh", "37"),
+            Map.entry("ladakh", "38"),
+            Map.entry("other territory", "97"),
+            Map.entry("other countries", "97"));
+
+    /**
+     * Normalizes a captured place of supply into a GSTR-1 state code. Accepts
+     * an already-valid code ("29"), a Tally state name ("Karnataka") or a
+     * code-prefixed value ("29-Karnataka"). Returns null when unresolvable.
+     */
+    public static String normalizeStateCode(String pos) {
+        if (pos == null || pos.isBlank()) {
+            return null;
+        }
+        String trimmed = pos.trim();
+        if (STATE_CODES.contains(trimmed)) {
+            return trimmed;
+        }
+        String key = trimmed.toLowerCase(Locale.ROOT);
+        String code = STATE_NAME_TO_CODE.get(key);
+        if (code != null) {
+            return code;
+        }
+        int dash = trimmed.indexOf('-');
+        if (dash == 2) {
+            String prefix = trimmed.substring(0, 2);
+            if (STATE_CODES.contains(prefix)) {
+                return prefix;
+            }
+        }
+        return null;
+    }
 
     private Gstr1Rules() {
     }

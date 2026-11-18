@@ -1,7 +1,7 @@
 package com.arktech.superaccountant.gstr1.services;
 
 import java.math.BigDecimal;
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -29,6 +29,17 @@ public final class VoucherView {
     private final String supplierStateCode;
     private final BigDecimal totalValue;
     private final boolean isCancelled;
+    private final String voucherNumber;
+    private final LocalDate voucherDate;
+    private final BigDecimal taxableValue;
+    private final BigDecimal rate;
+    private final BigDecimal igst;
+    private final BigDecimal cgst;
+    private final BigDecimal sgst;
+    private final BigDecimal cess;
+    private final String hsn;
+    private final String uqc;
+    private final BigDecimal quantity;
 
     private VoucherView(Builder b) {
         this.voucherKey = b.voucherKey;
@@ -43,6 +54,25 @@ public final class VoucherView {
         this.supplierStateCode = b.supplierStateCode;
         this.totalValue = b.totalValue;
         this.isCancelled = b.isCancelled;
+        this.voucherNumber = b.voucherNumber;
+        this.voucherDate = b.voucherDate;
+        this.taxableValue = b.taxableValue;
+        this.rate = b.rate;
+        this.igst = b.igst;
+        this.cgst = b.cgst;
+        this.sgst = b.sgst;
+        this.cess = b.cess;
+        this.hsn = b.hsn;
+        this.uqc = b.uqc;
+        this.quantity = b.quantity;
+    }
+
+    /**
+     * Place of supply normalized to a GSTR-1 state code via
+     * {@link Gstr1Rules#normalizeStateCode(String)}; null when unresolvable.
+     */
+    public String placeOfSupplyCode() {
+        return Gstr1Rules.normalizeStateCode(placeOfSupply);
     }
 
     public static VoucherView from(ParsedVoucher voucher, String voucherKey,
@@ -111,6 +141,50 @@ public final class VoucherView {
         return isCancelled;
     }
 
+    public String getVoucherNumber() {
+        return voucherNumber;
+    }
+
+    public LocalDate getVoucherDate() {
+        return voucherDate;
+    }
+
+    public BigDecimal getTaxableValue() {
+        return taxableValue;
+    }
+
+    public BigDecimal getRate() {
+        return rate;
+    }
+
+    public BigDecimal getIgst() {
+        return igst;
+    }
+
+    public BigDecimal getCgst() {
+        return cgst;
+    }
+
+    public BigDecimal getSgst() {
+        return sgst;
+    }
+
+    public BigDecimal getCess() {
+        return cess;
+    }
+
+    public String getHsn() {
+        return hsn;
+    }
+
+    public String getUqc() {
+        return uqc;
+    }
+
+    public BigDecimal getQuantity() {
+        return quantity;
+    }
+
     public static final class Builder {
         private String voucherKey;
         private String voucherTypeName;
@@ -124,6 +198,17 @@ public final class VoucherView {
         private String supplierStateCode;
         private BigDecimal totalValue;
         private boolean isCancelled;
+        private String voucherNumber;
+        private LocalDate voucherDate;
+        private BigDecimal taxableValue;
+        private BigDecimal rate;
+        private BigDecimal igst;
+        private BigDecimal cgst;
+        private BigDecimal sgst;
+        private BigDecimal cess;
+        private String hsn;
+        private String uqc;
+        private BigDecimal quantity;
 
         public Builder voucherKey(String v) {
             this.voucherKey = v;
@@ -182,6 +267,61 @@ public final class VoucherView {
 
         public Builder isCancelled(boolean v) {
             this.isCancelled = v;
+            return this;
+        }
+
+        public Builder voucherNumber(String v) {
+            this.voucherNumber = v;
+            return this;
+        }
+
+        public Builder voucherDate(LocalDate v) {
+            this.voucherDate = v;
+            return this;
+        }
+
+        public Builder taxableValue(BigDecimal v) {
+            this.taxableValue = v;
+            return this;
+        }
+
+        public Builder rate(BigDecimal v) {
+            this.rate = v;
+            return this;
+        }
+
+        public Builder igst(BigDecimal v) {
+            this.igst = v;
+            return this;
+        }
+
+        public Builder cgst(BigDecimal v) {
+            this.cgst = v;
+            return this;
+        }
+
+        public Builder sgst(BigDecimal v) {
+            this.sgst = v;
+            return this;
+        }
+
+        public Builder cess(BigDecimal v) {
+            this.cess = v;
+            return this;
+        }
+
+        public Builder hsn(String v) {
+            this.hsn = v;
+            return this;
+        }
+
+        public Builder uqc(String v) {
+            this.uqc = v;
+            return this;
+        }
+
+        public Builder quantity(BigDecimal v) {
+            this.quantity = v;
             return this;
         }
 
