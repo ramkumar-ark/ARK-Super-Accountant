@@ -17,6 +17,8 @@ public class FilerProfileRequest {
 
     private boolean einvoiceEnabled;
 
+    private Integer hsnDigits;
+
     @NotNull
     private LocalDate effectiveFrom;
 }

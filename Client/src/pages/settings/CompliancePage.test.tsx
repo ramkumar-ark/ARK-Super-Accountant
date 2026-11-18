@@ -171,6 +171,7 @@ describe('CompliancePage — responsibility start', () => {
               iffOptIn: false,
               einvoiceEnabled: false,
               effectiveFrom: '2024-04-01',
+              hsnDigits: 4,
               createdBy: 'alice',
               createdAt: '2024-04-01T00:00:00Z',
             },
@@ -180,6 +181,7 @@ describe('CompliancePage — responsibility start', () => {
               iffOptIn: true,
               einvoiceEnabled: false,
               effectiveFrom: '2025-04-01',
+              hsnDigits: 6,
               createdBy: 'alice',
               createdAt: '2025-04-01T00:00:00Z',
             },
@@ -195,11 +197,13 @@ describe('CompliancePage — responsibility start', () => {
     await waitFor(() => {
       expect(screen.getByText('2024-04-01')).toBeInTheDocument()
       expect(screen.getByText('2025-04-01')).toBeInTheDocument()
+      expect(screen.getByText('HSN: 6 digits')).toBeInTheDocument()
     })
 
     const user = userEvent.setup()
     await user.selectOptions(screen.getByLabelText('Frequency'), 'QRMP')
     await user.click(screen.getByLabelText('IFF opt-in'))
+    await user.selectOptions(screen.getByLabelText('HSN digits'), '6')
     await user.type(screen.getByLabelText('Effective from'), '2025-07-01')
     await user.click(screen.getByRole('button', { name: 'Add profile' }))
 
@@ -208,6 +212,7 @@ describe('CompliancePage — responsibility start', () => {
         frequency: 'QRMP',
         iffOptIn: true,
         einvoiceEnabled: false,
+        hsnDigits: 6,
         effectiveFrom: '2025-07-01',
       })
     })
