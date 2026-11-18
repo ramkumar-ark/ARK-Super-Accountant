@@ -222,10 +222,26 @@ public class TamperComparisonService {
         return VoucherScopeClassifier.touchedScopesText(scopes);
     }
 
+    private static final Set<ResolveStatus> TERMINAL_STATUSES =
+            EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED);
+
     void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId,
                               DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
         List<Workflow> blockingWorkflows = blockingWorkflows(change, activeWorkflows);
         if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED && blockingWorkflows.isEmpty()) {
+            return;
+        }
+        String findingKey = change.getChangeKind().name() + "|" + change.getVoucherKey();
+        boolean retro = change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED;
+        String evidenceHash = EvidenceHash.of("TAMPER_" + change.getChangeKind(), change.getVoucherKey(),
+                retro ? change.getRetroSection() : change.getOldHash(),
+                retro ? (change.getRetroShortfall() == null ? null : change.getRetroShortfall().toPlainString())
+                        : change.getNewHash(),
+                change.getNewDate() == null ? null : change.getNewDate().toString());
+        if (retro && tamperFindingRepository.findByOrganizationId(orgId).stream()
+                .anyMatch(f -> findingKey.equals(f.getFindingKey())
+                        && evidenceHash.equals(f.getEvidenceHash())
+                        && TERMINAL_STATUSES.contains(f.getResolveStatus()))) {
             return;
         }
         change.setBlocking(!blockingWorkflows.isEmpty());
@@ -236,17 +252,10 @@ public class TamperComparisonService {
         if (!change.isBlocking()) {
             return;
         }
-        String findingKey = change.getChangeKind().name() + "|" + change.getVoucherKey();
         changesByKey.put(findingKey, change);
-        boolean retro = change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED;
-        String evidenceHash = EvidenceHash.of("TAMPER_" + change.getChangeKind(), change.getVoucherKey(),
-                retro ? change.getRetroSection() : change.getOldHash(),
-                retro ? (change.getRetroShortfall() == null ? null : change.getRetroShortfall().toPlainString())
-                        : change.getNewHash(),
-                change.getNewDate() == null ? null : change.getNewDate().toString());
         List<TamperFinding> existing = tamperFindingRepository
                 .findByOrganizationIdAndResolveStatusNotIn(orgId,
-                        EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED));
+                        TERMINAL_STATUSES);
         TamperFinding tracked = existing.stream()
                 .filter(f -> findingKey.equals(f.getFindingKey()))
                 .findFirst()

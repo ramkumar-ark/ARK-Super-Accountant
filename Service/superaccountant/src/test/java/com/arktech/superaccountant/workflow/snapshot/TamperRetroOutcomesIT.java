@@ -218,6 +218,25 @@ class TamperRetroOutcomesIT {
     }
 
     @Test
+    void approvedRetroFlag_staysApprovedOnNextUpload() throws Exception {
+        seedRetroFinding();
+        assertThat(actStatus(accountantToken, "APPROVE", "accept the shortfall")).isEqualTo("200");
+
+        DayBookUploadJob job3 = completedJob(orgId, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedTdsVoucher(orgId, job3.getId(), "g-apr", "PY/APR/1", LocalDate.of(2025, 4, 10), "h-apr",
+                "Contractor ABC", entry("Professional Fees", "20000"));
+        seedTdsVoucher(orgId, job3.getId(), "g-may", "PY/MAY/1", LocalDate.of(2025, 5, 10), "h-may",
+                "Contractor ABC", entry("Professional Fees", "40000"));
+        tamperComparisonService.compare(job3.getId());
+
+        assertThat(theFinding().getResolveStatus()).isEqualTo(ResolveStatus.APPROVED);
+        mockMvc.perform(get("/api/v1/workflows/" + tdsApr.getId() + "/findings")
+                        .header("Authorization", "Bearer " + accountantToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockingCount").value(0));
+    }
+
+    @Test
     void accountantAcknowledge_approvesInOneStep() throws Exception {
         seedRetroFinding();
         assertThat(actStatus(accountantToken, "ACKNOWLEDGE", "accept the shortfall")).isEqualTo("200");
