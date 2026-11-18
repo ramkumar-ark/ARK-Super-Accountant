@@ -1,7 +1,9 @@
 package com.arktech.superaccountant.gst.workflow;
 
+import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.gst.models.VoucherSide;
+import com.arktech.superaccountant.gst.rules.GstRuleSupport;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingService;
 import com.arktech.superaccountant.gst.repository.GstDaybookFindingRepository;
@@ -36,11 +38,17 @@ public class GstOutwardAnalyzer extends AbstractGstAnalyzer {
 
     @Override
     public Set<WorkflowType> types() {
-        return Set.of(WorkflowType.GSTR1);
+        return Set.of(WorkflowType.GSTR1, WorkflowType.IFF);
     }
 
     @Override
     protected Set<VoucherSide> keepSides() {
         return Set.of(VoucherSide.SALES);
+    }
+
+    /** IFF reports only B2B invoices and CDNR credit notes: sales vouchers with a registered party. */
+    @Override
+    protected boolean includeVoucher(ParsedVoucher voucher, WorkflowType type) {
+        return type != WorkflowType.IFF || GstRuleSupport.isValidGstin(voucher.getPartyGstin());
     }
 }

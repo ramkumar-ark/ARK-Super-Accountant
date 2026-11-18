@@ -66,6 +66,44 @@ class Gstr1JsonParserTest {
     }
 
     @Test
+    void parsesSplitHsnSections() throws IOException {
+        byte[] v3;
+        try (InputStream in = getClass().getResourceAsStream("/filedreturns/gstr1-synthetic-v3.json")) {
+            v3 = in.readAllBytes();
+        }
+        Gstr1Parsed parsed = new Gstr1JsonParser().parse(v3);
+        assertFalse(parsed.warnings().stream().anyMatch(w -> w.contains("hsn_b2b") || w.contains("hsn_b2c")));
+
+        List<com.arktech.superaccountant.filedreturns.FiledReturnLine> hsn = parsed.lines().stream()
+                .filter(l -> l.getTableCode().equals("HSN")).toList();
+        assertEquals(3, hsn.size());
+        assertEquals(2, hsn.stream().filter(l -> "B2B".equals(l.getHsnCategory())).count());
+        assertEquals(1, hsn.stream().filter(l -> "B2C".equals(l.getHsnCategory())).count());
+        assertTrue(hsn.stream().anyMatch(l -> "9983".equals(l.getLabel())
+                && l.getTaxable().doubleValue() == 1000.00
+                && l.getIgst().doubleValue() == 180.00));
+        assertTrue(hsn.stream().anyMatch(l -> "9403".equals(l.getLabel())
+                && l.getCgst().doubleValue() == 9.00));
+    }
+
+    @Test
+    void parsesCurrentDocIssueShape() throws IOException {
+        byte[] v3;
+        try (InputStream in = getClass().getResourceAsStream("/filedreturns/gstr1-synthetic-v3.json")) {
+            v3 = in.readAllBytes();
+        }
+        Gstr1Parsed parsed = new Gstr1JsonParser().parse(v3);
+        List<com.arktech.superaccountant.filedreturns.FiledReturnLine> docs = parsed.lines().stream()
+                .filter(l -> l.getTableCode().equals("DOC")).toList();
+        assertEquals(2, docs.size());
+        assertEquals("1", docs.get(0).getDocNumber());
+        assertEquals(111, docs.get(0).getInvoiceValue().intValueExact());
+        assertEquals("2", docs.get(1).getDocNumber());
+        assertEquals(5, docs.get(1).getInvoiceValue().intValueExact());
+        assertEquals("CN-1-CN-5", docs.get(1).getLabel());
+    }
+
+    @Test
     void rejectsNonGstr1Json() {
         assertThrows(FiledReturnParseException.class,
                 () -> new Gstr1JsonParser().parse("{\"foo\":1}".getBytes()));

@@ -1,0 +1,67 @@
+{
+  "gstin": "29ABCDE1234F1Z5",
+  "fp": "042026",
+  "b2b": [
+    {
+      "ctin": "27AAECS6620H1ZQ",
+      "inv": [
+        {
+          "inum": "INV-100",
+          "idt": "03-04-2026",
+          "val": 1180.00,
+          "pos": "27",
+          "inv_typ": "R",
+          "itms": [
+            {"num": 1, "itm_det": {"rt": 18, "txval": 1000.00, "iamt": 180.00, "camt": 0, "samt": 0, "csamt": 0}}
+          ]
+        }
+      ]
+    }
+  ],
+  "hsn_b2b": [
+    {
+      "hsn_sc": "9983",
+      "txval": 1000.00,
+      "iamt": 180.00,
+      "camt": 0,
+      "samt": 0,
+      "csamt": 0
+    },
+    {
+      "hsn_sc": "8471",
+      "txval": 500.00,
+      "iamt": 0,
+      "camt": 45.00,
+      "samt": 45.00,
+      "csamt": 0
+    }
+  ],
+  "hsn_b2c": [
+    {
+      "hsn_sc": "9403",
+      "txval": 300.00,
+      "iamt": 0,
+      "camt": 9.00,
+      "samt": 9.00,
+      "csamt": 0
+    }
+  ],
+  "doc_issue": {
+    "doc_det": [
+      {
+        "doc_num": 1,
+        "doc_typ": "Invoices for outward supply",
+        "docs": [
+          {"from": "INV-100", "to": "INV-210", "totnum": 111, "cancel": 1, "net_issue": 110}
+        ]
+      },
+      {
+        "doc_num": "2",
+        "doc_typ": "Credit notes",
+        "docs": [
+          {"from": "CN-1", "to": "CN-5", "cancel": 0, "net_issue": 5}
+        ]
+      }
+    ]
+  }
+}

@@ -39,7 +39,7 @@ public class GstReanalysisListener {
         if (!gate.isComplete(event.organizationId())) {
             return;
         }
-        for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B)) {
+        for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF)) {
             for (Workflow workflow : workflowRepository
                     .findAllByOrganizationIdAndTypeAndStageAndActiveTrue(
                             event.organizationId(), type, WorkflowStage.DATA_UPLOADED)) {

@@ -50,7 +50,8 @@ public class GstDaybookFindingSource implements WorkflowFindingSource {
 
     @Override
     public boolean appliesTo(Workflow w) {
-        return w.getType() == WorkflowType.GSTR1 || w.getType() == WorkflowType.GSTR3B;
+        return w.getType() == WorkflowType.GSTR1 || w.getType() == WorkflowType.GSTR3B
+                || w.getType() == WorkflowType.IFF;
     }
 
     @Override

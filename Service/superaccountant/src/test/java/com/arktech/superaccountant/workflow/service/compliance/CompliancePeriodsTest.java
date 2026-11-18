@@ -56,12 +56,69 @@ class CompliancePeriodsTest {
     }
 
     @Test
-    void gstr1_qrmpWithoutIff_staysMonthly() {
+    void gstr1_qrmpWithoutIff_isQuarterly() {
         Function<LocalDate, FilerProfile> profileAt = d -> profile(FilerFrequency.QRMP, false);
         List<PeriodCalendar.PeriodRange> periods = CompliancePeriods.periods(
-                WorkflowType.GSTR1, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 7, 1), 4, profileAt);
-        assertEquals(List.of("2025-04", "2025-05", "2025-06"),
+                WorkflowType.GSTR1, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 7, 1), 4, profileAt);
+        assertEquals(List.of("2026-Q1"),
                 periods.stream().map(PeriodCalendar.PeriodRange::periodKey).toList());
+        assertEquals(LocalDate.of(2026, 4, 1), periods.get(0).start());
+        assertEquals(LocalDate.of(2026, 6, 30), periods.get(0).end());
+    }
+
+    @Test
+    void gstr1_qrmpWithIff_isQuarterly() {
+        Function<LocalDate, FilerProfile> profileAt = d -> profile(FilerFrequency.QRMP, true);
+        List<PeriodCalendar.PeriodRange> periods = CompliancePeriods.periods(
+                WorkflowType.GSTR1, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 7, 1), 4, profileAt);
+        assertEquals(List.of("2026-Q1"),
+                periods.stream().map(PeriodCalendar.PeriodRange::periodKey).toList());
+    }
+
+    @Test
+    void gstr1_monthlyProfile_staysMonthly() {
+        Function<LocalDate, FilerProfile> profileAt = d -> profile(FilerFrequency.MONTHLY, false);
+        List<PeriodCalendar.PeriodRange> periods = CompliancePeriods.periods(
+                WorkflowType.GSTR1, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 7, 1), 4, profileAt);
+        assertEquals(List.of("2026-04", "2026-05", "2026-06"),
+                periods.stream().map(PeriodCalendar.PeriodRange::periodKey).toList());
+    }
+
+    @Test
+    void iff_isMonthlyGrain() {
+        assertFalse(CompliancePeriods.isQuarterlyGrain(profile(FilerFrequency.QRMP, true), WorkflowType.IFF));
+    }
+
+    @Test
+    void iff_periods_areMonthsOneAndTwoOfEachQuarter() {
+        Function<LocalDate, FilerProfile> profileAt = d -> profile(FilerFrequency.QRMP, true);
+        List<PeriodCalendar.PeriodRange> periods = CompliancePeriods.periods(
+                WorkflowType.IFF, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 10, 1), 4, profileAt);
+        assertEquals(List.of("2026-04", "2026-05", "2026-07", "2026-08"),
+                periods.stream().map(PeriodCalendar.PeriodRange::periodKey).toList());
+    }
+
+    @Test
+    void iff_periods_emptyForIneligibleFilers() {
+        for (FilerProfile p : List.of(profile(FilerFrequency.MONTHLY, true),
+                profile(FilerFrequency.QRMP, false))) {
+            assertTrue(CompliancePeriods.periods(WorkflowType.IFF, LocalDate.of(2026, 4, 1),
+                    LocalDate.of(2026, 10, 1), 4, d -> p).isEmpty());
+        }
+    }
+
+    @Test
+    void iff_eligibility_requiresQrmpOptInAndMonthsOneOrTwo() {
+        assertTrue(CompliancePeriods.isIffEligible(profile(FilerFrequency.QRMP, true),
+                LocalDate.of(2026, 4, 1), 4));
+        assertTrue(CompliancePeriods.isIffEligible(profile(FilerFrequency.QRMP, true),
+                LocalDate.of(2026, 5, 1), 4));
+        assertFalse(CompliancePeriods.isIffEligible(profile(FilerFrequency.QRMP, true),
+                LocalDate.of(2026, 6, 1), 4));
+        assertFalse(CompliancePeriods.isIffEligible(profile(FilerFrequency.QRMP, false),
+                LocalDate.of(2026, 4, 1), 4));
+        assertFalse(CompliancePeriods.isIffEligible(profile(FilerFrequency.MONTHLY, true),
+                LocalDate.of(2026, 4, 1), 4));
     }
 
     @Test

@@ -62,6 +62,9 @@ public class FiledReturnLine {
     @Column(name = "label")
     private String label;
 
+    @Column(name = "hsn_category", length = 8)
+    private String hsnCategory;
+
     @Column(name = "invoice_value", precision = 19, scale = 2)
     private BigDecimal invoiceValue;
 

@@ -18,7 +18,8 @@ import java.util.UUID;
 @Component
 public class TaxMappingCompanyBlockerSource implements CompanyBlockerSource {
 
-    private static final Set<WorkflowType> GST_TYPES = EnumSet.of(WorkflowType.GSTR1, WorkflowType.GSTR3B);
+    private static final Set<WorkflowType> GST_TYPES =
+            EnumSet.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF);
 
     private final TaxLedgerMappingGate gate;
     private final com.arktech.superaccountant.workflow.repository.WorkflowRepository workflowRepository;

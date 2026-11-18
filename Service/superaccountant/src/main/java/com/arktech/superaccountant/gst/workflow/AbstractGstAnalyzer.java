@@ -15,6 +15,7 @@ import com.arktech.superaccountant.masters.services.FindingOverrideMasterService
 import com.arktech.superaccountant.review.FindingLifecycleService;
 import com.arktech.superaccountant.workflow.analysis.AnalysisContext;
 import com.arktech.superaccountant.workflow.analysis.WorkflowAnalyzer;
+import com.arktech.superaccountant.workflow.models.WorkflowType;
 
 import java.time.Instant;
 import java.util.List;
@@ -58,10 +59,17 @@ public abstract class AbstractGstAnalyzer implements WorkflowAnalyzer {
     /** The voucher sides this analyzer owns; no finding is raised on both. */
     protected abstract Set<VoucherSide> keepSides();
 
+    /** Whether the voucher falls in the workflow type's finding scope. */
+    protected boolean includeVoucher(ParsedVoucher voucher, WorkflowType type) {
+        return true;
+    }
+
     @Override
     public void analyze(AnalysisContext ctx) {
         mappingGate.requireComplete(ctx.organizationId());
-        List<ParsedVoucher> vouchers = parsedVoucherRepository.findByUploadJobId(ctx.uploadJobId());
+        List<ParsedVoucher> vouchers = parsedVoucherRepository.findByUploadJobId(ctx.uploadJobId()).stream()
+                .filter(v -> includeVoucher(v, ctx.type()))
+                .toList();
         Map<String, UploadLedgerSnapshot> snapshots = ctx.mastersJobId() == null
                 ? Map.of()
                 : mastersService.snapshotsByName(ctx.mastersJobId());

@@ -45,7 +45,7 @@ class MastersScopeTest {
 
     @Test
     void typesFor_income_gstr1And3b() {
-        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B),
+        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF),
                 types(finding("MISMATCH_DETECTION", LedgerCategory.INCOME, "Sales A/c"), null, null));
     }
 
@@ -70,11 +70,11 @@ class MastersScopeTest {
 
     @Test
     void typesFor_gstOutputLedger_gstr1And3b_inputLedger_gstr3bOnly() {
-        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B),
+        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF),
                 types(finding("MISMATCH_DETECTION", LedgerCategory.GST, "Output VAT"), null, null));
         assertEquals(Set.of(WorkflowType.GSTR3B),
                 types(finding("MISMATCH_DETECTION", LedgerCategory.GST, "Input Tax Credit"), null, null));
-        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B),
+        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF),
                 types(finding("MISMATCH_DETECTION", LedgerCategory.GST, "Ambiguous"), null, null));
     }
 
@@ -94,14 +94,14 @@ class MastersScopeTest {
         // Review Focus 1: finding INCOME, previous EXPENSE TDS-mapped → all four types
         ValidationFinding f = finding("MISMATCH_DETECTION", LedgerCategory.INCOME, "Sales A/c");
         UploadLedgerSnapshot p = snap("Sales A/c", LedgerCategory.EXPENSE, "194C", null);
-        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.TDS_PAYMENT, WorkflowType.TDS_26Q),
+        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF, WorkflowType.TDS_PAYMENT, WorkflowType.TDS_26Q),
                 types(f, snap("Sales A/c", LedgerCategory.INCOME, null, null), p));
     }
 
     @Test
     void typesFor_gstinPresence_sundryDebtors_gstr1And3b() {
         ValidationFinding f = finding("GSTIN_PRESENCE", LedgerCategory.INCOME, "Customer X");
-        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B),
+        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF),
                 types(f, snap("Customer X", LedgerCategory.INCOME, null, "Sundry Debtors|Group"), null));
     }
 
@@ -133,7 +133,7 @@ class MastersScopeTest {
         ValidationFinding f = finding("MISMATCH_DETECTION", LedgerCategory.INCOME, "Sales A/c");
         UploadLedgerSnapshot p = snap("Sales A/c", LedgerCategory.INCOME, null, null);
         Set<WorkflowType> types = types(f, null, p);
-        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B), types);
+        assertEquals(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF), types);
     }
 
     @Test

@@ -61,7 +61,7 @@ class MasterAttributesTest {
         UploadLedgerSnapshot previous = snapshot(LedgerCategory.INCOME);
         UploadLedgerSnapshot latest = snapshot(LedgerCategory.PURCHASE);
         assertThat(MastersScope.typesForLedger(latest, previous))
-                .containsExactlyInAnyOrder(WorkflowType.GSTR1, WorkflowType.GSTR3B);
+                .containsExactlyInAnyOrder(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF);
     }
 
     @Test

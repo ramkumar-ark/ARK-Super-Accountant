@@ -51,7 +51,7 @@ class VoucherScopeClassifierTest {
                 "Sales Account", ledger("Sales Account", LedgerCategory.INCOME));
         ParsedVoucher v = voucher("Sales", entry("Sales Account"));
         assertThat(classifier.scopes(VoucherPayload.of(v), ledgers))
-                .isEqualTo(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B));
+                .isEqualTo(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF));
     }
 
     @Test
@@ -69,7 +69,7 @@ class VoucherScopeClassifierTest {
                 "Output CGST @9%", ledger("Output CGST @9%", LedgerCategory.GST));
         ParsedVoucher v = voucher("Journal", entry("Output CGST @9%"));
         assertThat(classifier.scopes(VoucherPayload.of(v), ledgers))
-                .isEqualTo(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B));
+                .isEqualTo(Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF));
     }
 
     @Test

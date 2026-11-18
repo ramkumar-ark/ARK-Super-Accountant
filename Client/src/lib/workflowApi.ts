@@ -1,8 +1,8 @@
 import { api } from './api'
 
-export type WorkflowType = 'GSTR1' | 'GSTR3B' | 'TDS_PAYMENT' | 'TDS_26Q'
+export type WorkflowType = 'GSTR1' | 'GSTR3B' | 'IFF' | 'TDS_PAYMENT' | 'TDS_26Q'
 
-export const WORKFLOW_TYPES: WorkflowType[] = ['GSTR1', 'GSTR3B', 'TDS_PAYMENT', 'TDS_26Q']
+export const WORKFLOW_TYPES: WorkflowType[] = ['GSTR1', 'GSTR3B', 'IFF', 'TDS_PAYMENT', 'TDS_26Q']
 
 export type WorkflowStage =
   | 'BASELINE'
@@ -38,6 +38,7 @@ export interface Workflow {
 export const WORKFLOW_TYPE_LABEL: Record<WorkflowType, string> = {
   GSTR1: 'GSTR-1',
   GSTR3B: 'GSTR-3B',
+  IFF: 'IFF',
   TDS_PAYMENT: 'TDS payment',
   TDS_26Q: 'TDS 26Q',
 }
@@ -180,6 +181,7 @@ export function recordFiling(id: string, ref: string, date: string): Promise<Wor
 export const FILING_REF_LABEL: Record<WorkflowType, string> = {
   GSTR1: 'ARN',
   GSTR3B: 'ARN',
+  IFF: 'ARN',
   TDS_PAYMENT: 'Challan CIN / BSR + serial',
   TDS_26Q: 'Token / acknowledgement no.',
 }
