@@ -25,7 +25,7 @@ public class DocsIssuedBuilder {
         Map<String, SeriesGroup> series = new LinkedHashMap<>();
         for (VoucherView v : sales) {
             String number = v.getVoucherNumber();
-            if (TableRows.isBlank(number)) {
+            if (TableRows.isBlank(number) || !isOutwardInvoiceDoc(v.getVoucherTypeName())) {
                 continue;
             }
             Series seriesKey = parse(number.trim());
@@ -58,6 +58,12 @@ public class DocsIssuedBuilder {
             }
         }
         return rows;
+    }
+
+    private boolean isOutwardInvoiceDoc(String voucherTypeName) {
+        String type = TableRows.lower(voucherTypeName);
+        return TableRows.isNote(voucherTypeName) || type.contains("invoice") || type.contains("sales")
+                || type.contains("bill of supply") || type.contains("bill of entry");
     }
 
     private String seriesKey(String voucherTypeName, Series s) {
