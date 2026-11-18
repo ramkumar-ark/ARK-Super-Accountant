@@ -237,7 +237,7 @@ class TamperComparisonServiceIT {
         assertThat(changes).hasSize(1);
         TamperChange change = changes.get(0);
         assertThat(change.getChangeKind()).isEqualTo(TamperChangeKind.MODIFIED);
-        assertThat(change.getTouchedScopes()).isEqualTo("GSTR1,GSTR3B");
+        assertThat(change.getTouchedScopes()).isEqualTo("GSTR1,GSTR3B,IFF");
         assertThat(change.isBlocking()).isTrue();
         assertThat(change.getOldHash()).isEqualTo("h1");
         assertThat(change.getNewHash()).isEqualTo("h2");
@@ -379,7 +379,7 @@ class TamperComparisonServiceIT {
 
         List<TamperChange> changes = tamperChangeRepository.findByOrganizationId(org.getId());
         assertThat(changes).hasSize(1);
-        assertThat(changes.get(0).getTouchedScopes()).isEqualTo("GSTR1,GSTR3B");
+        assertThat(changes.get(0).getTouchedScopes()).isEqualTo("GSTR1,GSTR3B,IFF");
         assertThat(changes.get(0).isBlocking()).isTrue();
         assertThat(tamperFindingRepository.findByOrganizationId(org.getId())).hasSize(1);
     }
