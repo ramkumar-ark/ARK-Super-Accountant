@@ -28,6 +28,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -85,15 +87,22 @@ public class Gstr1WorkflowController {
     @PreAuthorize("hasRole('ACCOUNTANT')")
     @PutMapping("/{id}/gstr1/fill-ins")
     public ResponseEntity<?> putFillIn(@PathVariable UUID id,
-                                       @RequestBody Gstr1FillInRequest request,
+                                       @Valid @RequestBody Gstr1FillInRequest request,
                                        @AuthenticationPrincipal UserDetailsImpl principal) {
         if (principal.getOrganizationId() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
         }
         try {
             Workflow workflow = workflowService.get(principal.getOrganizationId(), id);
-            Gstr1FillInScope scope = Gstr1FillInScope.valueOf(request.scope());
-            Gstr1FillInAttribute attribute = Gstr1FillInAttribute.valueOf(request.attribute());
+            Gstr1FillInScope scope;
+            Gstr1FillInAttribute attribute;
+            try {
+                scope = Gstr1FillInScope.valueOf(request.scope());
+                attribute = Gstr1FillInAttribute.valueOf(request.attribute());
+            } catch (IllegalArgumentException e) {
+                throw new WorkflowBadRequestException(
+                        "Invalid fill-in scope or attribute: " + e.getMessage());
+            }
             String role = principal.getAuthorities().stream().findFirst()
                     .map(Object::toString).orElse("");
             if (request.value() == null || request.value().isBlank()) {

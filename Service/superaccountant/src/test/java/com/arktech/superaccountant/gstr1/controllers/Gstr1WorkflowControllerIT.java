@@ -224,6 +224,66 @@ class Gstr1WorkflowControllerIT {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void putFillIn_asAuditor403() throws Exception {
+        String ownerJwt = signupAndLogin("g1ownere", "g1ownere@test.com");
+        UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
+        String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
+                "g1operatore", "g1operatore@test.com");
+        String auditorJwt = memberJwt(ownerJwt, orgId, "auditor_ca",
+                "g1auditore", "g1auditore@test.com");
+
+        UUID workflowId = startedGstr1Workflow(operatorJwt);
+        setStage(workflowId, WorkflowStage.PREPARE);
+
+        mockMvc.perform(put("/api/v1/workflows/{id}/gstr1/fill-ins", workflowId)
+                .header("Authorization", "Bearer " + auditorJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"scope":"LEDGER","key":"Input GST - CGST","attribute":"HSN","value":"996334"}
+                    """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void putFillIn_asAccountant_invalidScope_returns400() throws Exception {
+        String ownerJwt = signupAndLogin("g1ownerf", "g1ownerf@test.com");
+        UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
+        String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
+                "g1operatorf", "g1operatorf@test.com");
+        String accountantJwt = memberJwt(ownerJwt, orgId, "accountant",
+                "g1accountantf", "g1accountantf@test.com");
+
+        UUID workflowId = startedGstr1Workflow(operatorJwt);
+        setStage(workflowId, WorkflowStage.PREPARE);
+
+        mockMvc.perform(put("/api/v1/workflows/{id}/gstr1/fill-ins", workflowId)
+                .header("Authorization", "Bearer " + accountantJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"scope":"NOT_A_SCOPE","key":"Input GST - CGST","attribute":"HSN","value":"996334"}
+                    """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/workflows/{id}/gstr1/fill-ins", workflowId)
+                .header("Authorization", "Bearer " + accountantJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"scope":"LEDGER","key":"Input GST - CGST","attribute":"NOT_AN_ATTRIBUTE","value":"996334"}
+                    """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/workflows/{id}/gstr1/fill-ins", workflowId)
+                .header("Authorization", "Bearer " + accountantJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"scope":"LEDGER","attribute":"HSN","value":"996334"}
+                    """))
+                .andExpect(status().isBadRequest());
+    }
+
     private void setStage(UUID workflowId, WorkflowStage stage) {
         var workflow = workflowRepository.findById(workflowId).orElseThrow();
         workflow.setStage(stage);
