@@ -224,6 +224,8 @@ public class TamperComparisonService {
 
     private static final Set<ResolveStatus> TERMINAL_STATUSES =
             EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED);
+    private static final Set<ResolveStatus> HUMAN_DECIDED_STATUSES =
+            EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.DISCARDED);
 
     void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId,
                               DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
@@ -241,7 +243,7 @@ public class TamperComparisonService {
         if (retro && tamperFindingRepository.findByOrganizationId(orgId).stream()
                 .anyMatch(f -> findingKey.equals(f.getFindingKey())
                         && evidenceHash.equals(f.getEvidenceHash())
-                        && TERMINAL_STATUSES.contains(f.getResolveStatus()))) {
+                        && HUMAN_DECIDED_STATUSES.contains(f.getResolveStatus()))) {
             return;
         }
         change.setBlocking(!blockingWorkflows.isEmpty());

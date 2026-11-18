@@ -291,6 +291,40 @@ class TamperRetroFlagIT {
     }
 
     @Test
+    void restoredRetroFinding_reflagsWhenSameVoucherReappears() {
+        Organization org = newOrg("retro-reappear");
+        seedTdsLedgers(org.getId());
+        DayBookUploadJob job1 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30));
+        seedTdsVoucher(org.getId(), job1.getId(), "g-apr", "PY/APR/1",
+                LocalDate.of(2025, 4, 10), "h-apr", "Contractor ABC", entry("Professional Fees", "20000"));
+        frozenTdsMonth(org.getId(), job1.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30));
+
+        DayBookUploadJob job2 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedTdsVoucher(org.getId(), job2.getId(), "g-apr", "PY/APR/1",
+                LocalDate.of(2025, 4, 10), "h-apr", "Contractor ABC", entry("Professional Fees", "20000"));
+        seedTdsVoucher(org.getId(), job2.getId(), "g-may", "PY/MAY/1",
+                LocalDate.of(2025, 5, 10), "h-may", "Contractor ABC", entry("Professional Fees", "40000"));
+        tamperComparisonService.compare(job2.getId());
+
+        DayBookUploadJob job3 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedTdsVoucher(org.getId(), job3.getId(), "g-apr", "PY/APR/1",
+                LocalDate.of(2025, 4, 10), "h-apr", "Contractor ABC", entry("Professional Fees", "20000"));
+        tamperComparisonService.compare(job3.getId());
+
+        DayBookUploadJob job4 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedTdsVoucher(org.getId(), job4.getId(), "g-apr", "PY/APR/1",
+                LocalDate.of(2025, 4, 10), "h-apr", "Contractor ABC", entry("Professional Fees", "20000"));
+        seedTdsVoucher(org.getId(), job4.getId(), "g-may", "PY/MAY/1",
+                LocalDate.of(2025, 5, 10), "h-may", "Contractor ABC", entry("Professional Fees", "40000"));
+        tamperComparisonService.compare(job4.getId());
+
+        List<TamperFinding> findings = tamperFindingRepository.findByOrganizationId(org.getId());
+        assertThat(findings).hasSize(2);
+        assertThat(findings).filteredOn(f -> f.getResolveStatus()
+                == com.arktech.superaccountant.masters.models.ResolveStatus.OPEN).hasSize(1);
+    }
+
+    @Test
     void crossingPlusEditedEarlierVoucher_oneRetroAndOneModified() {
         Organization org = newOrg("retro-edit");
         seedTdsLedgers(org.getId());
