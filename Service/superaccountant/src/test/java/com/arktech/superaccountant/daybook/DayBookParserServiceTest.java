@@ -302,6 +302,76 @@ class DayBookParserServiceTest {
         assertThat(result.get(1).getPartyGstRegistrationType()).isNull();
     }
 
+    @Test
+    void persistVouchers_capturesPlaceOfSupplyConsigneeAndNature() {
+        LedgerEntry expense = new LedgerEntry();
+        expense.setLedgername("Test Purchases");
+        expense.setAmount("-10000");
+        expense.setGstovrdnnature("Supply");
+        expense.setGstovrdntypeofsupply("Inter-State");
+
+        LedgerEntry tax = new LedgerEntry();
+        tax.setLedgername("Input IGST");
+        tax.setAmount("-1800");
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setDate("20250401");
+        voucher.setPlaceofsupply("27-Maharashtra");
+        voucher.setConsigneestatename("27-Maharashtra");
+        voucher.setConsigneecountryname("India");
+        voucher.setAllLedgerEntries(List.of(expense, tax));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> result = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(result).hasSize(1);
+        ParsedVoucher persisted = result.get(0);
+        assertThat(persisted.getPlaceOfSupply()).isEqualTo("27-Maharashtra");
+        assertThat(persisted.getConsigneeState()).isEqualTo("27-Maharashtra");
+        assertThat(persisted.getConsigneeCountry()).isEqualTo("India");
+        assertThat(persisted.getSupplyNature()).isEqualTo("Supply");
+        assertThat(persisted.getTypeOfSupply()).isEqualTo("Inter-State");
+        assertThat(persisted.getCaptureVersion()).isEqualTo(1);
+        // contentHash must not include the new fields
+        assertThat(persisted.getContentHash()).isEqualTo(VoucherCanonicalizer.contentHash(voucher));
+    }
+
+    @Test
+    void persistVouchers_defaultsCaptureVersionAndNullGeo() {
+        LedgerEntry entry = new LedgerEntry();
+        entry.setLedgername("Test Purchases");
+        entry.setAmount("-10000");
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Purchase");
+        voucher.setDate("20250401");
+        voucher.setAllLedgerEntries(List.of(entry));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> result = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        ParsedVoucher persisted = result.get(0);
+        assertThat(persisted.getPlaceOfSupply()).isNull();
+        assertThat(persisted.getConsigneeState()).isNull();
+        assertThat(persisted.getConsigneeCountry()).isNull();
+        assertThat(persisted.getSupplyNature()).isNull();
+        assertThat(persisted.getTypeOfSupply()).isNull();
+        assertThat(persisted.getCaptureVersion()).isEqualTo(1);
+    }
+
     private static GstRateDetail rate(String head, String rate) {
         GstRateDetail d = new GstRateDetail();
         d.setGstratedutyhead(head);

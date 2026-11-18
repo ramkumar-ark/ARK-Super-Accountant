@@ -69,6 +69,19 @@ public class DayBookParserService {
             pv.setTallyMasterId(v.getMasterid());
             pv.setTallyAlterId(v.getAlterid());
             pv.setContentHash(VoucherCanonicalizer.contentHash(v));
+            pv.setPlaceOfSupply(v.getPlaceofsupply());
+            pv.setConsigneeState(v.getConsigneestatename());
+            pv.setConsigneeCountry(v.getConsigneecountryname());
+            pv.setCaptureVersion(1);
+            for (LedgerEntry le : v.getAllLedgerEntriesCombined()) {
+                if (pv.getSupplyNature() == null && le.getGstovrdnnature() != null && !le.getGstovrdnnature().isBlank()) {
+                    pv.setSupplyNature(le.getGstovrdnnature().trim());
+                }
+                if (pv.getTypeOfSupply() == null && le.getGstovrdntypeofsupply() != null && !le.getGstovrdntypeofsupply().isBlank()) {
+                    pv.setTypeOfSupply(le.getGstovrdntypeofsupply().trim());
+                }
+                if (pv.getSupplyNature() != null && pv.getTypeOfSupply() != null) break;
+            }
 
             List<ParsedVoucherEntry> entries = new ArrayList<>();
             BigDecimal totalDebit = BigDecimal.ZERO;

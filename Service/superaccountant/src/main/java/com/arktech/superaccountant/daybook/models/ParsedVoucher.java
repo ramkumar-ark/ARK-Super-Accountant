@@ -78,6 +78,29 @@ public class ParsedVoucher {
     private boolean isReverseChargeApplicable;
     private boolean isCancelled;
 
+    // GST section — stored outside the content hash so preparation edits do not
+    // invalidate tamper evidence. Null when Tally did not send the field.
+    @Column(name = "place_of_supply")
+    private String placeOfSupply;
+
+    @Column(name = "consignee_state")
+    private String consigneeState;
+
+    @Column(name = "consignee_country")
+    private String consigneeCountry;
+
+    // From LedgerEntry gstovrdnnature (first non-blank across entries)
+    @Column(name = "supply_nature")
+    private String supplyNature;
+
+    // From LedgerEntry gstovrdntypeofsupply (first non-blank across entries)
+    @Column(name = "type_of_supply")
+    private String typeOfSupply;
+
+    // 0 = captured before this column existed; new parser code sets 1
+    @Column(name = "capture_version", nullable = false, columnDefinition = "int default 0")
+    private int captureVersion = 0;
+
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "parsedVoucher")
     private List<ParsedVoucherEntry> entries;
 }
