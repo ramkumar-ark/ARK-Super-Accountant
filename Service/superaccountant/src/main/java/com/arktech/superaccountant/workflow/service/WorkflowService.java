@@ -73,6 +73,14 @@ public class WorkflowService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private List<com.arktech.superaccountant.workflow.seam.FinalizePrecondition> finalizePreconditions
             = List.of();
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private List<com.arktech.superaccountant.workflow.seam.PrepareHook> prepareHooks = List.of();
+
+    private void firePrepareHooks(java.util.function.Consumer<com.arktech.superaccountant.workflow.seam.PrepareHook> action) {
+        for (com.arktech.superaccountant.workflow.seam.PrepareHook hook : prepareHooks) {
+            action.accept(hook);
+        }
+    }
 
     // ---------- lookups ----------
 
@@ -243,6 +251,11 @@ public class WorkflowService {
         }
         w.setStage(WorkflowStage.PREPARE);
         workflowRepository.save(w);
+        firePrepareHooks(hook -> {
+            if (hook.appliesTo(w)) {
+                hook.onEnterPrepare(w);
+            }
+        });
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.ADVANCED, "PREPARE", null));
         return w;
     }
@@ -288,6 +301,11 @@ public class WorkflowService {
         w.setFrozenThrough(w.getPeriodEnd());
         workflowRepository.save(w);
         snapshotService.freeze(w.getId(), organizationId, actor);
+        firePrepareHooks(hook -> {
+            if (hook.appliesTo(w)) {
+                hook.onFinalize(w);
+            }
+        });
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.FINALIZED, null, null));
         return w;
     }
@@ -331,6 +349,11 @@ public class WorkflowService {
         w.setFrozenThrough(null);
         workflowRepository.save(w);
         snapshotService.release(w.getId(), organizationId, actor);
+        firePrepareHooks(hook -> {
+            if (hook.appliesTo(w)) {
+                hook.onUnfinalize(w);
+            }
+        });
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.UNFINALIZED, reason, null));
         return w;
     }

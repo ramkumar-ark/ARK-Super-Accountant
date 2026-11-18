@@ -3,8 +3,9 @@ package com.arktech.superaccountant.gstr1.models;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,6 +22,7 @@ public class PreparedReturnRow {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "prepared_return_id", nullable = false)
@@ -35,7 +37,7 @@ public class PreparedReturnRow {
     @Column(name = "source_voucher_key", length = 128)
     private String sourceVoucherKey;
 
-    @Lob
+    // TEXT without @Lob: PostgreSQL OID lobs are not readable outside their transaction
     @Column(name = "payload", columnDefinition = "TEXT", nullable = false)
     private String payload;
 
