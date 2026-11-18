@@ -581,4 +581,29 @@ describe('WorkflowFindingsTab', () => {
       )
     })
   })
+
+  describe('TAMPER retro findings', () => {
+    const retroFinding = {
+      ...finding,
+      source: 'TAMPER',
+      findingType: 'TAMPER_RETRO_FLAGGED',
+      voucherNumber: 'PY/APR/1',
+      ledgerName: 'Contractor ABC',
+      message:
+        'Payment PY/APR/1 dated 2025-04-10 is retro-flagged under section 194J_B for deductee Contractor ABC',
+    }
+
+    it('shows a friendly label and message with no valid-from control', async () => {
+      mockGet.mockResolvedValue({
+        data: { findings: [retroFinding], blockingCount: 1 },
+      })
+
+      renderTab()
+
+      await screen.findByText(retroFinding.message)
+      expect(screen.getByRole('heading', { name: 'RETRO FLAGGED (1)' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'RETRO FLAGGED (1)' })).toBeInTheDocument()
+      expect(screen.queryByText(/valid from/i)).not.toBeInTheDocument()
+    })
+  })
 })

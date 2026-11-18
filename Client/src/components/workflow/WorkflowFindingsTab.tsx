@@ -23,6 +23,18 @@ interface WorkflowFinding extends ReviewFinding {
 // Mirrors MastersPage: rules whose corrected value is typed in by the user in Masters.
 const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
 
+const FINDING_TYPE_LABELS: Record<string, string> = {
+  TAMPER_RETRO_FLAGGED: 'RETRO FLAGGED',
+}
+
+function findingTypeLabel(type: string): string {
+  return (FINDING_TYPE_LABELS[type] ?? type).replaceAll('_', ' ')
+}
+
+function findingTypeFilterLabel(type: string): string {
+  return FINDING_TYPE_LABELS[type] ?? type
+}
+
 function needsTypedValue(f: WorkflowFinding): boolean {
   if (f.source === 'TDS') return f.findingType === 'PAN_MISSING' || f.findingType === 'PAN_INVALID'
   if (f.source === 'MASTERS') return TYPED_INPUT_RULES.includes(f.findingType)
@@ -187,6 +199,7 @@ export function WorkflowFindingsTab({
             values={countValues(findings, 'findingType')}
             selected={typeFilter}
             onToggle={(value) => toggleFilter(typeFilter, setTypeFilter, value)}
+            formatValue={findingTypeFilterLabel}
           />
           <FilterGroup
             title="Severity"
@@ -223,13 +236,13 @@ export function WorkflowFindingsTab({
             <section key={type} className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-                  {type.replaceAll('_', ' ')} ({items.length})
+                  {findingTypeLabel(type)} ({items.length})
                 </h4>
                 {selectableItems.length > 0 && (
                   <label className="flex items-center gap-1 text-xs text-[var(--color-text-muted)]">
                     <input
                       type="checkbox"
-                      aria-label={`Select all in ${type.replaceAll('_', ' ')}`}
+                      aria-label={`Select all in ${findingTypeLabel(type)}`}
                       checked={allInGroupSelected}
                       onChange={() => toggleGroup(items)}
                     />
@@ -319,11 +332,13 @@ function FilterGroup({
   values,
   selected,
   onToggle,
+  formatValue,
 }: {
   title: string
   values: Array<[string, number]>
   selected: string[]
   onToggle: (value: string) => void
+  formatValue?: (value: string) => string
 }): ReactNode {
   if (values.length === 0) return null
   return (
@@ -341,7 +356,7 @@ function FilterGroup({
               : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)]'
           }`}
         >
-          {value} ({count})
+          {formatValue ? formatValue(value) : value} ({count})
         </button>
       ))}
     </div>

@@ -11,6 +11,7 @@ import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
+import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -37,11 +38,12 @@ public class TdsEngine {
     public TdsAnalysisResult analyze(TdsAnalysisInput input) {
         List<TdsFinding> findings = new ArrayList<>();
         List<TdsDeducteeEntry> entries = new ArrayList<>();
+        List<RetroFlag> retroFlags = new ArrayList<>();
         List<VoucherFact> facts = new ArrayList<>();
         runPerVoucherPass(input, facts, findings, entries);
-        runThresholdPass(facts, input, findings);
+        runThresholdPass(facts, input, findings, retroFlags);
         runAdvancePass(input, facts, findings);
-        return new TdsAnalysisResult(findings, entries);
+        return new TdsAnalysisResult(findings, entries, retroFlags);
     }
 
     public static String key(String ledgerName) {
@@ -201,7 +203,8 @@ public class TdsEngine {
         }
     }
 
-    private void runThresholdPass(List<VoucherFact> facts, TdsAnalysisInput input, List<TdsFinding> findings) {
+    private void runThresholdPass(List<VoucherFact> facts, TdsAnalysisInput input, List<TdsFinding> findings,
+                                  List<RetroFlag> retroFlags) {
         Map<String, List<VoucherFact>> groups = new LinkedHashMap<>();
         for (VoucherFact fact : facts) {
             groups.computeIfAbsent(fact.partyKey() + "|" + fact.section(), k -> new ArrayList<>()).add(fact);
@@ -254,6 +257,12 @@ public class TdsEngine {
                         "Deduct " + expected + " and record the TDS entry in Tally."));
                 findings.get(findings.size() - 1)
                         .setRelatedVoucherIds(relatedIds.isEmpty() ? "[]" : "[" + String.join(",", relatedIds) + "]");
+                for (VoucherFact f : priorUndeducted) {
+                    BigDecimal shortfall = f.base().multiply(f.rate())
+                            .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+                    retroFlags.add(new RetroFlag(VoucherKeys.of(f.voucher()), f.voucher().getVoucherDate(),
+                            f.section(), f.partyName(), shortfall));
+                }
             }
             List<VoucherFact> notDeductedCandidates = new ArrayList<>();
             for (VoucherFact f : priorUndeducted) {

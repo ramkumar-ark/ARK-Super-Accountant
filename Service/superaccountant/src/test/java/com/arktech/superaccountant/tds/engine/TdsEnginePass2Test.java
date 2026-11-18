@@ -6,6 +6,7 @@ import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
+import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -143,6 +144,31 @@ class TdsEnginePass2Test {
         assertEquals(TdsFindingType.NOT_DEDUCTED, f.getFindingType());
         assertEquals(aug.getId(), f.getVoucherId());
         assertEquals(new BigDecimal("500.00"), f.getExpectedAmount());
+    }
+
+    @Test
+    void retroFlags_listEarlierVouchersMadeDeductibleByCrossing() {
+        Map<String, UploadLedgerSnapshot> snaps = snapsWith("Professional Fees", "ABC Contractors", PAN);
+        var may = bill("V1", LocalDate.of(2026, 5, 10), "Professional Fees", "ABC Contractors", "20000", false);
+        var jul = bill("V2", LocalDate.of(2026, 7, 10), "Professional Fees", "ABC Contractors", "40000", false);
+        var result = engine.analyze(input(List.of(may, jul), snaps,
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)));
+        assertEquals(1, result.retroFlags().size());
+        RetroFlag flag = result.retroFlags().get(0);
+        assertEquals(VoucherKeys.of(may), flag.voucherKey());
+        assertEquals(LocalDate.of(2026, 5, 10), flag.voucherDate());
+        assertEquals("194J_B", flag.section());
+        assertEquals("ABC Contractors", flag.deducteeLedger());
+        assertEquals(new BigDecimal("2000.00"), flag.shortfall());
+    }
+
+    @Test
+    void retroFlags_emptyWhenThresholdNotCrossed() {
+        Map<String, UploadLedgerSnapshot> snaps = snapsWith("Professional Fees", "ABC Contractors", PAN);
+        var may = bill("V1", LocalDate.of(2026, 5, 10), "Professional Fees", "ABC Contractors", "20000", false);
+        var result = engine.analyze(input(List.of(may), snaps,
+                LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31)));
+        assertTrue(result.retroFlags().isEmpty());
     }
 
     @Test

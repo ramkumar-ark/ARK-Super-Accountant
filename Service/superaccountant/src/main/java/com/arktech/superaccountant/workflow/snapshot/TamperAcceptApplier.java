@@ -54,10 +54,12 @@ public class TamperAcceptApplier implements FindingApplier<ReviewableFinding> {
             masterTamperApplier.apply(finding, approver);
             return;
         }
-        switch (f.getChangeKind()) {
-            case MODIFIED, INSERTED -> rewriteOrInsert(f);
-            case DELETED -> release(f);
-            default -> {
+        if (f.getChangeKind() != TamperChangeKind.RETRO_FLAGGED) {
+            switch (f.getChangeKind()) {
+                case MODIFIED, INSERTED -> rewriteOrInsert(f);
+                case DELETED -> release(f);
+                default -> {
+                }
             }
         }
         recordFollowUps(f, approver);
