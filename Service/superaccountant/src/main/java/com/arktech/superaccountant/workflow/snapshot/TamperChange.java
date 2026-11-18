@@ -59,6 +59,12 @@ public class TamperChange {
 
     private String touchedScopes;
 
+    /** Retro flags: the TDS section whose annual threshold was crossed later. */
+    private String retroSection;
+
+    /** Retro flags: TDS shortfall now due on this earlier voucher. */
+    private java.math.BigDecimal retroShortfall;
+
     private boolean blocking;
 
     private String blockingWorkflowIds;

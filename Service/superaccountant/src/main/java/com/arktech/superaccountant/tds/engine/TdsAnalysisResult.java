@@ -5,5 +5,6 @@ import com.arktech.superaccountant.tds.models.TdsFinding;
 
 import java.util.List;
 
-public record TdsAnalysisResult(List<TdsFinding> findings, List<TdsDeducteeEntry> entries) {
+public record TdsAnalysisResult(List<TdsFinding> findings, List<TdsDeducteeEntry> entries,
+                                List<RetroFlag> retroFlags) {
 }

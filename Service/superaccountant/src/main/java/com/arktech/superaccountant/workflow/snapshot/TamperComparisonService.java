@@ -59,6 +59,8 @@ public class TamperComparisonService {
     private FrozenThrough frozenThrough;
     @Autowired
     private VoucherScopeClassifier scopeClassifier;
+    @Autowired
+    private List<RetroFlagSource> retroFlagSources = List.of();
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void compare(UUID uploadJobId) {
@@ -133,6 +135,24 @@ public class TamperComparisonService {
             saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
         }
 
+        for (RetroFlagSource source : retroFlagSources) {
+            for (RetroFlagSource.Flag flag : source.retroFlags(orgId, uploadJobId)) {
+                ParsedVoucher uploaded = uploadedByKey.get(flag.voucherKey());
+                if (uploaded == null) {
+                    continue;
+                }
+                TamperChange change = change(orgId, uploadJobId, flag.voucherKey(),
+                        TamperChangeKind.RETRO_FLAGGED, null, null,
+                        flag.voucherDate(), flag.voucherDate(),
+                        uploaded.getVoucherTypeName(), uploaded.getVoucherNumber(),
+                        flag.deducteeLedger());
+                change.setTouchedScopes("TDS_26Q,TDS_PAYMENT");
+                change.setRetroSection(flag.section());
+                change.setRetroShortfall(flag.shortfall());
+                saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
+            }
+        }
+
         reconcile(orgId, job, changesByKey);
     }
 
@@ -202,9 +222,12 @@ public class TamperComparisonService {
         return VoucherScopeClassifier.touchedScopesText(scopes);
     }
 
-    private void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId,
-                                      DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
+    void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId,
+                              DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
         List<Workflow> blockingWorkflows = blockingWorkflows(change, activeWorkflows);
+        if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED && blockingWorkflows.isEmpty()) {
+            return;
+        }
         change.setBlocking(!blockingWorkflows.isEmpty());
         change.setBlockingWorkflowIds(blockingWorkflows.stream()
                 .map(w -> w.getId().toString()).collect(Collectors.joining(",")));
@@ -215,8 +238,11 @@ public class TamperComparisonService {
         }
         String findingKey = change.getChangeKind().name() + "|" + change.getVoucherKey();
         changesByKey.put(findingKey, change);
+        boolean retro = change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED;
         String evidenceHash = EvidenceHash.of("TAMPER_" + change.getChangeKind(), change.getVoucherKey(),
-                change.getOldHash(), change.getNewHash(),
+                retro ? change.getRetroSection() : change.getOldHash(),
+                retro ? (change.getRetroShortfall() == null ? null : change.getRetroShortfall().toPlainString())
+                        : change.getNewHash(),
                 change.getNewDate() == null ? null : change.getNewDate().toString());
         List<TamperFinding> existing = tamperFindingRepository
                 .findByOrganizationIdAndResolveStatusNotIn(orgId,
@@ -330,14 +356,21 @@ public class TamperComparisonService {
                 .map(w -> w.getType().name() + " " + w.getPeriodKey())
                 .distinct()
                 .collect(Collectors.joining(", "));
+        LocalDate date = changeDate(change.getOldDate(), change.getNewDate());
+        if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED) {
+            return change.getVoucherTypeName() + " " + change.getVoucherNumber() + " dated " + date
+                    + " is retro-flagged under section " + change.getRetroSection()
+                    + " for deductee " + change.getPartyLedgerName() + ": TDS shortfall "
+                    + change.getRetroShortfall() + " now due because " + where
+                    + " crossed the annual threshold";
+        }
         String verb = switch (change.getChangeKind()) {
             case MODIFIED -> "modified";
             case DELETED -> "deleted";
             case INSERTED -> "inserted";
-            case MASTER_MODIFIED, MASTER_REMOVED ->
-                    throw new IllegalStateException("masters change in voucher comparison");
+            case RETRO_FLAGGED, MASTER_MODIFIED, MASTER_REMOVED ->
+                    throw new IllegalStateException("unexpected change kind in voucher comparison");
         };
-        LocalDate date = changeDate(change.getOldDate(), change.getNewDate());
         return change.getVoucherTypeName() + " " + change.getVoucherNumber() + " dated " + date
                 + " was " + verb + " after " + where + " was finalized";
     }
