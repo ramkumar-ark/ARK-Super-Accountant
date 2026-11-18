@@ -99,6 +99,15 @@ class CompliancePeriodsTest {
     }
 
     @Test
+    void iff_periods_emptyForIneligibleFilers() {
+        for (FilerProfile p : List.of(profile(FilerFrequency.MONTHLY, true),
+                profile(FilerFrequency.QRMP, false))) {
+            assertTrue(CompliancePeriods.periods(WorkflowType.IFF, LocalDate.of(2026, 4, 1),
+                    LocalDate.of(2026, 10, 1), 4, d -> p).isEmpty());
+        }
+    }
+
+    @Test
     void iff_eligibility_requiresQrmpOptInAndMonthsOneOrTwo() {
         assertTrue(CompliancePeriods.isIffEligible(profile(FilerFrequency.QRMP, true),
                 LocalDate.of(2026, 4, 1), 4));

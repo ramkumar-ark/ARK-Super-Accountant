@@ -26,7 +26,8 @@ public final class CompliancePeriods {
         List<PeriodCalendar.PeriodRange> periods = new ArrayList<>();
         LocalDate cursor = from;
         while (cursor.isBefore(toExclusive)) {
-            if (type == WorkflowType.IFF && !isIffMonth(cursor, fyStartMonth)) {
+            if (type == WorkflowType.IFF
+                    && !isIffEligible(profileAt.apply(cursor), cursor, fyStartMonth)) {
                 cursor = skipMonth(cursor, fyStartMonth);
                 continue;
             }
