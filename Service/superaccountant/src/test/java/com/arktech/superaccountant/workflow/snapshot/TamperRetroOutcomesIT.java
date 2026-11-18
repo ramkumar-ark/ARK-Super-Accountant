@@ -220,7 +220,7 @@ class TamperRetroOutcomesIT {
     @Test
     void approvedRetroFlag_staysApprovedOnNextUpload() throws Exception {
         seedRetroFinding();
-        assertThat(actStatus(accountantToken, "APPROVE", "accept the shortfall")).isEqualTo("200");
+        assertThat(actStatus(accountantToken, "ACKNOWLEDGE", "accept the shortfall")).isEqualTo("200");
 
         DayBookUploadJob job3 = completedJob(orgId, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
         seedTdsVoucher(orgId, job3.getId(), "g-apr", "PY/APR/1", LocalDate.of(2025, 4, 10), "h-apr",
