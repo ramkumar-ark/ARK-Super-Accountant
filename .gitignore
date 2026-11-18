@@ -71,7 +71,9 @@ src/routeTree.gen.ts
 Design documents/~$*
 graphify-out/
 .planning/
-docs/
+docs/*
+!docs/adr/
+
 .agent/
 .gstack/
 
