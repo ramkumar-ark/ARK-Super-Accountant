@@ -108,6 +108,25 @@ describe('StartWorkflowDialog', () => {
     )
   })
 
+  it('start_iff_postsMonthlyKey', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.post).mockResolvedValue({ data: started({ type: 'IFF' }) })
+
+    renderDialog()
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'IFF')
+    expect(screen.queryByLabelText('Period grain')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2026-04' } })
+    await user.click(screen.getByRole('button', { name: 'Start' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/v1/workflows', {
+        type: 'IFF',
+        periodKey: '2026-04',
+      }),
+    )
+  })
+
   it('start_conflict_showsServerMessage', async () => {
     const user = userEvent.setup()
     vi.mocked(api.post).mockRejectedValue({

@@ -30,7 +30,8 @@ public class TaxMappingFindingSource implements WorkflowFindingSource {
     static final String SOURCE_CODE = "TAX_MAPPING";
     static final String FINDING_TYPE = "TAX_LEDGER_UNMAPPED";
 
-    private static final Set<WorkflowType> GST_TYPES = EnumSet.of(WorkflowType.GSTR1, WorkflowType.GSTR3B);
+    private static final Set<WorkflowType> GST_TYPES =
+            EnumSet.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF);
     private static final Set<WorkflowStage> BLOCKED_STAGES = EnumSet.of(WorkflowStage.STARTED,
             WorkflowStage.DATA_UPLOADED, WorkflowStage.FINDINGS_REVIEW, WorkflowStage.PREPARE);
 

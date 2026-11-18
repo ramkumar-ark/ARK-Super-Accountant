@@ -45,6 +45,7 @@ public class VoucherScopeClassifier {
         if (salesLike) {
             scopes.add(WorkflowType.GSTR1);
             scopes.add(WorkflowType.GSTR3B);
+            scopes.add(WorkflowType.IFF);
         } else if (purchaseLike) {
             scopes.add(WorkflowType.GSTR3B);
         }

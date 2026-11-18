@@ -20,6 +20,8 @@ public final class MasterAttributes {
                     "gstApplicable", "gstApplicabilityType", "hsnSacCode"),
             WorkflowType.GSTR3B, List.of("category", "gstin", "gstRegistrationType",
                     "gstApplicable", "gstApplicabilityType", "hsnSacCode"),
+            WorkflowType.IFF, List.of("category", "gstin", "gstRegistrationType",
+                    "gstApplicable", "gstApplicabilityType", "hsnSacCode"),
             WorkflowType.TDS_PAYMENT, List.of("category", "pan", "tdsSection", "tdsApplicable"),
             WorkflowType.TDS_26Q, List.of("category", "pan", "tdsSection", "tdsApplicable"));
 

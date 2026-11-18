@@ -19,7 +19,8 @@ import java.util.Set;
 public final class MastersScope {
     private MastersScope() {}
 
-    private static final Set<WorkflowType> GSTR1_3B = Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B);
+    private static final Set<WorkflowType> GSTR1_3B =
+            Set.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF);
     private static final Set<WorkflowType> GSTR3B = Set.of(WorkflowType.GSTR3B);
     private static final Set<WorkflowType> TDS = Set.of(WorkflowType.TDS_PAYMENT, WorkflowType.TDS_26Q);
 

@@ -58,7 +58,7 @@ public class FilerProfileSettingsService {
             throw new WorkflowBadRequestException(
                     "effectiveFrom must be a quarter start for this financial year");
         }
-        for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B)) {
+        for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF)) {
             boolean conflicts = workflowRepository
                     .findAllByOrganizationIdAndTypeAndStageNot(organizationId, type, WorkflowStage.BASELINE)
                     .stream()
@@ -83,7 +83,7 @@ public class FilerProfileSettingsService {
         profile.setCreatedBy(actor);
         filerProfileRepository.save(profile);
 
-        for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B)) {
+        for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF)) {
             responsibilityStartSettingsService.list(organizationId).stream()
                     .filter(r -> r.type().equals(type.name()) && r.firstPeriodStart() != null)
                     .filter(r -> r.firstPeriodStart().isAfter(effectiveFrom))

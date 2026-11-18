@@ -43,7 +43,7 @@ export function StartWorkflowDialog({ open, onClose, onStarted }: StartWorkflowD
   if (!open) return null
 
   const effectiveGrain: Grain =
-    type === 'TDS_PAYMENT' ? 'MONTHLY' : type === 'TDS_26Q' ? 'QUARTERLY' : grain
+    type === 'TDS_PAYMENT' || type === 'IFF' ? 'MONTHLY' : type === 'TDS_26Q' ? 'QUARTERLY' : grain
   const periodKey = effectiveGrain === 'QUARTERLY' ? `${year}-${quarter}` : month
 
   async function handleStart() {

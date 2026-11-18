@@ -75,7 +75,7 @@ class GstAnalyzersTest {
                 mastersService, organizationRepository, new GstRuleRunner(List.of(stubRule())),
                 new FindingLifecycleService(), mock(TaxLedgerMappingGate.class), mock(TaxLedgerMappingService.class));
         assertThat(analyzer.code()).isEqualTo("GST_OUTWARD");
-        assertThat(analyzer.types()).containsExactly(WorkflowType.GSTR1);
+        assertThat(analyzer.types()).containsExactlyInAnyOrder(WorkflowType.GSTR1, WorkflowType.IFF);
     }
 
     @Test

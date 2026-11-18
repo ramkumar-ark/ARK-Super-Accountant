@@ -209,6 +209,91 @@ class WorkflowServiceTest {
         assertDoesNotThrow(() -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-Q1"));
     }
 
+    // ---------- IFF ----------
+
+    private void qrmpProfile(boolean iffOptIn) {
+        FilerProfile profile = new FilerProfile();
+        profile.setFrequency(FilerFrequency.QRMP);
+        profile.setIffOptIn(iffOptIn);
+        when(filerProfileRepository
+                .findFirstByOrganizationIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
+                        eq(orgId), any()))
+                .thenReturn(Optional.of(profile));
+    }
+
+    @Test
+    void start_iffRejectedForMonthlyProfile() {
+        FilerProfile profile = new FilerProfile();
+        profile.setFrequency(FilerFrequency.MONTHLY);
+        profile.setIffOptIn(true);
+        when(filerProfileRepository
+                .findFirstByOrganizationIdAndEffectiveFromLessThanEqualOrderByEffectiveFromDesc(
+                        eq(orgId), any()))
+                .thenReturn(Optional.of(profile));
+
+        assertThrows(WorkflowBadRequestException.class,
+                () -> service.start(orgId, actor, WorkflowType.IFF, "2026-04"));
+    }
+
+    @Test
+    void start_iffRejectedWithoutIffOptIn() {
+        qrmpProfile(false);
+
+        assertThrows(WorkflowBadRequestException.class,
+                () -> service.start(orgId, actor, WorkflowType.IFF, "2026-04"));
+    }
+
+    @Test
+    void start_iffRejectedForQuarterMonthThree() {
+        qrmpProfile(true);
+
+        assertThrows(WorkflowBadRequestException.class,
+                () -> service.start(orgId, actor, WorkflowType.IFF, "2026-06"));
+    }
+
+    @Test
+    void start_iffRejectsQuarterlyKey() {
+        qrmpProfile(true);
+
+        assertThrows(WorkflowBadRequestException.class,
+                () -> service.start(orgId, actor, WorkflowType.IFF, "2026-Q1"));
+    }
+
+    @Test
+    void start_iffAcceptedForMonthsOneAndTwo() {
+        qrmpProfile(true);
+
+        Workflow first = service.start(orgId, actor, WorkflowType.IFF, "2026-04");
+        Workflow second = service.start(orgId, actor, WorkflowType.IFF, "2026-05");
+
+        assertEquals(LocalDate.of(2026, 4, 30), first.getPeriodEnd());
+        assertEquals(LocalDate.of(2026, 5, 31), second.getPeriodEnd());
+    }
+
+    @Test
+    void dependencies_iffHasNone() {
+        Workflow w = prepareWorkflow(WorkflowType.IFF, "2026-04");
+
+        assertTrue(service.evaluateDependencies(w).isEmpty());
+    }
+
+    @Test
+    void dependencies_gstr1QuarterDoesNotDependOnIff() {
+        Workflow w = prepareWorkflow(WorkflowType.GSTR1, "2026-Q1");
+
+        assertTrue(service.evaluateDependencies(w).isEmpty());
+    }
+
+    @Test
+    void prepare_iffIsNotSupportedYet() {
+        Workflow w = prepareWorkflow(WorkflowType.IFF, "2026-04");
+        w.setStage(WorkflowStage.FINDINGS_REVIEW);
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+
+        assertThrows(WorkflowBadRequestException.class,
+                () -> service.advanceToPrepare(orgId, actor, w.getId()));
+    }
+
     // ---------- finalize / dependencies ----------
 
     private Workflow prepareWorkflow(WorkflowType type, String periodKey) {
