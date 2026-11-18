@@ -2,7 +2,6 @@ package com.arktech.superaccountant.workflow.service;
 
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
-import com.arktech.superaccountant.workflow.models.FilerFrequency;
 import com.arktech.superaccountant.workflow.models.FilerProfile;
 import com.arktech.superaccountant.workflow.models.FinancialYearClose;
 import com.arktech.superaccountant.workflow.models.Workflow;
@@ -19,6 +18,7 @@ import com.arktech.superaccountant.workflow.seam.ResponsibilityStartService;
 import com.arktech.superaccountant.workflow.seam.SnapshotService;
 import com.arktech.superaccountant.workflow.seam.UploadFreshnessGate;
 import com.arktech.superaccountant.workflow.seam.WorkflowGate;
+import com.arktech.superaccountant.workflow.service.compliance.CompliancePeriods;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -139,10 +139,7 @@ public class WorkflowService {
 
         if (type == WorkflowType.GSTR1 || type == WorkflowType.GSTR3B) {
             FilerProfile profile = profileInForce(organizationId, range.start());
-            FilerFrequency freq = profile == null ? FilerFrequency.MONTHLY : profile.getFrequency();
-            boolean iffOptIn = profile != null && profile.isIffOptIn();
-            boolean expectedQuarterly = freq == FilerFrequency.QRMP
-                    && (type == WorkflowType.GSTR3B || iffOptIn);
+            boolean expectedQuarterly = CompliancePeriods.isQuarterlyGrain(profile, type);
             if (expectedQuarterly != keyIsQuarterly) {
                 throw new WorkflowBadRequestException(
                         "Period key does not match the filer profile in force for this period");

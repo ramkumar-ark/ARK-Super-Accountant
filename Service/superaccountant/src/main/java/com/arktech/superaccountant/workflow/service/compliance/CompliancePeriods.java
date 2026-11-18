@@ -48,18 +48,25 @@ public final class CompliancePeriods {
 
     private static boolean isQuarterlyGrain(WorkflowType type, LocalDate periodStart, int fyStartMonth,
             Function<LocalDate, FilerProfile> profileAt) {
+        return isQuarterlyGrain(profileAt.apply(periodStart), type);
+    }
+
+    /**
+     * The one grain decision shared by the period enumerator and workflow start
+     * validation. QRMP is quarterly for GSTR1 and GSTR3B regardless of IFF opt-in.
+     */
+    public static boolean isQuarterlyGrain(FilerProfile profile, WorkflowType type) {
         if (type == WorkflowType.TDS_PAYMENT) {
             return false;
         }
         if (type == WorkflowType.TDS_26Q) {
             return true;
         }
-        FilerProfile profile = profileAt.apply(periodStart);
         FilerFrequency freq = profile == null ? FilerFrequency.MONTHLY : profile.getFrequency();
         if (freq != FilerFrequency.QRMP) {
             return false;
         }
-        if (type == WorkflowType.GSTR3B) {
+        if (type == WorkflowType.GSTR1 || type == WorkflowType.GSTR3B) {
             return true;
         }
         return profile != null && profile.isIffOptIn();

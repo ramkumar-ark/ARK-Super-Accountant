@@ -201,10 +201,12 @@ class WorkflowServiceTest {
         assertThrows(WorkflowBadRequestException.class,
                 () -> service.start(orgId, actor, WorkflowType.GSTR3B, "2026-04"));
 
-        // GSTR1 stays monthly without IFF opt-in
+        // GSTR1 is quarterly under QRMP even without IFF opt-in
+        assertThrows(WorkflowBadRequestException.class,
+                () -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-04"));
         when(workflowRepository.findByOrganizationIdAndTypeAndPeriodKeyAndActiveTrue(
-                orgId, WorkflowType.GSTR1, "2026-04")).thenReturn(Optional.empty());
-        assertDoesNotThrow(() -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-04"));
+                orgId, WorkflowType.GSTR1, "2026-Q1")).thenReturn(Optional.empty());
+        assertDoesNotThrow(() -> service.start(orgId, actor, WorkflowType.GSTR1, "2026-Q1"));
     }
 
     // ---------- finalize / dependencies ----------
