@@ -81,7 +81,9 @@ public class Gstr1JsonParser {
                 case "nil" -> parseNilSection(section.getValue(), lines);
                 case "at" -> parseAtSection(section.getValue(), "AT", lines);
                 case "atadj" -> parseAtSection(section.getValue(), "ATADJ", lines);
-                case "hsn" -> parseHsnSection(section.getValue(), lines);
+                case "hsn" -> parseHsnSection(section.getValue(), null, lines);
+                case "hsn_b2b" -> parseHsnSection(section.getValue(), "B2B", lines);
+                case "hsn_b2c" -> parseHsnSection(section.getValue(), "B2C", lines);
                 case "doc_issue" -> parseDocIssueSection(section.getValue(), lines);
                 default -> warnings.add("Ignored section " + key);
             }
@@ -304,13 +306,14 @@ public class Gstr1JsonParser {
         }
     }
 
-    private void parseHsnSection(JsonNode section, List<FiledReturnLine> lines) {
-        JsonNode data = section.get("data");
+    private void parseHsnSection(JsonNode section, String category, List<FiledReturnLine> lines) {
+        JsonNode data = section.has("data") ? section.get("data") : section;
         if (data == null || !data.isArray()) {
             return;
         }
         for (JsonNode row : data) {
             FiledReturnLine line = baseLine("HSN");
+            line.setHsnCategory(category);
             line.setLabel(text(row, "hsn_sc"));
             line.setTaxable(nvl(decimal(row, "txval")));
             line.setIgst(nvl(decimal(row, "iamt")));
@@ -333,8 +336,12 @@ public class Gstr1JsonParser {
             }
             for (JsonNode doc : docs) {
                 FiledReturnLine line = baseLine("DOC");
+                line.setDocNumber(text(series, "doc_num"));
                 line.setLabel(text(doc, "from") + "-" + text(doc, "to"));
-                line.setInvoiceValue(nvl(decimal(doc, "totnum")));
+                BigDecimal issued = decimal(doc, "totnum");
+                if (issued == null) issued = decimal(doc, "net_issue");
+                if (issued == null) issued = decimal(doc, "net_num");
+                line.setInvoiceValue(nvl(issued));
                 line.setTaxable(nvl(decimal(doc, "cancel")));
                 lines.add(line);
             }
@@ -416,6 +423,7 @@ public class Gstr1JsonParser {
         line.setRate(source.getRate());
         line.setInvoiceType(source.getInvoiceType());
         line.setLabel(source.getLabel());
+        line.setHsnCategory(source.getHsnCategory());
         line.setInvoiceValue(source.getInvoiceValue());
         line.setTaxable(source.getTaxable());
         line.setIgst(source.getIgst());
