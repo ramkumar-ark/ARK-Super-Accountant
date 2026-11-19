@@ -58,6 +58,7 @@ function baseWorkflow(overrides: Partial<WorkflowDetail['workflow']> = {}) {
     filedAt: null,
     filingRef: null,
     filingRefDate: null,
+    filingChannel: null,
     createdBy: 'op1',
     createdAt: '2025-04-01T00:00:00Z',
     ...overrides,
