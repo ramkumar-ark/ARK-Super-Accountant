@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiErrorMessage } from '@/lib/apiError'
 import { getGstr1Export } from '@/lib/api'
 
@@ -25,6 +25,7 @@ function fileNameFrom(disposition: string | undefined | null): string | null {
 
 export function Gstr1DownloadButton({ workflowId, disabled, disabledReason }: Props) {
   const [error, setError] = useState('')
+  const queryClient = useQueryClient()
 
   const downloadMutation = useMutation({
     mutationFn: () => getGstr1Export(workflowId),
@@ -42,6 +43,7 @@ export function Gstr1DownloadButton({ workflowId, disabled, disabledReason }: Pr
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
+      queryClient.invalidateQueries({ queryKey: ['workflow-events', workflowId] })
     },
     onError: (err) => setError(apiErrorMessage(err, 'Could not download the portal file.')),
   })
