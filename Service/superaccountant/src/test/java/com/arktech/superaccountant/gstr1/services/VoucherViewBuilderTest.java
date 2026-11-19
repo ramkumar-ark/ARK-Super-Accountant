@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gstr1.services;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.daybook.models.ParsedVoucherItem;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.gst.mapping.GstHead;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMapping;
@@ -278,5 +279,52 @@ class VoucherViewBuilderTest {
         Workflow w = workflow();
         w.setUploadJobId(null);
         assertTrue(builder.build(w).isEmpty());
+    }
+
+    @Test
+    void uqcQuantityAndHsnFallBackToCapturedItemsWhenFillInsAbsent() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "2000.00", "18"));
+        ParsedVoucherItem first = item("Plywood 8mm", "4407", "NOS", "10");
+        ParsedVoucherItem second = item("Teak Board", "4407", "NOS", "5");
+        v.setItems(new ArrayList<>(List.of(first, second)));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        assertEquals("NOS", view.getUqc());
+        assertEquals(0, new BigDecimal("15").compareTo(view.getQuantity()));
+        assertEquals("4407", view.getHsn());
+    }
+
+    @Test
+    void fillInStillBeatsCapturedItemsForUqcQuantityAndHsn() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Sales Account", "2000.00", "18"));
+        v.setItems(new ArrayList<>(List.of(item("Plywood 8mm", "4407", "NOS", "10"))));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+        when(fillInService.resolve(any(), anyString(), eq("Sales Account"),
+                eq(com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute.UQC)))
+                .thenReturn(Optional.of("PCS"));
+        when(fillInService.resolve(any(), anyString(), eq("Sales Account"),
+                eq(com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute.QTY)))
+                .thenReturn(Optional.of("3"));
+        when(fillInService.resolve(any(), anyString(), eq("Sales Account"),
+                eq(com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute.HSN)))
+                .thenReturn(Optional.of("9999"));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        assertEquals("PCS", view.getUqc());
+        assertEquals(0, new BigDecimal("3").compareTo(view.getQuantity()));
+        assertEquals("9999", view.getHsn());
+    }
+
+    private ParsedVoucherItem item(String stockItemName, String hsn, String uqc, String quantity) {
+        ParsedVoucherItem item = new ParsedVoucherItem();
+        item.setOrganizationId(orgId);
+        item.setStockItemName(stockItemName);
+        item.setHsn(hsn);
+        item.setUqc(uqc);
+        item.setQuantity(new BigDecimal(quantity));
+        return item;
     }
 }

@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gstr1.services;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.daybook.models.ParsedVoucherItem;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute;
 import com.arktech.superaccountant.gst.mapping.GstHead;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.function.Function;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -107,6 +110,8 @@ public class VoucherViewBuilder {
                              Map<String, UploadLedgerSnapshot> snapshots) {
         List<ParsedVoucherEntry> entries = voucher.getEntries() == null
                 ? List.of() : voucher.getEntries();
+        List<ParsedVoucherItem> items = voucher.getItems() == null
+                ? List.of() : voucher.getItems();
 
         BigDecimal totalValue = totalValue(voucher);
 
@@ -135,6 +140,8 @@ public class VoucherViewBuilder {
             taxableValue = derived.max(BigDecimal.ZERO);
         }
 
+        List<ParsedVoucherItem> uniformItems = uniformHsnUqcItems(items) ? items : List.of();
+
         VoucherView.Builder b = new VoucherView.Builder()
                 .voucherKey(voucherKey)
                 .voucherTypeName(voucher.getVoucherTypeName())
@@ -157,10 +164,13 @@ public class VoucherViewBuilder {
                 .cgst(heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO))
                 .sgst(heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO))
                 .cess(heads.getOrDefault(GstHead.CESS, BigDecimal.ZERO))
-                .hsn(resolveHsn(workflow, voucherKey, entries, snapshots).orElse(null))
-                .uqc(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.UQC).orElse(null))
+                .hsn(resolveHsn(workflow, voucherKey, entries, snapshots)
+                        .orElseGet(() -> firstItemValue(uniformItems, ParsedVoucherItem::getHsn)))
+                .uqc(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.UQC)
+                        .orElseGet(() -> firstItemValue(uniformItems, ParsedVoucherItem::getUqc)))
                 .quantity(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.QTY)
-                        .map(VoucherViewBuilder::parseAmount).orElse(null));
+                        .map(VoucherViewBuilder::parseAmount)
+                        .orElseGet(() -> sumItemQuantities(uniformItems)));
         return b.build();
     }
 
@@ -185,6 +195,40 @@ public class VoucherViewBuilder {
             }
         }
         return Optional.empty();
+    }
+
+    private static boolean uniformHsnUqcItems(List<ParsedVoucherItem> items) {
+        return distinctTrimmed(items, ParsedVoucherItem::getHsn) <= 1
+                && distinctTrimmed(items, ParsedVoucherItem::getUqc) <= 1;
+    }
+
+    private static long distinctTrimmed(List<ParsedVoucherItem> items,
+                                        Function<ParsedVoucherItem, String> getter) {
+        return items.stream()
+                .map(getter)
+                .map(v -> v == null ? "" : v.trim())
+                .distinct()
+                .count();
+    }
+
+    // Item-level fallback: used only when fill-ins and ledger snapshots yield
+    // nothing, so captured inventory lines can still populate the HSN summary.
+    private static String firstItemValue(List<ParsedVoucherItem> items,
+                                         Function<ParsedVoucherItem, String> getter) {
+        return items.stream()
+                .map(getter)
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static BigDecimal sumItemQuantities(List<ParsedVoucherItem> items) {
+        BigDecimal total = items.stream()
+                .map(ParsedVoucherItem::getQuantity)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return items.stream().anyMatch(i -> i.getQuantity() != null) ? total : null;
     }
 
     // Ledger-scope fill-ins are baked into the view here, so the classifier's

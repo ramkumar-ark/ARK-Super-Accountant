@@ -103,4 +103,8 @@ public class ParsedVoucher {
 
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "parsedVoucher")
     private List<ParsedVoucherEntry> entries;
+
+    // Item lines (INVENTORYENTRIES.LIST) — stored outside the content hash
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "parsedVoucher")
+    private List<ParsedVoucherItem> items;
 }
