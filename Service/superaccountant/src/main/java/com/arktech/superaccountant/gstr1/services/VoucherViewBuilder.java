@@ -142,6 +142,19 @@ public class VoucherViewBuilder {
 
         List<ParsedVoucherItem> uniformItems = uniformHsnUqcItems(items) ? items : List.of();
 
+        Optional<String> hsnValue = resolveHsn(workflow, voucherKey, entries, snapshots);
+        Optional<String> uqcValue = resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.UQC);
+        Optional<BigDecimal> qtyValue = resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.QTY)
+                .map(VoucherViewBuilder::parseAmount);
+
+        // Item-level HSN breakdown is a pure captured-data path: only when no
+        // fill-in or ledger snapshot resolves HSN/UQC/quantity anywhere does the
+        // mixed-HSN voucher split into per-item contributions.
+        List<VoucherView.HsnItem> hsnItems = hsnValue.isEmpty() && uqcValue.isEmpty() && qtyValue.isEmpty()
+                && !uniformHsnUqcItems(items)
+                ? allocateHsnItems(items, taxableValue, heads)
+                : List.of();
+
         VoucherView.Builder b = new VoucherView.Builder()
                 .voucherKey(voucherKey)
                 .voucherTypeName(voucher.getVoucherTypeName())
@@ -164,14 +177,82 @@ public class VoucherViewBuilder {
                 .cgst(heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO))
                 .sgst(heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO))
                 .cess(heads.getOrDefault(GstHead.CESS, BigDecimal.ZERO))
-                .hsn(resolveHsn(workflow, voucherKey, entries, snapshots)
+                .hsn(hsnValue
                         .orElseGet(() -> firstItemValue(uniformItems, ParsedVoucherItem::getHsn)))
-                .uqc(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.UQC)
+                .uqc(uqcValue
                         .orElseGet(() -> firstItemValue(uniformItems, ParsedVoucherItem::getUqc)))
-                .quantity(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.QTY)
-                        .map(VoucherViewBuilder::parseAmount)
-                        .orElseGet(() -> sumItemQuantities(uniformItems)));
+                .quantity(qtyValue
+                        .orElseGet(() -> sumItemQuantities(uniformItems)))
+                .hsnItems(hsnItems);
         return b.build();
+    }
+
+    /**
+     * Splits a mixed-HSN voucher's taxable value and tax heads across its
+     * inventory items, pro-rata by |item amount| (equal weights when no item
+     * carries an amount), rounded to 2dp with the rounding residual added to
+     * the largest-weight item so sums reconcile exactly to the voucher totals.
+     * Items with a blank HSN are skipped.
+     */
+    private static List<VoucherView.HsnItem> allocateHsnItems(List<ParsedVoucherItem> items,
+                                                              BigDecimal taxableValue,
+                                                              Map<GstHead, BigDecimal> heads) {
+        List<ParsedVoucherItem> rated = items.stream()
+                .filter(i -> i.getHsn() != null && !i.getHsn().isBlank())
+                .toList();
+        if (rated.isEmpty()) {
+            return List.of();
+        }
+        BigDecimal[] weights = new BigDecimal[rated.size()];
+        BigDecimal totalWeight = BigDecimal.ZERO;
+        for (int i = 0; i < rated.size(); i++) {
+            BigDecimal amount = rated.get(i).getAmount();
+            weights[i] = amount == null ? BigDecimal.ZERO : amount.abs();
+            totalWeight = totalWeight.add(weights[i]);
+        }
+        boolean equalSplit = totalWeight.compareTo(BigDecimal.ZERO) == 0;
+        if (equalSplit) {
+            for (int i = 0; i < rated.size(); i++) {
+                weights[i] = BigDecimal.ONE;
+            }
+            totalWeight = new BigDecimal(rated.size());
+        }
+        int largest = 0;
+        for (int i = 1; i < rated.size(); i++) {
+            if (weights[i].compareTo(weights[largest]) > 0) {
+                largest = i;
+            }
+        }
+        BigDecimal[] taxable = allocate(taxableValue, weights, totalWeight, largest);
+        BigDecimal[] igst = allocate(heads.getOrDefault(GstHead.IGST, BigDecimal.ZERO), weights, totalWeight, largest);
+        BigDecimal[] cgst = allocate(heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO), weights, totalWeight, largest);
+        BigDecimal[] sgst = allocate(heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO), weights, totalWeight, largest);
+        BigDecimal[] cess = allocate(heads.getOrDefault(GstHead.CESS, BigDecimal.ZERO), weights, totalWeight, largest);
+
+        List<VoucherView.HsnItem> result = new ArrayList<>();
+        for (int i = 0; i < rated.size(); i++) {
+            ParsedVoucherItem item = rated.get(i);
+            result.add(new VoucherView.HsnItem(
+                    item.getHsn().trim(),
+                    item.getUqc() == null ? null : item.getUqc().trim(),
+                    item.getQuantity(),
+                    taxable[i], igst[i], cgst[i], sgst[i], cess[i]));
+        }
+        return result;
+    }
+
+    private static BigDecimal[] allocate(BigDecimal total, BigDecimal[] weights,
+                                         BigDecimal totalWeight, int largest) {
+        BigDecimal[] shares = new BigDecimal[weights.length];
+        BigDecimal allocated = BigDecimal.ZERO;
+        for (int i = 0; i < weights.length; i++) {
+            BigDecimal share = total.multiply(weights[i])
+                    .divide(totalWeight, 2, java.math.RoundingMode.HALF_UP);
+            shares[i] = share;
+            allocated = allocated.add(share);
+        }
+        shares[largest] = shares[largest].add(total.subtract(allocated));
+        return shares;
     }
 
     private Optional<String> resolveHsn(Workflow workflow, String voucherKey, List<ParsedVoucherEntry> entries,

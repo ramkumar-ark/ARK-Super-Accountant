@@ -514,6 +514,25 @@ class DayBookParserServiceTest {
     }
 
     @Test
+    void inventoryEntryBindsUppercaseTallyKeys() throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper om =
+                new com.fasterxml.jackson.databind.ObjectMapper();
+        String json = """
+                {"STOCKITEMNAME":"Plywood 8mm","HSN":"4407","UQC":"NOS","UNIT":"NOS",
+                 "ACTUALQTY":"10 NOS","BILLEDQTY":"10 NOS","RATE":"100.00","AMOUNT":"1000.00"}
+                """;
+        InventoryEntry item = om.readValue(json, InventoryEntry.class);
+        assertThat(item.getStockitemname()).isEqualTo("Plywood 8mm");
+        assertThat(item.getHsn()).isEqualTo("4407");
+        assertThat(item.getUqc()).isEqualTo("NOS");
+        assertThat(item.getUnit()).isEqualTo("NOS");
+        assertThat(item.getActualqty()).isEqualTo("10 NOS");
+        assertThat(item.getBilledqty()).isEqualTo("10 NOS");
+        assertThat(item.getRate()).isEqualTo("100.00");
+        assertThat(item.getAmount()).isEqualTo("1000.00");
+    }
+
+    @Test
     void persistVouchers_inventoryEntriesAreEmptyWithoutInventoryData() {
         LedgerEntry entry = new LedgerEntry();
         entry.setLedgername("Bank Account");

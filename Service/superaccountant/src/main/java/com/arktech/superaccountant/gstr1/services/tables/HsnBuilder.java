@@ -31,7 +31,41 @@ public class HsnBuilder {
     public List<PreparedReturnRow> build(Workflow workflow, List<VoucherView> sales) {
         Map<String, Bucket> buckets = new LinkedHashMap<>();
         for (VoucherView v : sales) {
-            if (v.isCancelled() || TableRows.isBlank(v.getHsn())) {
+            if (v.isCancelled()) {
+                continue;
+            }
+            // Mixed-HSN vouchers arrive with per-item contributions (voucher-level
+            // HSN is null), so they contribute one contribution per captured item.
+            if (!v.getHsnItems().isEmpty()) {
+                for (VoucherView.HsnItem item : v.getHsnItems()) {
+                    if (TableRows.isBlank(item.hsn())) {
+                        continue;
+                    }
+                    String hsn = item.hsn().trim();
+                    String uqc = TableRows.isBlank(item.uqc()) ? "NA" : item.uqc().trim();
+                    BigDecimal rate = v.getRate() == null ? BigDecimal.ZERO : v.getRate();
+                    String supplyType = TableRows.hasGstin(v) ? "B2B" : "B2C";
+                    String key = hsn + ":" + uqc + ":" + rate.toPlainString() + ":" + supplyType;
+                    Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket());
+                    bucket.hsn = hsn;
+                    bucket.uqc = uqc;
+                    bucket.rate = rate;
+                    bucket.supplyType = supplyType;
+                    bucket.quantity = bucket.quantity.add(TableRows.orZero(item.quantity()));
+                    bucket.taxable = bucket.taxable.add(TableRows.orZero(item.taxableValue()));
+                    bucket.igst = bucket.igst.add(TableRows.orZero(item.igst()));
+                    bucket.cgst = bucket.cgst.add(TableRows.orZero(item.cgst()));
+                    bucket.sgst = bucket.sgst.add(TableRows.orZero(item.sgst()));
+                    bucket.cess = bucket.cess.add(TableRows.orZero(item.cess()));
+                    // Invoice value follows the same weights as the allocated amounts.
+                    bucket.invoiceValue = bucket.invoiceValue.add(
+                            TableRows.orZero(v.getTotalValue()).multiply(TableRows.orZero(item.taxableValue()))
+                                    .divide(TableRows.orZero(v.getTaxableValue()), 2,
+                                            java.math.RoundingMode.HALF_UP));
+                }
+                continue;
+            }
+            if (TableRows.isBlank(v.getHsn())) {
                 continue;
             }
             String hsn = v.getHsn().trim();
