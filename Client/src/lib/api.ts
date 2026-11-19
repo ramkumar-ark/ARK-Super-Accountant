@@ -59,6 +59,27 @@ export interface Gstr1FillInInput {
   value: string
 }
 
+export interface Gstr1ValidationIssue {
+  code: string
+  severity: 'ERROR' | 'WARNING'
+  tableCode: string | null
+  rowKey: string | null
+  message: string
+}
+
+export interface Gstr1Validation {
+  errors: Gstr1ValidationIssue[]
+  warnings: Gstr1ValidationIssue[]
+}
+
+export function getGstr1Validation(workflowId: string): Promise<Gstr1Validation> {
+  return api.get(`/v1/workflows/${workflowId}/gstr1/validation`).then((res) => res.data)
+}
+
+export function getGstr1Export(workflowId: string) {
+  return api.get(`/v1/workflows/${workflowId}/gstr1/export`, { responseType: 'blob' })
+}
+
 export function getGstr1Tables(workflowId: string): Promise<Gstr1Tables> {
   return api.get(`/v1/workflows/${workflowId}/gstr1/tables`).then((res) => res.data)
 }

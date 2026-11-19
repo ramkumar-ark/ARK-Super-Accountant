@@ -1,6 +1,10 @@
 package com.arktech.superaccountant.gstr1.controllers;
 
 import com.arktech.superaccountant.gstr1.models.Gstr1FillIn;
+import com.arktech.superaccountant.gstr1.json.Gstr1JsonWriter;
+import com.arktech.superaccountant.gstr1.json.Gstr1WriterVersion;
+import com.arktech.superaccountant.gstr1.json.PortalFilePart;
+import com.arktech.superaccountant.gstr1.json.WriterOptions;
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute;
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInScope;
 import com.arktech.superaccountant.gstr1.models.PreparedReturn;
@@ -14,7 +18,12 @@ import com.arktech.superaccountant.gstr1.services.Gstr1PrepareService;
 import com.arktech.superaccountant.gstr1.validation.Gstr1Validator;
 import com.arktech.superaccountant.gstr1.validation.ValidationResult;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.models.Organization;
+import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.workflow.models.FilerProfile;
 import com.arktech.superaccountant.workflow.models.Workflow;
+import com.arktech.superaccountant.workflow.models.WorkflowStage;
+import com.arktech.superaccountant.workflow.repository.FilerProfileRepository;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import com.arktech.superaccountant.workflow.service.WorkflowService;
@@ -28,17 +37,26 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * GSTR-1 Prepare API: read the prepared return's table rows (grouped by table code,
@@ -71,6 +89,15 @@ public class Gstr1WorkflowController {
 
     @Autowired
     private Gstr1Validator validator;
+
+    @Autowired
+    private Gstr1JsonWriter jsonWriter;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private FilerProfileRepository filerProfileRepository;
 
     @GetMapping("/{id}/gstr1/tables")
     public ResponseEntity<?> tables(@PathVariable UUID id,
@@ -147,7 +174,113 @@ public class Gstr1WorkflowController {
         }
     }
 
+    @PreAuthorize("hasRole('ACCOUNTANT')")
+    @GetMapping("/{id}/gstr1/export")
+    public ResponseEntity<?> export(@PathVariable UUID id,
+                                    @RequestParam(name = "includeIrp", defaultValue = "false")
+                                    boolean includeIrp,
+                                    @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal.getOrganizationId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        try {
+            Workflow workflow = workflowService.get(principal.getOrganizationId(), id);
+            WorkflowStage stage = workflow.getStage();
+            if (stage != WorkflowStage.PREPARE && stage != WorkflowStage.FINALIZED
+                    && stage != WorkflowStage.FILED) {
+                throw new WorkflowConflictException("Export is available from Prepare onward");
+            }
+            PreparedReturn prepared = prepareService.buildOrRebuild(workflow);
+            List<PreparedReturnRow> rows = rowRepository.findByPreparedReturnId(prepared.getId());
+            if (stage == WorkflowStage.PREPARE) {
+                boolean hasErrors = validator.validate(workflow, rows).stream()
+                        .anyMatch(r -> r.severity() == ValidationResult.Severity.ERROR);
+                if (hasErrors) {
+                    throw new WorkflowConflictException(
+                            "Export is available once validation errors are resolved");
+                }
+            }
+            String gstin = organizationRepository.findById(workflow.getOrganizationId())
+                    .map(Organization::getGstin).orElse(null);
+            List<PortalFilePart> parts = jsonWriter.write(prepared, rows, workflow, gstin,
+                    profileFor(workflow), new WriterOptions(includeIrp));
+
+            byte[] body;
+            String filename;
+            String contentType;
+            if (parts.size() == 1) {
+                body = parts.get(0).bytes();
+                filename = parts.get(0).fileName();
+                contentType = "application/json";
+            } else {
+                body = zip(parts);
+                String fp = filingPeriod(workflow);
+                String gstinSuffix = gstin == null ? "NOGSTIN"
+                        : gstin.substring(Math.max(0, gstin.length() - 6));
+                filename = "GSTR1_" + fp + "_" + gstinSuffix + ".zip";
+                contentType = "application/zip";
+            }
+            String sha256 = sha256(body);
+            workflowService.recordPortalFileDownload(principal.getOrganizationId(),
+                    principal.getUsername(), id, sha256, (long) body.length,
+                    Gstr1WriterVersion.PORTAL_VERSION, parts.size());
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                    .contentType(org.springframework.http.MediaType.parseMediaType(contentType))
+                    .body(body);
+        } catch (WorkflowBadRequestException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (WorkflowConflictException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // ---------- response assembly ----------
+
+    // ---------- export helpers ----------
+
+    private FilerProfile profileFor(Workflow workflow) {
+        List<FilerProfile> profiles = filerProfileRepository
+                .findAllByOrganizationIdOrderByEffectiveFromAsc(workflow.getOrganizationId());
+        LocalDate periodEnd = workflow.getPeriodEnd();
+        FilerProfile applicable = null;
+        for (FilerProfile profile : profiles) {
+            if (profile.getEffectiveFrom() == null || periodEnd == null
+                    || !profile.getEffectiveFrom().isAfter(periodEnd)) {
+                applicable = profile;
+            }
+        }
+        return applicable;
+    }
+
+    private byte[] zip(List<PortalFilePart> parts) {
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream();
+             ZipOutputStream zip = new ZipOutputStream(out)) {
+            for (PortalFilePart part : parts) {
+                zip.putNextEntry(new ZipEntry(part.fileName()));
+                zip.write(part.bytes());
+                zip.closeEntry();
+            }
+            zip.finish();
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to zip GSTR-1 portal parts", e);
+        }
+    }
+
+    private String filingPeriod(Workflow workflow) {
+        return java.time.format.DateTimeFormatter.ofPattern("MMyyyy")
+                .format(workflow.getPeriodStart());
+    }
+
+    private String sha256(byte[] body) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(body));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
 
     private Gstr1TablesResponse toResponse(Workflow workflow, PreparedReturn prepared) {
         List<PreparedReturnRow> rows = rowRepository.findByPreparedReturnId(prepared.getId());

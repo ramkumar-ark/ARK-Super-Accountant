@@ -10,6 +10,7 @@ import { WorkflowUploadStep } from '@/components/workflow/WorkflowUploadStep'
 import { WorkflowEventsTimeline } from '@/components/workflow/WorkflowEventsTimeline'
 import { TdsPreparePanel } from '@/components/tds/TdsPreparePanel'
 import { Gstr1PreparePanel } from '@/pages/workflow/Gstr1PreparePanel'
+import { Gstr1ValidationPanel } from '@/pages/workflow/Gstr1ValidationPanel'
 import { ParentWorkflowNotice } from '@/components/workflow/ParentWorkflowNotice'
 import { AmendmentFollowUpList } from '@/components/snapshot/AmendmentFollowUpList'
 import { MastersTamperWarningBanner } from '@/components/snapshot/MastersTamperWarningBanner'
@@ -123,6 +124,7 @@ export function WorkflowDetailPage() {
           <TdsPreparePanel workflow={workflow} role={role ?? ''} />
 
           <Gstr1PreparePanel workflow={workflow} role={role ?? ''} />
+          <Gstr1ValidationPanel workflow={workflow} role={role ?? ''} />
 
           <MastersTamperWarningBanner findings={findingsQuery.data?.findings ?? []} />
 

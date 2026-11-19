@@ -379,6 +379,23 @@ public class WorkflowService {
         return w;
     }
 
+    @Transactional
+    public void recordPortalFileDownload(UUID organizationId, String actor, UUID id,
+                                         String sha256, long bytes, String writerVersion,
+                                         int parts) {
+        Workflow w = get(organizationId, id);
+        workflowEventRepository.save(event(w.getId(), actor,
+                WorkflowEventKind.PORTAL_FILE_DOWNLOADED, null, portalDownloadPayload(
+                        sha256, bytes, writerVersion, parts)));
+    }
+
+    private String portalDownloadPayload(String sha256, long bytes, String writerVersion,
+                                         int parts) {
+        return "{\"sha256\":\"" + sha256 + "\",\"bytes\":" + bytes
+                + ",\"writerVersion\":\"" + writerVersion.replace("\"", "\\\"")
+                + "\",\"parts\":" + parts + "}";
+    }
+
     // ---------- dependencies ----------
 
     public record DependencyStatus(String type, String periodKey, boolean satisfied) {
