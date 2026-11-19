@@ -65,7 +65,7 @@ public class Gstr1JsonParser {
             Map.Entry<String, JsonNode> section = sections.next();
             String key = section.getKey();
             switch (key) {
-                case "gstin", "fp", "version", "file_hash", "checksum" -> { }
+                case "gstin", "fp", "version", "hash", "file_hash", "checksum" -> { }
                 case "b2b" -> parseInvoiceSection(section.getValue(), "B2B", false, false, gstin, lines);
                 case "b2ba" -> parseInvoiceSection(section.getValue(), "B2BA", true, false, gstin, lines);
                 case "cdnr" -> parseNoteSection(section.getValue(), "CDNR", false, gstin, lines);
@@ -81,7 +81,9 @@ public class Gstr1JsonParser {
                 case "nil" -> parseNilSection(section.getValue(), lines);
                 case "at" -> parseAtSection(section.getValue(), "AT", lines);
                 case "atadj" -> parseAtSection(section.getValue(), "ATADJ", lines);
-                case "hsn" -> parseHsnSection(section.getValue(), null, lines);
+                case "txpd" -> parseAtSection(section.getValue(), "TXPD", lines);
+                case "txpda" -> parseAtSection(section.getValue(), "TXPDA", lines);
+                case "hsn" -> parseHsnWrapper(section.getValue(), lines);
                 case "hsn_b2b" -> parseHsnSection(section.getValue(), "B2B", lines);
                 case "hsn_b2c" -> parseHsnSection(section.getValue(), "B2C", lines);
                 case "doc_issue" -> parseDocIssueSection(section.getValue(), lines);
@@ -288,15 +290,24 @@ public class Gstr1JsonParser {
     private void parseAtSection(JsonNode section, String tableCode, List<FiledReturnLine> lines) {
         for (JsonNode row : section) {
             String pos = text(row, "pos");
-            JsonNode txpd = row.get("txpd");
-            if (txpd == null || !txpd.isArray()) {
-                continue;
+            // portal V3.2.4 shape carries the items in `itms` with the advance amount
+            // in `ad_amt`; the older offline-tool shape used a `txpd` array
+            JsonNode items = row.get("itms");
+            boolean portalShape = items != null && items.isArray();
+            if (!portalShape) {
+                items = row.get("txpd");
+                if (items == null || !items.isArray()) {
+                    continue;
+                }
             }
-            for (JsonNode item : txpd) {
+            for (JsonNode item : items) {
                 FiledReturnLine line = baseLine(tableCode);
                 line.setSupplyType("INTER".equalsIgnoreCase(text(row, "sply_ty")) ? "INTER" : "INTRA");
                 line.setPlaceOfSupply(pos);
                 applyAmounts(line, item);
+                if (portalShape) {
+                    line.setTaxable(nvl(decimal(item, "ad_amt")));
+                }
                 BigDecimal atadj = decimal(item, "atadj");
                 if (atadj != null && tableCode.equals("AT")) {
                     line.setIgst(nvl(line.getIgst()).subtract(atadj));
@@ -304,6 +315,25 @@ public class Gstr1JsonParser {
                 lines.add(line);
             }
         }
+    }
+
+    /**
+     * Portal V3.2.4 emits {@code hsn: {hsn_b2b: [...], hsn_b2c: [...]}}; older exports
+     * carry a flat array (optionally under {@code data}).
+     */
+    private void parseHsnWrapper(JsonNode section, List<FiledReturnLine> lines) {
+        JsonNode b2b = section.get("hsn_b2b");
+        JsonNode b2c = section.get("hsn_b2c");
+        if ((b2b != null && b2b.isArray()) || (b2c != null && b2c.isArray())) {
+            if (b2b != null && b2b.isArray()) {
+                parseHsnSection(b2b, "B2B", lines);
+            }
+            if (b2c != null && b2c.isArray()) {
+                parseHsnSection(b2c, "B2C", lines);
+            }
+            return;
+        }
+        parseHsnSection(section, null, lines);
     }
 
     private void parseHsnSection(JsonNode section, String category, List<FiledReturnLine> lines) {
