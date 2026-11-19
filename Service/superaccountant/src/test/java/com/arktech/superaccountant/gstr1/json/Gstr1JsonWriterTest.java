@@ -99,6 +99,30 @@ class Gstr1JsonWriterTest {
     }
 
     @Test
+    void nilRowsAreAggregatedPerSupplyType() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        List<PreparedReturnRow> rows = new ArrayList<>();
+        for (String[] r : new String[][] {{"27", "100"}, {"29", "250"}, {"33", "40"}}) {
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("pos", r[0]);
+            p.put("taxableValue", new BigDecimal(r[1]));
+            rows.add(row(workflow.getId(), "NIL", "nil:" + r[0], p));
+        }
+
+        List<PortalFilePart> parts = writer().write(prepared(workflow.getId()), rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode inv = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8))
+                .get("nil").get("inv");
+        assertEquals(2, inv.size());
+        for (JsonNode entry : inv) {
+            BigDecimal expected = new BigDecimal(
+                    "INTERB2C".equals(entry.get("sply_ty").asText()) ? "350" : "40");
+            assertEquals(0, expected.compareTo(entry.get("nil_amt").decimalValue()));
+        }
+    }
+
+    @Test
     void q6bOmitsEinvoiceSectionsWhenIrpTablesExcluded() throws Exception {
         Workflow workflow = workflow(FilerFrequency.MONTHLY);
         List<PreparedReturnRow> rows = new ArrayList<>();

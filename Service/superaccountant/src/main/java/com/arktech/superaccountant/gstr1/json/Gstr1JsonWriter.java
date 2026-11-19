@@ -190,13 +190,18 @@ public class Gstr1JsonWriter {
             return List.of();
         }
         ObjectNode nil = NODES.objectNode();
-        ArrayNode inv = nil.putArray("inv");
+        Map<String, BigDecimal> totals = new LinkedHashMap<>();
         for (PreparedReturnRow row : rows) {
             Map<String, Object> p = row.payload();
-            ObjectNode entry = inv.addObject();
-            entry.put("sply_ty", intraState(orgGstin, text(p, "pos")) ? "INTRB2C" : "INTERB2C");
-            entry.put("nil_amt", amount(num(p, "taxableValue")));
+            String splyTy = intraState(orgGstin, text(p, "pos")) ? "INTRB2C" : "INTERB2C";
+            totals.merge(splyTy, num(p, "taxableValue"), BigDecimal::add);
         }
+        ArrayNode inv = nil.putArray("inv");
+        totals.forEach((splyTy, total) -> {
+            ObjectNode entry = inv.addObject();
+            entry.put("sply_ty", splyTy);
+            entry.put("nil_amt", amount(total));
+        });
         return List.of(Block.object("nil", nil));
     }
 
