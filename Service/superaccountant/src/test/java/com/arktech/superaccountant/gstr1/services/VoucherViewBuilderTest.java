@@ -318,6 +318,128 @@ class VoucherViewBuilderTest {
         assertEquals("9999", view.getHsn());
     }
 
+    @Test
+    void mixedHsnItemsProducePerItemHsnContributions() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "10000.00", "18"),
+                tax("Output CGST", "900.00"),
+                tax("Output SGST", "900.00"),
+                tax("Sundry Debtors", "-11800.00"));
+        ParsedVoucherItem first = item("Plywood 8mm", "4407", "NOS", "10");
+        first.setAmount(new BigDecimal("6000.00"));
+        ParsedVoucherItem second = item("Teak Board", "4408", "NOS", "5");
+        second.setAmount(new BigDecimal("4000.00"));
+        v.setItems(new ArrayList<>(List.of(first, second)));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        List<VoucherView.HsnItem> hsnItems = view.getHsnItems();
+        assertEquals(2, hsnItems.size());
+        VoucherView.HsnItem a = hsnItems.get(0);
+        assertEquals("4407", a.hsn());
+        assertEquals("NOS", a.uqc());
+        assertEquals(0, new BigDecimal("10").compareTo(a.quantity()));
+        assertEquals(0, new BigDecimal("6000.00").compareTo(a.taxableValue()));
+        assertEquals(0, new BigDecimal("540.00").compareTo(a.cgst()));
+        assertEquals(0, new BigDecimal("540.00").compareTo(a.sgst()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(a.igst()));
+        VoucherView.HsnItem c = hsnItems.get(1);
+        assertEquals("4408", c.hsn());
+        assertEquals(0, new BigDecimal("4000.00").compareTo(c.taxableValue()));
+        assertEquals(0, new BigDecimal("360.00").compareTo(c.cgst()));
+    }
+
+    @Test
+    void fillInsSuppressPerItemHsnContributions() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "10000.00", "18"));
+        ParsedVoucherItem first = item("Plywood 8mm", "4407", "NOS", "10");
+        first.setAmount(new BigDecimal("6000.00"));
+        ParsedVoucherItem second = item("Teak Board", "4408", "NOS", "5");
+        second.setAmount(new BigDecimal("4000.00"));
+        v.setItems(new ArrayList<>(List.of(first, second)));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+        when(fillInService.resolve(any(), anyString(), any(),
+                eq(com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute.HSN)))
+                .thenReturn(Optional.of("9999"));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        assertEquals("9999", view.getHsn());
+        assertTrue(view.getHsnItems().isEmpty());
+    }
+
+    @Test
+    void itemsWithoutAmountsSplitTaxableValueEqually() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "10000.00", "18"),
+                tax("Output CGST", "900.00"));
+        v.setItems(new ArrayList<>(List.of(
+                item("Plywood 8mm", "4407", "NOS", "10"),
+                item("Teak Board", "4408", "NOS", "5"))));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        List<VoucherView.HsnItem> hsnItems = view.getHsnItems();
+        assertEquals(2, hsnItems.size());
+        assertEquals(0, new BigDecimal("5000.00").compareTo(hsnItems.get(0).taxableValue()));
+        assertEquals(0, new BigDecimal("450.00").compareTo(hsnItems.get(0).cgst()));
+        assertEquals(0, new BigDecimal("5000.00").compareTo(hsnItems.get(1).taxableValue()));
+        assertEquals(0, new BigDecimal("450.00").compareTo(hsnItems.get(1).cgst()));
+    }
+
+    @Test
+    void itemsWithBlankHsnAreSkippedInPerItemContributions() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "10000.00", "18"),
+                tax("Output CGST", "900.00"));
+        ParsedVoucherItem blank = item("Unknown", null, "NOS", "2");
+        blank.setAmount(new BigDecimal("1000.00"));
+        ParsedVoucherItem rated = item("Teak Board", "4408", "NOS", "5");
+        rated.setAmount(new BigDecimal("4000.00"));
+        v.setItems(new ArrayList<>(List.of(blank, rated)));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        List<VoucherView.HsnItem> hsnItems = view.getHsnItems();
+        assertEquals(1, hsnItems.size());
+        assertEquals("4408", hsnItems.get(0).hsn());
+        assertEquals(0, new BigDecimal("10000.00").compareTo(hsnItems.get(0).taxableValue()));
+        assertEquals(0, new BigDecimal("900.00").compareTo(hsnItems.get(0).cgst()));
+    }
+
+    @Test
+    void threeEqualItemsReconcileInvoiceValueWithResidual() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "100.00", "18"));
+        v.setItems(new ArrayList<>(List.of(
+                item("A", "4407", "NOS", "1"),
+                item("B", "4408", "NOS", "1"),
+                item("C", "4409", "NOS", "1"))));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        BigDecimal sumInv = view.getHsnItems().stream().map(VoucherView.HsnItem::invoiceValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumTax = view.getHsnItems().stream().map(VoucherView.HsnItem::taxableValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(3, view.getHsnItems().size());
+        assertEquals(0, view.getTotalValue().compareTo(sumInv));
+        assertEquals(0, view.getTaxableValue().compareTo(sumTax));
+    }
+
+    @Test
+    void zeroTaxableMixedHsnVoucherDoesNotThrow() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                tax("Sundry Debtors", "100.00"));
+        v.setItems(new ArrayList<>(List.of(
+                item("A", "4407", "NOS", "1"),
+                item("B", "4408", "NOS", "1"))));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        assertEquals(2, view.getHsnItems().size());
+    }
+
     private ParsedVoucherItem item(String stockItemName, String hsn, String uqc, String quantity) {
         ParsedVoucherItem item = new ParsedVoucherItem();
         item.setOrganizationId(orgId);

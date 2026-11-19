@@ -133,4 +133,40 @@ class HsnBuilderTest extends TableTestSupport {
         assertNum("4", num(pcsRow.payload(), "quantity"));
         assertEquals("PCS", pcsRow.payload().get("uqc"));
     }
+
+    @Test
+    void splitsMixedHsnVouchersIntoPerItemRows() {
+        VoucherView mixed = voucher()
+                .voucherKey("SB/508")
+                .voucherTypeName("Sales")
+                .partyGstin("29ABCDE1234F1Z5")
+                .rate(v("18"))
+                .taxableValue(v("10000.00"))
+                .totalValue(v("11800.00"))
+                .cgst(v("900.00"))
+                .sgst(v("900.00"))
+                .hsnItems(List.of(
+                        new VoucherView.HsnItem("4407", "NOS", v("10"),
+                                v("6000.00"), v("0"), v("540.00"), v("540.00"), v("0"), v("7080.00")),
+                        new VoucherView.HsnItem("4408", "NOS", v("5"),
+                                v("4000.00"), v("0"), v("360.00"), v("360.00"), v("0"), v("4720.00"))))
+                .build();
+
+        List<PreparedReturnRow> rows = new HsnBuilder().build(workflow(), List.of(mixed));
+
+        assertEquals(2, rows.size());
+        PreparedReturnRow first = rows.stream()
+                .filter(r -> r.getRowKey().startsWith("hsn:4407:NOS:18:b2b"))
+                .findFirst().orElseThrow();
+        assertEquals("B2B", first.payload().get("supplyType"));
+        assertNum("10", num(first.payload(), "quantity"));
+        assertNum("6000.00", num(first.payload(), "taxableValue"));
+        assertNum("540.00", num(first.payload(), "cgst"));
+        PreparedReturnRow second = rows.stream()
+                .filter(r -> r.getRowKey().startsWith("hsn:4408:NOS:18:b2b"))
+                .findFirst().orElseThrow();
+        assertNum("5", num(second.payload(), "quantity"));
+        assertNum("4000.00", num(second.payload(), "taxableValue"));
+        assertNum("360.00", num(second.payload(), "cgst"));
+    }
 }

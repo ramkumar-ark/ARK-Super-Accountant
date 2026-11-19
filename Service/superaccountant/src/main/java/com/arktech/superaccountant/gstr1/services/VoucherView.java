@@ -2,6 +2,7 @@ package com.arktech.superaccountant.gstr1.services;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -40,6 +41,19 @@ public final class VoucherView {
     private final String hsn;
     private final String uqc;
     private final BigDecimal quantity;
+    private final List<HsnItem> hsnItems;
+
+    /**
+     * A per-item HSN contribution for vouchers whose inventory lines carry
+     * different HSNs or UQCs. Taxable value and tax heads are allocated
+     * pro-rata by item amount so per-voucher sums reconcile to the
+     * voucher-level totals.
+     */
+    public record HsnItem(String hsn, String uqc, BigDecimal quantity,
+                          BigDecimal taxableValue, BigDecimal igst,
+                          BigDecimal cgst, BigDecimal sgst, BigDecimal cess,
+                          BigDecimal invoiceValue) {
+    }
 
     private VoucherView(Builder b) {
         this.voucherKey = b.voucherKey;
@@ -65,6 +79,7 @@ public final class VoucherView {
         this.hsn = b.hsn;
         this.uqc = b.uqc;
         this.quantity = b.quantity;
+        this.hsnItems = b.hsnItems == null ? List.of() : List.copyOf(b.hsnItems);
     }
 
     /**
@@ -185,6 +200,10 @@ public final class VoucherView {
         return quantity;
     }
 
+    public List<HsnItem> getHsnItems() {
+        return hsnItems;
+    }
+
     public static final class Builder {
         private String voucherKey;
         private String voucherTypeName;
@@ -209,6 +228,7 @@ public final class VoucherView {
         private String hsn;
         private String uqc;
         private BigDecimal quantity;
+        private List<HsnItem> hsnItems;
 
         public Builder voucherKey(String v) {
             this.voucherKey = v;
@@ -322,6 +342,11 @@ public final class VoucherView {
 
         public Builder quantity(BigDecimal v) {
             this.quantity = v;
+            return this;
+        }
+
+        public Builder hsnItems(List<HsnItem> v) {
+            this.hsnItems = v;
             return this;
         }
 
