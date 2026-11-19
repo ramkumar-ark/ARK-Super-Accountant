@@ -5,6 +5,7 @@ import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository;
 import com.arktech.superaccountant.gstr1.services.tables.AdvanceBuilder;
+import com.arktech.superaccountant.gstr1.services.tables.AmendmentBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.B2bBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.B2clBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.B2csBuilder;
@@ -88,6 +89,8 @@ public class Gstr1PrepareService {
     private HsnBuilder hsnBuilder;
     @Autowired
     private DocsIssuedBuilder docsIssuedBuilder;
+    @Autowired
+    private AmendmentBuilder amendmentBuilder;
 
     private ReportingClassifier classifier(Workflow workflow) {
         return new ReportingClassifier((view, attribute) -> fillInService.resolve(
@@ -164,6 +167,8 @@ public class Gstr1PrepareService {
                 ReportingClass.ADVANCE, ReportingClass.ADV_ADJ)));
         rows.addAll(hsnBuilder.build(workflow, reportable));
         rows.addAll(docsIssuedBuilder.build(workflow, views));
+        // amendment/late rows (T20): folded in after the normal builders
+        rows.addAll(amendmentBuilder.build(workflow, rows));
         rows.forEach(row -> row.setPreparedReturnId(preparedReturnId));
         return rows;
     }

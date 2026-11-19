@@ -23,6 +23,8 @@ class Gstr1FinalizePreconditionTest extends com.arktech.superaccountant.gstr1.se
     private Gstr1Validator validator;
     private PreparedReturnRepository preparedReturnRepository;
     private PreparedReturnRowRepository rowRepository;
+    private com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository followUpRepository;
+    private com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository fillInRepository;
     private Gstr1FinalizePrecondition precondition;
 
     @BeforeEach
@@ -30,10 +32,64 @@ class Gstr1FinalizePreconditionTest extends com.arktech.superaccountant.gstr1.se
         validator = mock(Gstr1Validator.class);
         preparedReturnRepository = mock(PreparedReturnRepository.class);
         rowRepository = mock(PreparedReturnRowRepository.class);
+        followUpRepository = mock(com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository.class);
+        fillInRepository = mock(com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository.class);
         when(preparedReturnRepository.findByWorkflowIdAndReturnKind(any(UUID.class), any()))
                 .thenReturn(Optional.empty());
         precondition = new Gstr1FinalizePrecondition(validator,
-                preparedReturnRepository, rowRepository);
+                preparedReturnRepository, rowRepository, followUpRepository, fillInRepository);
+    }
+
+    @Test
+    void deletedFollowUpWithoutAckBlocksFinalize() {
+        seedPreparedReturn();
+        com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp followUp =
+                new com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp();
+        followUp.setOrganizationId(workflow().getOrganizationId());
+        followUp.setWorkflowId(UUID.randomUUID());
+        followUp.setVoucherKey("G:v1");
+        followUp.setStatus(com.arktech.superaccountant.workflow.snapshot.AmendmentStatus.OPEN);
+        followUp.setChange(com.arktech.superaccountant.workflow.snapshot.AmendmentChangeKind.DELETED);
+        followUp.setTableCode("B2B");
+        when(followUpRepository.findByOrganizationIdAndStatus(any(UUID.class), any()))
+                .thenReturn(List.of(followUp));
+        when(validator.validate(any(), anyList())).thenReturn(List.of());
+        when(fillInRepository.findByWorkflowIdAndScopeAndKeyAndAttribute(any(UUID.class), any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        List<String> unmet = precondition.unmet(workflow());
+
+        assertThat(unmet).hasSize(1);
+        assertThat(unmet.get(0)).contains("G:v1");
+        assertThat(unmet.get(0)).containsIgnoringCase("ack");
+    }
+
+    @Test
+    void deletedFollowUpWithAckDoesNotBlock() {
+        seedPreparedReturn();
+        com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp followUp =
+                new com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp();
+        followUp.setOrganizationId(workflow().getOrganizationId());
+        followUp.setWorkflowId(UUID.randomUUID());
+        followUp.setVoucherKey("G:v1");
+        followUp.setStatus(com.arktech.superaccountant.workflow.snapshot.AmendmentStatus.OPEN);
+        followUp.setChange(com.arktech.superaccountant.workflow.snapshot.AmendmentChangeKind.DELETED);
+        followUp.setTableCode("B2B");
+        when(followUpRepository.findByOrganizationIdAndStatus(any(UUID.class), any()))
+                .thenReturn(List.of(followUp));
+        when(validator.validate(any(), anyList())).thenReturn(List.of());
+        when(fillInRepository.findByWorkflowIdAndScopeAndKeyAndAttribute(any(UUID.class), any(), any(), any()))
+                .thenReturn(Optional.of(new com.arktech.superaccountant.gstr1.models.Gstr1FillIn()));
+
+        assertThat(precondition.unmet(workflow())).isEmpty();
+    }
+
+    private void seedPreparedReturn() {
+        PreparedReturn prepared = new PreparedReturn();
+        prepared.setId(UUID.randomUUID());
+        when(preparedReturnRepository.findByWorkflowIdAndReturnKind(any(UUID.class), any()))
+                .thenReturn(Optional.of(prepared));
+        when(rowRepository.findByPreparedReturnId(any(UUID.class))).thenReturn(List.of());
     }
 
     @Test

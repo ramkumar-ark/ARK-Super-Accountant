@@ -35,8 +35,28 @@ final class TableRows {
         return row;
     }
 
+    /**
+     * Amendment row (T20): isAmendment=true plus the original-return provenance
+     * (period, doc key) and the follow-up the row closes.
+     */
+    static PreparedReturnRow amendmentRow(UUID preparedReturnId, String tableCode, String rowKey,
+                                          String sourceVoucherKey, Map<String, Object> payload,
+                                          String originalPeriod, String originalDocKey, UUID followUpId) {
+        PreparedReturnRow row = row(preparedReturnId, tableCode, rowKey, sourceVoucherKey, payload);
+        row.setAmendment(true);
+        row.setOriginalPeriod(originalPeriod);
+        row.setOriginalDocKey(originalDocKey);
+        row.setFollowUpId(followUpId);
+        return row;
+    }
+
     static Map<String, Object> payload() {
         return new LinkedHashMap<>();
+    }
+
+    /** Replaces a row's payload with the given map (payload() returns a fresh copy). */
+    static void savePayload(PreparedReturnRow row, Map<String, Object> payload) {
+        row.setPayload(toJson(payload));
     }
 
     static String date(LocalDate value) {

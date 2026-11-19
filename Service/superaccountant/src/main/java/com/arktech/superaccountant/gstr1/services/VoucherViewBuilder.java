@@ -83,6 +83,19 @@ public class VoucherViewBuilder {
     }
 
     public List<VoucherView> build(Workflow workflow) {
+        return views(workflow, true);
+    }
+
+    /**
+     * Same as {@link #build} but without the period filter: amendment builders
+     * (T20) must see the current books' view of a voucher dated in an earlier
+     * period — e.g. an April invoice corrected after April's return was frozen.
+     */
+    public List<VoucherView> buildAll(Workflow workflow) {
+        return views(workflow, false);
+    }
+
+    private List<VoucherView> views(Workflow workflow, boolean restrictToPeriod) {
         if (workflow == null || workflow.getUploadJobId() == null) {
             return List.of();
         }
@@ -93,9 +106,9 @@ public class VoucherViewBuilder {
 
         List<ParsedVoucher> vouchers = parsedVoucherRepository
                 .findByUploadJobId(workflow.getUploadJobId()).stream()
-                .filter(v -> v.getVoucherDate() != null
+                .filter(v -> !restrictToPeriod || (v.getVoucherDate() != null
                         && !v.getVoucherDate().isBefore(workflow.getPeriodStart())
-                        && !v.getVoucherDate().isAfter(workflow.getPeriodEnd()))
+                        && !v.getVoucherDate().isAfter(workflow.getPeriodEnd())))
                 .toList();
 
         List<VoucherView> views = new ArrayList<>();

@@ -316,6 +316,11 @@ public class Gstr1Validator {
                     "Invoice date '" + date + "' is in the future"));
             return;
         }
+        // amendment and late-reported rows legitimately carry the original period's
+        // date: the period-window check applies only to rows dated in this return
+        if (row.isAmendment() || row.isLateReporting()) {
+            return;
+        }
         if (periodStart != null && parsed.isBefore(periodStart)
                 || periodEnd != null && parsed.isAfter(periodEnd)) {
             results.add(new ValidationResult("DATE_INVALID", ValidationResult.Severity.ERROR,

@@ -204,6 +204,169 @@ class Gstr1JsonWriterTest {
         assertTrue(!json.contains("10000.50"));
     }
 
+    @Test
+    void writesB2baSectionWithOriginalInvoiceKeys() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        Map<String, Object> p = b2bPayload();
+        p.put("invoiceNo", "INV-001-REV");
+        p.put("oinum", "INV-001");
+        p.put("oidt", "2025-04-15");
+        List<PreparedReturnRow> rows = new ArrayList<>();
+        rows.add(amendmentRow(workflow.getId(), "B2BA", "b2ba:v1", p));
+        PreparedReturn prepared = prepared(workflow.getId());
+
+        List<PortalFilePart> parts = writer().write(prepared, rows, workflow, "33AAAAA0000A1Z9",
+                profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        JsonNode inv = root.get("b2ba").get(0).get("inv").get(0);
+        assertEquals("INV-001-REV", inv.get("inum").asText());
+        assertEquals("INV-001", inv.get("oinum").asText());
+        assertEquals("15-04-2025", inv.get("oidt").asText());
+        assertTrue(!root.has("b2b"), "empty normal sections stay omitted");
+    }
+
+    @Test
+    void writesLateReportingRowIntoNormalSection() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        List<PreparedReturnRow> rows = new ArrayList<>();
+        PreparedReturnRow late = row(workflow.getId(), "B2B", "b2b:v1", b2bPayload());
+        late.setLateReporting(true);
+        rows.add(late);
+
+        List<PortalFilePart> parts = writer().write(prepared(workflow.getId()), rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        assertTrue(root.has("b2b"), "late rows write into their normal section");
+        assertTrue(!root.has("b2ba"));
+    }
+
+    @Test
+    void writesCdnraSectionWithOriginalNoteKeys() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        Map<String, Object> p = cdnrPayload();
+        p.put("ontNum", "CN-000");
+        p.put("ontDate", "2025-04-01");
+        List<PreparedReturnRow> rows = List.of(
+                amendmentRow(workflow.getId(), "CDNRA", "cdnra:v1", p));
+
+        List<PortalFilePart> parts = writer().write(prepared(workflow.getId()), rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        JsonNode nt = root.get("cdnra").get(0).get("nt").get(0);
+        assertEquals("CN-000", nt.get("ont_num").asText());
+        assertEquals("01-04-2025", nt.get("ont_dt").asText());
+    }
+
+    @Test
+    void writesB2csaEnvelopeWithOriginalPeriodAndNestedItems() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        Map<String, Object> p = b2csPayload("INV-2");
+        p.put("omon", "042025");
+        List<PreparedReturnRow> rows = List.of(
+                amendmentRow(workflow.getId(), "B2CSA", "b2csa:v1", p));
+
+        List<PortalFilePart> parts = writer().write(prepared(workflow.getId()), rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        JsonNode envelope = root.get("b2csa").get(0);
+        assertEquals("042025", envelope.get("omon").asText());
+        assertEquals("INTRA", envelope.get("sply_ty").asText());
+        assertEquals("OE", envelope.get("typ").asText());
+        assertEquals("33", envelope.get("pos").asText());
+        assertEquals(1000, envelope.get("itms").get(0).get("txval").asInt());
+        assertEquals(90, envelope.get("itms").get(0).get("camt").asInt());
+    }
+
+    @Test
+    void writesAtaEnvelopeWithOriginalPeriod() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("pos", "29");
+        p.put("omon", "042025");
+        p.put("rate", new BigDecimal("18"));
+        p.put("advanceAmount", new BigDecimal("5000"));
+        p.put("igst", new BigDecimal("900"));
+        p.put("cgst", BigDecimal.ZERO);
+        p.put("sgst", BigDecimal.ZERO);
+        p.put("cess", BigDecimal.ZERO);
+        List<PreparedReturnRow> rows = List.of(amendmentRow(workflow.getId(), "ATA", "ata:v1", p));
+
+        List<PortalFilePart> parts = writer().write(prepared(workflow.getId()), rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        JsonNode envelope = root.get("ata").get(0);
+        assertEquals("042025", envelope.get("omon").asText());
+        assertEquals("29", envelope.get("pos").asText());
+        assertEquals("INTER", envelope.get("sply_ty").asText());
+        assertEquals(5000, envelope.get("itms").get(0).get("ad_amt").asInt());
+    }
+
+    @Test
+    void amendmentRowsInOtherSectionsKeepTheirShapes() throws Exception {
+        Workflow workflow = workflow(FilerFrequency.MONTHLY);
+        Map<String, Object> b2cla = b2bPayload();
+        b2cla.remove("gstin");
+        b2cla.put("oinum", "INV-000");
+        b2cla.put("oidt", "2025-04-10");
+        Map<String, Object> expa = expPayload();
+        expa.put("oinum", "EXP-000");
+        expa.put("oidt", "2025-04-12");
+        Map<String, Object> cdnura = new LinkedHashMap<>();
+        cdnura.put("noteType", "C");
+        cdnura.put("noteNo", "CN-UR");
+        cdnura.put("noteDate", "2025-04-05");
+        cdnura.put("ontNum", "CN-UR0");
+        cdnura.put("ontDate", "2025-04-02");
+        cdnura.put("pos", "33");
+        cdnura.put("rate", new BigDecimal("18"));
+        cdnura.put("taxableValue", new BigDecimal("-500"));
+        cdnura.put("igst", new BigDecimal("-90"));
+        cdnura.put("cgst", BigDecimal.ZERO);
+        cdnura.put("sgst", BigDecimal.ZERO);
+        cdnura.put("cess", BigDecimal.ZERO);
+        cdnura.put("invoiceValue", new BigDecimal("-590"));
+        Map<String, Object> txpda = new LinkedHashMap<>();
+        txpda.put("pos", "29");
+        txpda.put("omon", "042025");
+        txpda.put("rate", new BigDecimal("18"));
+        txpda.put("advanceAmount", new BigDecimal("1000"));
+        txpda.put("igst", BigDecimal.ZERO);
+        txpda.put("cgst", new BigDecimal("90"));
+        txpda.put("sgst", new BigDecimal("90"));
+        txpda.put("cess", BigDecimal.ZERO);
+
+        List<PreparedReturnRow> rows = List.of(
+                amendmentRow(workflow.getId(), "B2CLA", "b2cla:v1", b2cla),
+                amendmentRow(workflow.getId(), "EXPA", "expa:v1", expa),
+                amendmentRow(workflow.getId(), "CDNURA", "cdnura:v1", cdnura),
+                amendmentRow(workflow.getId(), "TXPDA", "txpda:v1", txpda));
+
+        List<PortalFilePart> parts = writer().write(prepared(workflow.getId()), rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.MONTHLY), WriterOptions.defaults());
+
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        assertEquals("INV-000", root.get("b2cla").get(0).get("inv").get(0).get("oinum").asText());
+        assertEquals("EXP-000", root.get("expa").get(0).get("inv").get(0).get("oinum").asText());
+        assertEquals("CN-UR0", root.get("cdnura").get(0).get("ont_num").asText());
+        assertEquals("042025", root.get("txpda").get(0).get("omon").asText());
+        assertTrue(!root.get("txpda").get(0).get("itms").get(0).has("csamt"),
+                "txpda omits zero cess");
+        assertTrue(!root.has("ata") && !root.has("b2ba") && !root.has("b2csa")
+                && !root.has("cdnra"), "empty amendment sections stay omitted");
+    }
+
+    private static PreparedReturnRow amendmentRow(UUID workflowId, String tableCode, String rowKey,
+                                                  Map<String, Object> payload) {
+        PreparedReturnRow row = row(workflowId, tableCode, rowKey, payload);
+        row.setAmendment(true);
+        return row;
+    }
+
     private Gstr1JsonWriter writer() {
         return new Gstr1JsonWriter();
     }
