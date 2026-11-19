@@ -1,0 +1,38 @@
+package com.arktech.superaccountant.gstr1.models;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "prepared_returns", uniqueConstraints = @UniqueConstraint(
+        name = "uk_prepared_returns_workflow_kind", columnNames = {"workflow_id", "return_kind"}))
+@Data
+@NoArgsConstructor
+public class PreparedReturn {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "workflow_id", nullable = false)
+    private UUID workflowId;
+
+    @Column(name = "return_kind", nullable = false, length = 32)
+    private String returnKind;
+
+    @Column(name = "built_at", nullable = false)
+    private Instant builtAt;
+
+    @Column(name = "frozen_at")
+    private Instant frozenAt;
+}

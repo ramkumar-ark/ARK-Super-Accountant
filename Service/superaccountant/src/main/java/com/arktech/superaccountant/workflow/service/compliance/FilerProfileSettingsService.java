@@ -58,6 +58,10 @@ public class FilerProfileSettingsService {
             throw new WorkflowBadRequestException(
                     "effectiveFrom must be a quarter start for this financial year");
         }
+        int hsnDigits = request.getHsnDigits() == null ? 4 : request.getHsnDigits();
+        if (hsnDigits != 4 && hsnDigits != 6) {
+            throw new WorkflowBadRequestException("hsnDigits must be 4 or 6");
+        }
         for (WorkflowType type : List.of(WorkflowType.GSTR1, WorkflowType.GSTR3B, WorkflowType.IFF)) {
             boolean conflicts = workflowRepository
                     .findAllByOrganizationIdAndTypeAndStageNot(organizationId, type, WorkflowStage.BASELINE)
@@ -80,6 +84,7 @@ public class FilerProfileSettingsService {
         profile.setFrequency(frequency);
         profile.setIffOptIn(request.isIffOptIn());
         profile.setEinvoiceEnabled(request.isEinvoiceEnabled());
+        profile.setHsnDigits(hsnDigits);
         profile.setCreatedBy(actor);
         filerProfileRepository.save(profile);
 
@@ -96,6 +101,6 @@ public class FilerProfileSettingsService {
 
     private static FilerProfileResponse toResponse(FilerProfile p) {
         return new FilerProfileResponse(p.getId(), p.getFrequency().name(), p.isIffOptIn(),
-                p.isEinvoiceEnabled(), p.getEffectiveFrom(), p.getCreatedBy(), p.getCreatedAt());
+                p.isEinvoiceEnabled(), p.getHsnDigits(), p.getEffectiveFrom(), p.getCreatedBy(), p.getCreatedAt());
     }
 }

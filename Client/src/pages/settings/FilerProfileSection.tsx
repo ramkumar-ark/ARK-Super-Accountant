@@ -48,6 +48,7 @@ export function FilerProfileSection() {
               <th className="py-2">Frequency</th>
               <th className="py-2">IFF</th>
               <th className="py-2">E-invoice</th>
+              <th className="py-2">HSN digits</th>
             </tr>
           </thead>
           <tbody>
@@ -57,6 +58,7 @@ export function FilerProfileSection() {
                 <td className="py-2">{p.frequency === 'QRMP' ? 'QRMP (quarterly)' : 'Monthly'}</td>
                 <td className="py-2">{p.iffOptIn ? 'Yes' : 'No'}</td>
                 <td className="py-2">{p.einvoiceEnabled ? 'Yes' : 'No'}</td>
+                <td className="py-2">HSN: {p.hsnDigits} digits</td>
               </tr>
             ))}
           </tbody>
@@ -71,6 +73,7 @@ function AddProfileForm({ onSubmit }: { onSubmit: (b: FilerProfileInput) => void
   const [frequency, setFrequency] = useState<'MONTHLY' | 'QRMP'>('MONTHLY')
   const [iffOptIn, setIffOptIn] = useState(false)
   const [einvoiceEnabled, setEinvoiceEnabled] = useState(false)
+  const [hsnDigits, setHsnDigits] = useState(4)
   const [effectiveFrom, setEffectiveFrom] = useState('')
   return (
     <form
@@ -78,7 +81,7 @@ function AddProfileForm({ onSubmit }: { onSubmit: (b: FilerProfileInput) => void
       aria-label="Add filer profile"
       onSubmit={(e) => {
         e.preventDefault()
-        onSubmit({ frequency, iffOptIn, einvoiceEnabled, effectiveFrom })
+        onSubmit({ frequency, iffOptIn, einvoiceEnabled, hsnDigits, effectiveFrom })
       }}
     >
       <label className="text-sm flex flex-col gap-1">
@@ -108,6 +111,18 @@ function AddProfileForm({ onSubmit }: { onSubmit: (b: FilerProfileInput) => void
           onChange={(e) => setEinvoiceEnabled(e.target.checked)}
         />
         E-invoice
+      </label>
+      <label className="text-sm flex flex-col gap-1">
+        HSN digits
+        <select
+          aria-label="HSN digits"
+          value={hsnDigits}
+          onChange={(e) => setHsnDigits(Number(e.target.value))}
+          className="border rounded px-2 py-1 text-sm"
+        >
+          <option value={4}>4 digits</option>
+          <option value={6}>6 digits</option>
+        </select>
       </label>
       <label className="text-sm flex flex-col gap-1">
         Effective from

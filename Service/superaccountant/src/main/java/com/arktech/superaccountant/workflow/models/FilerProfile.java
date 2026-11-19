@@ -30,6 +30,9 @@ public class FilerProfile {
     @Column(name = "einvoice_enabled", nullable = false)
     private boolean einvoiceEnabled = false;
 
+    @Column(name = "hsn_digits", nullable = false, columnDefinition = "integer default 4")
+    private Integer hsnDigits = 4;
+
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;
 

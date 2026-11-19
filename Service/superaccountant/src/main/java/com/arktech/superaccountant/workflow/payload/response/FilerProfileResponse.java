@@ -9,6 +9,7 @@ public record FilerProfileResponse(
         String frequency,
         boolean iffOptIn,
         boolean einvoiceEnabled,
+        Integer hsnDigits,
         LocalDate effectiveFrom,
         String createdBy,
         Instant createdAt) {

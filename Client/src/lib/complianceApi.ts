@@ -15,6 +15,7 @@ export interface FilerProfile {
   frequency: 'MONTHLY' | 'QRMP'
   iffOptIn: boolean
   einvoiceEnabled: boolean
+  hsnDigits: number
   effectiveFrom: string
   createdBy: string | null
   createdAt: string | null
@@ -24,6 +25,7 @@ export interface FilerProfileInput {
   frequency: 'MONTHLY' | 'QRMP'
   iffOptIn: boolean
   einvoiceEnabled: boolean
+  hsnDigits: number
   effectiveFrom: string
 }
 
