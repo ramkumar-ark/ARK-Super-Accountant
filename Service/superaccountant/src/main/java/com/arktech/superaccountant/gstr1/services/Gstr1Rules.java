@@ -124,6 +124,10 @@ public final class Gstr1Rules {
     }
 
     public static boolean isAllowedRate(BigDecimal rate) {
-        return rate != null && ALLOWED_RATES.contains(rate);
+        if (rate == null) {
+            return false;
+        }
+        // numeric equality regardless of scale: 18.0 must equal 18
+        return ALLOWED_RATES.stream().anyMatch(allowed -> allowed.compareTo(rate) == 0);
     }
 }

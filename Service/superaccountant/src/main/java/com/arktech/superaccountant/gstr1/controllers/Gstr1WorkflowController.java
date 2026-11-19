@@ -11,6 +11,8 @@ import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository;
 import com.arktech.superaccountant.gstr1.services.Gstr1FillInService;
 import com.arktech.superaccountant.gstr1.services.Gstr1PrepareService;
+import com.arktech.superaccountant.gstr1.validation.Gstr1Validator;
+import com.arktech.superaccountant.gstr1.validation.ValidationResult;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
@@ -67,6 +69,9 @@ public class Gstr1WorkflowController {
     @Autowired
     private Gstr1FillInRepository fillInRepository;
 
+    @Autowired
+    private Gstr1Validator validator;
+
     @GetMapping("/{id}/gstr1/tables")
     public ResponseEntity<?> tables(@PathVariable UUID id,
                                     @AuthenticationPrincipal UserDetailsImpl principal) {
@@ -77,6 +82,29 @@ public class Gstr1WorkflowController {
             Workflow workflow = workflowService.get(principal.getOrganizationId(), id);
             PreparedReturn prepared = prepareService.buildOrRebuild(workflow);
             return ResponseEntity.ok(toResponse(workflow, prepared));
+        } catch (WorkflowBadRequestException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (WorkflowConflictException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/gstr1/validation")
+    public ResponseEntity<?> validation(@PathVariable UUID id,
+                                        @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (principal.getOrganizationId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        try {
+            Workflow workflow = workflowService.get(principal.getOrganizationId(), id);
+            PreparedReturn prepared = prepareService.buildOrRebuild(workflow);
+            List<ValidationResult> results = validator.validate(
+                    workflow, rowRepository.findByPreparedReturnId(prepared.getId()));
+            return ResponseEntity.ok(Map.of(
+                    "errors", results.stream()
+                            .filter(r -> r.severity() == ValidationResult.Severity.ERROR).toList(),
+                    "warnings", results.stream()
+                            .filter(r -> r.severity() == ValidationResult.Severity.WARNING).toList()));
         } catch (WorkflowBadRequestException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (WorkflowConflictException e) {
