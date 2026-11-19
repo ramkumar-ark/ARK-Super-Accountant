@@ -20,7 +20,6 @@ import com.arktech.superaccountant.workflow.seam.UploadFreshnessGate;
 import com.arktech.superaccountant.workflow.seam.WorkflowGate;
 import com.arktech.superaccountant.workflow.service.compliance.CompliancePeriods;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -373,6 +372,13 @@ public class WorkflowService {
         if (filingRef == null || filingRef.isBlank() || filingRefDate == null) {
             throw new WorkflowBadRequestException("Filing reference and date are required");
         }
+        String channel = filingChannel == null || filingChannel.isBlank()
+                ? "PORTAL_FILE" : filingChannel;
+        try {
+            com.arktech.superaccountant.gstr1.channel.ChannelKind.valueOf(channel);
+        } catch (IllegalArgumentException e) {
+            throw new WorkflowBadRequestException("Unknown filing channel: " + channel);
+        }
         Workflow w = get(organizationId, id);
         if (w.getStage() != WorkflowStage.FINALIZED) {
             throw new WorkflowConflictException("Only a FINALIZED workflow can be marked as filed");
@@ -380,8 +386,7 @@ public class WorkflowService {
         w.setStage(WorkflowStage.FILED);
         w.setFilingRef(filingRef);
         w.setFilingRefDate(filingRefDate);
-        w.setFilingChannel(filingChannel == null || filingChannel.isBlank()
-                ? "PORTAL_FILE" : filingChannel);
+        w.setFilingChannel(channel);
         w.setFiledAt(Instant.now());
         w.setFiledBy(actor);
         workflowRepository.save(w);
@@ -398,33 +403,25 @@ public class WorkflowService {
             throw new WorkflowConflictException(
                     "Portal upload can be recorded only on a FINALIZED workflow");
         }
-        String sha256 = fileHash == null || fileHash.isBlank()
-                ? latestDownloadSha256(w.getId()) : fileHash;
-        StringBuilder payload = new StringBuilder("{\"sha256\":");
-        payload.append(sha256 == null ? "null" : "\"" + sha256 + "\"");
-        if (note != null && !note.isBlank()) {
-            payload.append(",\"note\":\"").append(note.replace("\\", "\\\\")
-                    .replace("\"", "\\\"")).append("\"");
+        if (fileHash != null && !fileHash.isBlank() && !fileHash.matches("[0-9a-fA-F]{64}")) {
+            throw new WorkflowBadRequestException("fileHash must be a 64-character hex SHA-256");
         }
-        payload.append("}");
+        String sha256 = fileHash == null || fileHash.isBlank()
+                ? PortalDownloadHashes.latestSha256(workflowEventRepository, w.getId())
+                : fileHash;
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("sha256", sha256);
+        if (note != null && !note.isBlank()) {
+            payload.put("note", note);
+        }
+        String json;
+        try {
+            json = PortalDownloadHashes.mapper().writeValueAsString(payload);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
         workflowEventRepository.save(event(w.getId(), actor,
-                WorkflowEventKind.PORTAL_UPLOADED, null, payload.toString()));
-    }
-
-    private String latestDownloadSha256(UUID workflowId) {
-        return workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(workflowId)
-                .stream()
-                .filter(e -> e.getKind() == WorkflowEventKind.PORTAL_FILE_DOWNLOADED)
-                .reduce((first, second) -> second)
-                .map(e -> {
-                    try {
-                        return new ObjectMapper()
-                                .readTree(e.getPayload()).path("sha256").asText(null);
-                    } catch (Exception ex) {
-                        return null;
-                    }
-                })
-                .orElse(null);
+                WorkflowEventKind.PORTAL_UPLOADED, null, json));
     }
 
     @Transactional

@@ -2,11 +2,8 @@ package com.arktech.superaccountant.gstr1.channel;
 
 import com.arktech.superaccountant.gstr1.json.WriterOptions;
 import com.arktech.superaccountant.gstr1.models.PreparedReturn;
-import com.arktech.superaccountant.workflow.models.WorkflowEvent;
-import com.arktech.superaccountant.workflow.models.WorkflowEventKind;
 import com.arktech.superaccountant.workflow.repository.WorkflowEventRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.arktech.superaccountant.workflow.service.PortalDownloadHashes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -18,8 +15,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class PortalFileChannel implements Gstr1FilingChannel {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
     private final WorkflowEventRepository workflowEventRepository;
@@ -41,23 +36,9 @@ public class PortalFileChannel implements Gstr1FilingChannel {
 
     @Override
     public ChannelResult submit(PreparedReturn preparedReturn, WriterOptions options) {
-        String sha256 = workflowEventRepository
-                .findAllByWorkflowIdOrderByOccurredAtAsc(preparedReturn.getWorkflowId())
-                .stream()
-                .filter(e -> e.getKind() == WorkflowEventKind.PORTAL_FILE_DOWNLOADED)
-                .reduce((first, second) -> second)
-                .map(this::downloadSha256)
-                .orElse(null);
+        String sha256 = PortalDownloadHashes.latestSha256(
+                workflowEventRepository, preparedReturn.getWorkflowId());
         return new ChannelResult(ChannelResult.Status.MANUAL_UPLOAD_REQUIRED, sha256,
                 "Upload the downloaded portal file on the GST portal manually");
-    }
-
-    private String downloadSha256(WorkflowEvent event) {
-        try {
-            JsonNode payload = MAPPER.readTree(event.getPayload());
-            return payload.path("sha256").asText(null);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }
