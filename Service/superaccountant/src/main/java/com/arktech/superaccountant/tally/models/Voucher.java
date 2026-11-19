@@ -89,6 +89,13 @@ public class Voucher {
     // GST section
     private List<GstEntry> gst;
 
+    // Inventory entries — Tally uses different key names depending on voucher type
+    @JsonProperty("inventoryentries")
+    private List<InventoryEntry> inventoryEntries;
+
+    @JsonProperty("allinventoryentries")
+    private List<InventoryEntry> allInventoryEntries;
+
     /**
      * Returns all ledger entries regardless of which JSON key was used.
      * Payment vouchers use "allledgerentries", Purchase vouchers use "ledgerentries".
@@ -99,6 +106,20 @@ public class Voucher {
         }
         if (ledgerEntries != null && !ledgerEntries.isEmpty()) {
             return ledgerEntries;
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Returns all inventory entries regardless of which JSON key was used,
+     * mirroring the {@link #getAllLedgerEntriesCombined()} dual-key quirk.
+     */
+    public List<InventoryEntry> getAllInventoryEntriesCombined() {
+        if (inventoryEntries != null && !inventoryEntries.isEmpty()) {
+            return inventoryEntries;
+        }
+        if (allInventoryEntries != null && !allInventoryEntries.isEmpty()) {
+            return allInventoryEntries;
         }
         return Collections.emptyList();
     }

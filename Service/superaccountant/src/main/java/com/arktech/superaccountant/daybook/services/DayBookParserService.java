@@ -2,7 +2,9 @@ package com.arktech.superaccountant.daybook.services;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.daybook.models.ParsedVoucherItem;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
+import com.arktech.superaccountant.tally.models.InventoryEntry;
 import com.arktech.superaccountant.tally.models.LedgerEntry;
 import com.arktech.superaccountant.tally.models.TallyMessage;
 import com.arktech.superaccountant.tally.models.Voucher;
@@ -116,9 +118,47 @@ public class DayBookParserService {
             pv.setEntries(entries);
             pv.setTotalDebit(totalDebit);
             pv.setTotalCredit(totalCredit);
+            pv.setItems(buildItems(v, pv, orgId));
             vouchers.add(pv);
         }
         return parsedVoucherRepository.saveAll(vouchers);
+    }
+
+    /**
+     * Normalizes Tally inventory entry lines into ParsedVoucherItems.
+     * Quantity: numeric prefix of ACTUALQTY ("10 NOS" → 10), falling back to
+     * BILLEDQTY. UQC: mapped via UqcMapper (raw unit preserved separately).
+     */
+    private List<ParsedVoucherItem> buildItems(Voucher v, ParsedVoucher pv, UUID orgId) {
+        List<ParsedVoucherItem> items = new ArrayList<>();
+        for (InventoryEntry ie : v.getAllInventoryEntriesCombined()) {
+            ParsedVoucherItem item = new ParsedVoucherItem();
+            item.setParsedVoucher(pv);
+            item.setOrganizationId(orgId);
+            item.setStockItemName(ie.getStockitemname());
+            item.setHsn(ie.getHsn());
+            String unit = ie.getUqc() != null && !ie.getUqc().isBlank() ? ie.getUqc() : ie.getUnit();
+            item.setUnit(unit);
+            item.setUqc(UqcMapper.map(unit));
+            item.setQuantity(firstParseable(ie.getActualqty(), ie.getBilledqty()));
+            item.setRate(parseAmount(ie.getRate()));
+            item.setAmount(parseAmount(ie.getAmount()));
+            items.add(item);
+        }
+        return items;
+    }
+
+    private BigDecimal firstParseable(String... candidates) {
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isBlank()) continue;
+            // Tally qty strings carry the unit suffix: "10 NOS" → parse "10"
+            String numeric = candidate.trim().split("\\s+")[0];
+            BigDecimal value = parseAmount(numeric);
+            if (value.compareTo(BigDecimal.ZERO) != 0) {
+                return value;
+            }
+        }
+        return null;
     }
 
     /**

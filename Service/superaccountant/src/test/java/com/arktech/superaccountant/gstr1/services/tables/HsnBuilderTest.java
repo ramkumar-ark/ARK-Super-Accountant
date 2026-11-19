@@ -88,4 +88,49 @@ class HsnBuilderTest extends TableTestSupport {
 
         assertEquals(0, rows.size());
     }
+
+    @Test
+    void splitsRowsByUqcAndSumsQuantity() {
+        VoucherView nos = voucher()
+                .voucherKey("SB/505")
+                .voucherTypeName("Sales")
+                .hsn("4407")
+                .uqc("NOS")
+                .quantity(v("10"))
+                .rate(v("18"))
+                .taxableValue(v("1000.00"))
+                .build();
+        VoucherView pcs = voucher()
+                .voucherKey("SB/506")
+                .voucherTypeName("Sales")
+                .hsn("4407")
+                .uqc("PCS")
+                .quantity(v("4"))
+                .rate(v("18"))
+                .taxableValue(v("400.00"))
+                .build();
+        VoucherView sameUqc = voucher()
+                .voucherKey("SB/507")
+                .voucherTypeName("Sales")
+                .hsn("4407")
+                .uqc("NOS")
+                .quantity(v("2.5"))
+                .rate(v("18"))
+                .taxableValue(v("250.00"))
+                .build();
+
+        List<PreparedReturnRow> rows = new HsnBuilder().build(workflow(), List.of(nos, pcs, sameUqc));
+
+        assertEquals(2, rows.size());
+        PreparedReturnRow nosRow = rows.stream()
+                .filter(r -> r.getRowKey().startsWith("hsn:4407:NOS:18:"))
+                .findFirst().orElseThrow();
+        assertNum("12.5", num(nosRow.payload(), "quantity"));
+        assertEquals("NOS", nosRow.payload().get("uqc"));
+        PreparedReturnRow pcsRow = rows.stream()
+                .filter(r -> r.getRowKey().startsWith("hsn:4407:PCS:18:"))
+                .findFirst().orElseThrow();
+        assertNum("4", num(pcsRow.payload(), "quantity"));
+        assertEquals("PCS", pcsRow.payload().get("uqc"));
+    }
 }

@@ -2,10 +2,12 @@ package com.arktech.superaccountant.daybook;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.daybook.models.ParsedVoucherItem;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.daybook.services.DayBookParserService;
 import com.arktech.superaccountant.daybook.services.VoucherCanonicalizer;
 import com.arktech.superaccountant.tally.models.GstRateDetail;
+import com.arktech.superaccountant.tally.models.InventoryEntry;
 import com.arktech.superaccountant.tally.models.LedgerEntry;
 import com.arktech.superaccountant.tally.models.TallyMessage;
 import com.arktech.superaccountant.tally.models.Voucher;
@@ -469,5 +471,69 @@ class DayBookParserServiceTest {
         assertThat(persisted.getTallyAlterId()).isEqualTo("456");
         assertThat(persisted.getContentHash())
                 .isEqualTo(VoucherCanonicalizer.contentHash(voucher));
+    }
+
+    @Test
+    void persistVouchers_capturesInventoryEntriesWithUqcMapping() {
+        LedgerEntry entry = new LedgerEntry();
+        entry.setLedgername("Sales Account");
+        entry.setAmount("1180");
+
+        InventoryEntry item = new InventoryEntry();
+        item.setStockitemname("Plywood 8mm");
+        item.setHsn("4407");
+        item.setUqc("NOS");
+        item.setActualqty("10 NOS");
+        item.setRate("100.00");
+        item.setAmount("1000.00");
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Sales");
+        voucher.setDate("20250405");
+        voucher.setAllLedgerEntries(List.of(entry));
+        voucher.setLedgerEntries(List.of());
+        voucher.setInventoryEntries(List.of(item));
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> result = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getItems()).hasSize(1);
+        ParsedVoucherItem persistedItem = result.get(0).getItems().get(0);
+        assertThat(persistedItem.getStockItemName()).isEqualTo("Plywood 8mm");
+        assertThat(persistedItem.getHsn()).isEqualTo("4407");
+        assertThat(persistedItem.getUqc()).isEqualTo("NOS");
+        assertThat(persistedItem.getQuantity()).isEqualByComparingTo(new BigDecimal("10"));
+        assertThat(persistedItem.getRate()).isEqualByComparingTo(new BigDecimal("100.00"));
+        assertThat(persistedItem.getAmount()).isEqualByComparingTo(new BigDecimal("1000.00"));
+    }
+
+    @Test
+    void persistVouchers_inventoryEntriesAreEmptyWithoutInventoryData() {
+        LedgerEntry entry = new LedgerEntry();
+        entry.setLedgername("Bank Account");
+        entry.setAmount("54500");
+
+        Voucher voucher = new Voucher();
+        voucher.setVouchertypename("Payment");
+        voucher.setDate("20250410");
+        voucher.setAllLedgerEntries(List.of(entry));
+        voucher.setLedgerEntries(List.of());
+
+        TallyMessage tallyMessage = new TallyMessage();
+        tallyMessage.setTallymessage(List.of(voucher));
+
+        when(parsedVoucherRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+
+        List<ParsedVoucher> result = dayBookParserService.persistVouchers(
+                tallyMessage, UUID.randomUUID(), UUID.randomUUID());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getItems()).isEmpty();
     }
 }
