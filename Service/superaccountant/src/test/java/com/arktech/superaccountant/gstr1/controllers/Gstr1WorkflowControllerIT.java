@@ -151,6 +151,23 @@ class Gstr1WorkflowControllerIT {
     }
 
     @Test
+    void getValidation_operatorReads200_withErrorsAndWarnings() throws Exception {
+        String ownerJwt = signupAndLogin("g1ownerd", "g1ownerd@test.com");
+        UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
+        String operatorJwt = memberJwt(ownerJwt, orgId, "operator",
+                "g1operatord", "g1operatord@test.com");
+
+        UUID workflowId = startedGstr1Workflow(operatorJwt);
+
+        mockMvc.perform(get("/api/v1/workflows/{id}/gstr1/validation", workflowId)
+                .header("Authorization", "Bearer " + operatorJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.errors").isArray())
+                .andExpect(jsonPath("$.warnings").isArray());
+    }
+
+    @Test
     void putFillIn_asAccountant200_andListedAsFixedInPrepare() throws Exception {
         String ownerJwt = signupAndLogin("g1ownerb", "g1ownerb@test.com");
         UUID orgId = createOrganization(ownerJwt);

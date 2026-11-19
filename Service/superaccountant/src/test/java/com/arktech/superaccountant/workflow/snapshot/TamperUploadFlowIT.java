@@ -75,6 +75,8 @@ class TamperUploadFlowIT {
     private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
     @Autowired
     private WorkflowRepository workflowRepository;
+    @Autowired
+    private com.arktech.superaccountant.gstr1.services.Gstr1PrepareService prepareService;
 
     private UUID orgId;
     private final com.fasterxml.jackson.databind.ObjectMapper json = new ObjectMapper();
@@ -171,6 +173,9 @@ class TamperUploadFlowIT {
         w.setStage(WorkflowStage.PREPARE);
         w.setBaselineConfirmedAt(Instant.now());
         workflowRepository.save(w);
+        // the stage was set directly, so the PrepareHook did not run; build the
+        // prepared return the finalize gate validates
+        prepareService.buildOrRebuild(w);
     }
 
     private void seedValidatedMasters(UUID org) {

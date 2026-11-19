@@ -183,9 +183,10 @@ class Gstr1PrepareFlowIT {
         v.setVoucherNumber("INV-1");
         v.setVoucherDate(LocalDate.of(2025, 4, 10));
         v.setPartyLedgerName("Sundry Debtors");
-        v.setPartyGstin("29AABCU9603R1ZM");
+        v.setPartyGstin("29AABCU9603R1ZJ");
         v.setPartyGstRegistrationType("Regular");
         v.setPlaceOfSupply("Karnataka");
+        v.setCaptureVersion(1);
         v.setTotalDebit(new BigDecimal("11800.00"));
         v.setTotalCredit(new BigDecimal("11800.00"));
         List<ParsedVoucherEntry> entries = new ArrayList<>();
@@ -213,8 +214,9 @@ class Gstr1PrepareFlowIT {
         v.setVoucherNumber(number);
         v.setVoucherDate(LocalDate.of(2025, 4, 20));
         v.setPartyLedgerName("Sundry Debtors");
-        v.setPartyGstin("29AABCU9603R1ZM");
+        v.setPartyGstin("29AABCU9603R1ZJ");
         v.setPlaceOfSupply("Karnataka");
+        v.setCaptureVersion(1);
         v.setTotalDebit(new BigDecimal("5900.00"));
         v.setTotalCredit(new BigDecimal("5900.00"));
         List<ParsedVoucherEntry> entries = new ArrayList<>();
