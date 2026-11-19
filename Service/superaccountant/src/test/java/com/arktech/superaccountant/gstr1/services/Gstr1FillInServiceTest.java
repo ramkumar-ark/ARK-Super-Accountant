@@ -75,7 +75,7 @@ class Gstr1FillInServiceTest {
     }
 
     @Test
-    void voucherFillInBeatsLedgerBeatsCapturedData() {
+    void voucherFillInBeatsLedgerScope() {
         Workflow wf = workflow(WorkflowStage.PREPARE, WorkflowType.GSTR1);
         wf.setUploadJobId(UUID.randomUUID());
         wf = workflowRepository.save(wf);
@@ -113,13 +113,8 @@ class Gstr1FillInServiceTest {
                         Gstr1FillInScope.LEDGER, "Sales - Local", Gstr1FillInAttribute.POS).orElseThrow();
         fillInRepository.delete(ledger);
 
-        assertEquals(Optional.of("27"),
+        assertEquals(Optional.empty(),
                 fillInService.resolve(wf, voucherKey, "Sales - Local", Gstr1FillInAttribute.POS));
-
-        assertEquals(Optional.of("B2B"),
-                fillInService.resolve(wf, voucherKey, null, Gstr1FillInAttribute.SUPPLY_NATURE));
-        assertEquals(Optional.of("Inter-State"),
-                fillInService.resolve(wf, voucherKey, null, Gstr1FillInAttribute.EXPORT_TYPE));
         assertEquals(Optional.empty(),
                 fillInService.resolve(wf, voucherKey, null, Gstr1FillInAttribute.PORT_CODE));
     }

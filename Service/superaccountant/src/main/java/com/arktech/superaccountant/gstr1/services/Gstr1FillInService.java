@@ -1,7 +1,5 @@
 package com.arktech.superaccountant.gstr1.services;
 
-import com.arktech.superaccountant.daybook.models.ParsedVoucher;
-import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.gstr1.models.Gstr1FillIn;
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute;
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInScope;
@@ -9,14 +7,12 @@ import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
-import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -28,9 +24,6 @@ public class Gstr1FillInService {
 
     @Autowired
     private Gstr1FillInRepository fillInRepository;
-
-    @Autowired
-    private ParsedVoucherRepository parsedVoucherRepository;
 
     @Transactional
     public Gstr1FillIn upsert(Workflow workflow, Gstr1FillInScope scope, String key,
@@ -84,7 +77,7 @@ public class Gstr1FillInService {
                 return ledger;
             }
         }
-        return capturedValue(workflow, voucherKey, attribute);
+        return Optional.empty();
     }
 
     /**
@@ -133,44 +126,5 @@ public class Gstr1FillInService {
         if (!ACCOUNTANT_ROLE.equals(role)) {
             throw new WorkflowConflictException("Only an Accountant can edit fill-ins");
         }
-    }
-
-    private Optional<String> capturedValue(Workflow workflow, String voucherKey,
-                                           Gstr1FillInAttribute attribute) {
-        if (voucherKey == null || workflow.getUploadJobId() == null) {
-            return Optional.empty();
-        }
-        Optional<String> capturedField = switch (attribute) {
-            case POS -> Optional.of("placeOfSupply");
-            case SUPPLY_NATURE -> Optional.of("supplyNature");
-            case EXPORT_TYPE -> Optional.of("typeOfSupply");
-            default -> Optional.empty();
-        };
-        if (capturedField.isEmpty()) {
-            return Optional.empty();
-        }
-        Map<String, ParsedVoucher> keyed = VoucherKeys.keyAll(
-                parsedVoucherRepository.findByUploadJobId(workflow.getUploadJobId()));
-        ParsedVoucher voucher = keyed.get(voucherKey);
-        if (voucher == null) {
-            // keyAll appends "#n" suffixes on collisions; fall back to a prefix match
-            voucher = keyed.entrySet().stream()
-                    .filter(e -> e.getKey().startsWith(voucherKey + "#"))
-                    .map(Map.Entry::getValue)
-                    .findFirst()
-                    .orElse(null);
-        }
-        if (voucher == null) {
-            return Optional.empty();
-        }
-        return switch (attribute) {
-            case POS -> Optional.ofNullable(voucher.getPlaceOfSupply())
-                    .filter(v -> !v.isBlank());
-            case SUPPLY_NATURE -> Optional.ofNullable(voucher.getSupplyNature())
-                    .filter(v -> !v.isBlank());
-            case EXPORT_TYPE -> Optional.ofNullable(voucher.getTypeOfSupply())
-                    .filter(v -> !v.isBlank());
-            default -> Optional.empty();
-        };
     }
 }

@@ -15,6 +15,7 @@ import com.arktech.superaccountant.gstr1.services.tables.HsnBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.NilExemptBuilder;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
+import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,9 @@ public class Gstr1PrepareService {
     static final String RETURN_KIND = "GSTR1";
 
     @Autowired
+    private WorkflowRepository workflowRepository;
+
+    @Autowired
     private PreparedReturnRepository preparedReturnRepository;
 
     @Autowired
@@ -93,6 +97,7 @@ public class Gstr1PrepareService {
     @Transactional
     public PreparedReturn buildOrRebuild(Workflow workflow) {
         requireGstr1(workflow);
+        lockWorkflow(workflow);
         PreparedReturn prepared = existing(workflow).orElseGet(() -> create(workflow));
         if (prepared.getFrozenAt() != null) {
             return prepared;
@@ -110,6 +115,7 @@ public class Gstr1PrepareService {
     @Transactional
     public PreparedReturn freeze(Workflow workflow) {
         requireGstr1(workflow);
+        lockWorkflow(workflow);
         PreparedReturn prepared = existing(workflow)
                 .orElseGet(() -> buildOrRebuild(workflow));
         if (prepared.getFrozenAt() == null) {
@@ -183,6 +189,11 @@ public class Gstr1PrepareService {
         prepared.setReturnKind(RETURN_KIND);
         prepared.setBuiltAt(Instant.now());
         return preparedReturnRepository.save(prepared);
+    }
+
+    private void lockWorkflow(Workflow workflow) {
+        workflowRepository.findByIdForUpdate(workflow.getId())
+                .orElseThrow(() -> new WorkflowConflictException("Workflow no longer exists"));
     }
 
     private void requireGstr1(Workflow workflow) {
