@@ -6,9 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * One INVENTORYENTRIES.LIST line from a Tally voucher. The exact JSON key
- * casing Tally emits for HSN/unit is not verified across versions, so every
- * string field carries aliases for the commonly seen variants.
+ * One INVENTORYENTRIES.LIST line from a Tally voucher.
  */
 @Data
 @NoArgsConstructor

@@ -140,6 +140,8 @@ public class VoucherViewBuilder {
             taxableValue = derived.max(BigDecimal.ZERO);
         }
 
+        List<ParsedVoucherItem> uniformItems = uniformHsnUqcItems(items) ? items : List.of();
+
         VoucherView.Builder b = new VoucherView.Builder()
                 .voucherKey(voucherKey)
                 .voucherTypeName(voucher.getVoucherTypeName())
@@ -163,12 +165,12 @@ public class VoucherViewBuilder {
                 .sgst(heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO))
                 .cess(heads.getOrDefault(GstHead.CESS, BigDecimal.ZERO))
                 .hsn(resolveHsn(workflow, voucherKey, entries, snapshots)
-                        .orElseGet(() -> firstItemValue(items, ParsedVoucherItem::getHsn)))
+                        .orElseGet(() -> firstItemValue(uniformItems, ParsedVoucherItem::getHsn)))
                 .uqc(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.UQC)
-                        .orElseGet(() -> firstItemValue(items, ParsedVoucherItem::getUqc)))
+                        .orElseGet(() -> firstItemValue(uniformItems, ParsedVoucherItem::getUqc)))
                 .quantity(resolveText(workflow, voucherKey, entries, Gstr1FillInAttribute.QTY)
                         .map(VoucherViewBuilder::parseAmount)
-                        .orElseGet(() -> sumItemQuantities(items)));
+                        .orElseGet(() -> sumItemQuantities(uniformItems)));
         return b.build();
     }
 
@@ -193,6 +195,20 @@ public class VoucherViewBuilder {
             }
         }
         return Optional.empty();
+    }
+
+    private static boolean uniformHsnUqcItems(List<ParsedVoucherItem> items) {
+        return distinctTrimmed(items, ParsedVoucherItem::getHsn) <= 1
+                && distinctTrimmed(items, ParsedVoucherItem::getUqc) <= 1;
+    }
+
+    private static long distinctTrimmed(List<ParsedVoucherItem> items,
+                                        Function<ParsedVoucherItem, String> getter) {
+        return items.stream()
+                .map(getter)
+                .map(v -> v == null ? "" : v.trim())
+                .distinct()
+                .count();
     }
 
     // Item-level fallback: used only when fill-ins and ledger snapshots yield
