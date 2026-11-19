@@ -90,9 +90,10 @@ public class ReportingClassifier {
             return Result.of(ReportingClass.EXP);
         }
 
-        String posCode = Gstr1Rules.STATE_CODES.contains(pos.trim())
-                ? pos.trim()
-                : lower(pos);
+        String posCode = Gstr1Rules.normalizeStateCode(pos);
+        if (posCode == null) {
+            posCode = lower(pos);
+        }
         String supplierCode = lower(v.getSupplierStateCode());
         boolean interState = !posCode.equals(supplierCode);
         BigDecimal value = v.getTotalValue() == null ? BigDecimal.ZERO : v.getTotalValue();

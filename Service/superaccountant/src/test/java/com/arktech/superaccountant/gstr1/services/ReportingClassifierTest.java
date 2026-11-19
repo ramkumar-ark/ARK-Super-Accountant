@@ -58,6 +58,33 @@ class ReportingClassifierTest {
     }
 
     @Test
+    void intraStateNameFormPosMatchesCodeFormResult() {
+        VoucherView v = voucher()
+                .placeOfSupply("Karnataka")
+                .totalValue(new BigDecimal("300000.00"))
+                .build();
+        assertEquals(ReportingClass.B2CS, classifier().classify(v, PERIOD).category());
+    }
+
+    @Test
+    void intraStatePrefixedPosMatchesCodeFormResult() {
+        VoucherView v = voucher()
+                .placeOfSupply("29-Maharashtra")
+                .totalValue(new BigDecimal("300000.00"))
+                .build();
+        assertEquals(ReportingClass.B2CS, classifier().classify(v, PERIOD).category());
+    }
+
+    @Test
+    void interStatePrefixedPosMatchesCodeFormResult() {
+        VoucherView v = voucher()
+                .placeOfSupply("27-Maharashtra")
+                .totalValue(new BigDecimal("300000.00"))
+                .build();
+        assertEquals(ReportingClass.B2CL, classifier().classify(v, PERIOD).category());
+    }
+
+    @Test
     void gstinPresentIsB2bRegardlessOfValue() {
         VoucherView v = voucher()
                 .partyGstin("29ABCDE1234F1Z5")

@@ -187,6 +187,8 @@ public class VoucherViewBuilder {
         return Optional.empty();
     }
 
+    // Ledger-scope fill-ins are baked into the view here, so the classifier's
+    // voucher-scope resolve still sees them via the built VoucherView fields.
     private Optional<String> resolveText(Workflow workflow, String voucherKey, List<ParsedVoucherEntry> entries,
                                          Gstr1FillInAttribute attribute) {
         Optional<String> voucherScope = fillInService
