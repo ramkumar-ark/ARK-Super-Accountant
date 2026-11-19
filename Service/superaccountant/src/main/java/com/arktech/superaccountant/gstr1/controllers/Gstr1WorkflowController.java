@@ -10,6 +10,7 @@ import com.arktech.superaccountant.gstr1.models.Gstr1FillInScope;
 import com.arktech.superaccountant.gstr1.models.PreparedReturn;
 import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
 import com.arktech.superaccountant.gstr1.payload.request.Gstr1FillInRequest;
+import com.arktech.superaccountant.gstr1.payload.request.PortalUploadRequest;
 import com.arktech.superaccountant.gstr1.payload.response.Gstr1TablesResponse;
 import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository;
@@ -34,6 +35,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -167,6 +169,27 @@ public class Gstr1WorkflowController {
             Gstr1FillIn fillIn = fillInService.upsert(workflow, scope, request.key(),
                     attribute, request.value(), role, principal.getUsername());
             return ResponseEntity.ok(toSummary(fillIn));
+        } catch (WorkflowBadRequestException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (WorkflowConflictException e) {
+            return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/gstr1/portal-upload")
+    @PreAuthorize("hasRole('ACCOUNTANT')")
+    public ResponseEntity<?> portalUpload(@AuthenticationPrincipal UserDetailsImpl principal,
+                                          @PathVariable UUID id,
+                                          @RequestBody(required = false) PortalUploadRequest request) {
+        if (principal.getOrganizationId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "User is not linked to an organization."));
+        }
+        try {
+            workflowService.recordPortalUpload(principal.getOrganizationId(),
+                    principal.getUsername(), id,
+                    request == null ? null : request.getFileHash(),
+                    request == null ? null : request.getNote());
+            return ResponseEntity.ok(Map.of("recorded", true));
         } catch (WorkflowBadRequestException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (WorkflowConflictException e) {

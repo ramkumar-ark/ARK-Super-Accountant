@@ -21,6 +21,7 @@ type DetailOverrides = {
   baselineConfirmed?: boolean
   filingRef?: string | null
   filingRefDate?: string | null
+  filingChannel?: string | null
 }
 
 function makeDetail(overrides: DetailOverrides = {}): WorkflowDetail {
@@ -46,6 +47,7 @@ function makeDetail(overrides: DetailOverrides = {}): WorkflowDetail {
       filedAt: null,
       filingRef: overrides.filingRef ?? null,
       filingRefDate: overrides.filingRefDate ?? null,
+      filingChannel: overrides.filingChannel ?? null,
       createdBy: 'operator',
       createdAt: '2025-04-01T00:00:00Z',
     },
@@ -199,8 +201,38 @@ describe('WorkflowStageActions', () => {
       expect(api.post).toHaveBeenCalledWith('/v1/workflows/wf-1/filing', {
         ref: 'AA0704250012345',
         date: '2025-05-11',
+        channel: 'PORTAL_FILE',
       })
     })
+  })
+
+  it('filing_postsChannelDefaultingToPortalFile', async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: makeDetail({ stage: 'FILED' }).workflow })
+    const user = userEvent.setup()
+    renderActions(makeDetail({ stage: 'FINALIZED', type: 'GSTR1' }), 'ROLE_ACCOUNTANT')
+
+    await user.click(screen.getByRole('button', { name: 'Record filing' }))
+    await user.type(screen.getByLabelText('ARN'), 'AA0704250012345')
+    await user.type(screen.getByLabelText('Filing date'), '2025-05-11')
+    await user.click(screen.getByRole('button', { name: 'Confirm filing' }))
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/v1/workflows/wf-1/filing', {
+        ref: 'AA0704250012345',
+        date: '2025-05-11',
+        channel: 'PORTAL_FILE',
+      })
+    })
+  })
+
+  it('filing_channelSelectDefaultsToPortalFile', async () => {
+    const user = userEvent.setup()
+    renderActions(makeDetail({ stage: 'FINALIZED', type: 'GSTR1' }), 'ROLE_ACCOUNTANT')
+
+    await user.click(screen.getByRole('button', { name: 'Record filing' }))
+
+    const select = screen.getByLabelText('Filing channel') as HTMLSelectElement
+    expect(select.value).toBe('PORTAL_FILE')
   })
 
   it('filed_showsReferenceReadOnly', () => {

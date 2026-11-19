@@ -20,6 +20,7 @@ import com.arktech.superaccountant.workflow.seam.UploadFreshnessGate;
 import com.arktech.superaccountant.workflow.seam.WorkflowGate;
 import com.arktech.superaccountant.workflow.service.compliance.CompliancePeriods;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -361,6 +362,14 @@ public class WorkflowService {
     @Transactional
     public Workflow recordFiling(UUID organizationId, String actor, UUID id,
                                  String filingRef, LocalDate filingRefDate) {
+        return recordFiling(organizationId, actor, id, filingRef, filingRefDate,
+                "PORTAL_FILE");
+    }
+
+    @Transactional
+    public Workflow recordFiling(UUID organizationId, String actor, UUID id,
+                                 String filingRef, LocalDate filingRefDate,
+                                 String filingChannel) {
         if (filingRef == null || filingRef.isBlank() || filingRefDate == null) {
             throw new WorkflowBadRequestException("Filing reference and date are required");
         }
@@ -371,12 +380,51 @@ public class WorkflowService {
         w.setStage(WorkflowStage.FILED);
         w.setFilingRef(filingRef);
         w.setFilingRefDate(filingRefDate);
+        w.setFilingChannel(filingChannel == null || filingChannel.isBlank()
+                ? "PORTAL_FILE" : filingChannel);
         w.setFiledAt(Instant.now());
         w.setFiledBy(actor);
         workflowRepository.save(w);
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.FILED,
                 null, payloadOf("filingRef", filingRef)));
         return w;
+    }
+
+    @Transactional
+    public void recordPortalUpload(UUID organizationId, String actor, UUID id,
+                                   String fileHash, String note) {
+        Workflow w = get(organizationId, id);
+        if (w.getStage() != WorkflowStage.FINALIZED) {
+            throw new WorkflowConflictException(
+                    "Portal upload can be recorded only on a FINALIZED workflow");
+        }
+        String sha256 = fileHash == null || fileHash.isBlank()
+                ? latestDownloadSha256(w.getId()) : fileHash;
+        StringBuilder payload = new StringBuilder("{\"sha256\":");
+        payload.append(sha256 == null ? "null" : "\"" + sha256 + "\"");
+        if (note != null && !note.isBlank()) {
+            payload.append(",\"note\":\"").append(note.replace("\\", "\\\\")
+                    .replace("\"", "\\\"")).append("\"");
+        }
+        payload.append("}");
+        workflowEventRepository.save(event(w.getId(), actor,
+                WorkflowEventKind.PORTAL_UPLOADED, null, payload.toString()));
+    }
+
+    private String latestDownloadSha256(UUID workflowId) {
+        return workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(workflowId)
+                .stream()
+                .filter(e -> e.getKind() == WorkflowEventKind.PORTAL_FILE_DOWNLOADED)
+                .reduce((first, second) -> second)
+                .map(e -> {
+                    try {
+                        return new ObjectMapper()
+                                .readTree(e.getPayload()).path("sha256").asText(null);
+                    } catch (Exception ex) {
+                        return null;
+                    }
+                })
+                .orElse(null);
     }
 
     @Transactional

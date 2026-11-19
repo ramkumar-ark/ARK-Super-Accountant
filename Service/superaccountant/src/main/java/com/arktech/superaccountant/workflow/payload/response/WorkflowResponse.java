@@ -31,6 +31,7 @@ public record WorkflowResponse(
         String filedBy,
         String filingRef,
         LocalDate filingRefDate,
+        String filingChannel,
         String createdBy,
         Instant createdAt) {
 
@@ -41,7 +42,8 @@ public record WorkflowResponse(
                 w.getSupersedesWorkflowId(), w.getStage(), w.isActive(), w.getUploadJobId(),
                 w.getMastersJobId(), w.getBaselineConfirmedAt(), w.getBaselineConfirmedBy(),
                 w.getFinalizedAt(), w.getFinalizedBy(), w.getFrozenThrough(), w.getFiledAt(),
-                w.getFiledBy(), w.getFilingRef(), w.getFilingRefDate(), w.getCreatedBy(),
+                w.getFiledBy(), w.getFilingRef(), w.getFilingRefDate(), w.getFilingChannel(),
+                w.getCreatedBy(),
                 w.getCreatedAt());
     }
 }
