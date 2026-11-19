@@ -219,7 +219,7 @@ class Gstr1ValidatorTest extends TableTestSupport {
                 .allMatch(r -> r.severity() == ValidationResult.Severity.ERROR)).isTrue();
         assertThat(has(validate(
                 row("B2B", "b2b:G:g7", "G:g7", b2b("invoiceNo", "INV-DUP")),
-                row("EXPWP", "exp:G:g8", "G:g8",
+                row("EXP", "exp:G:g8", "G:g8",
                         payload("invoiceNo", "INV-DUP", "invoiceDate", "2025-04-10",
                                 "exportType", "WP", "country", "United States",
                                 "rate", n("0"), "taxableValue", n("1000"),
@@ -251,7 +251,7 @@ class Gstr1ValidatorTest extends TableTestSupport {
 
     @Test
     void exportWithoutPlaceOfSupplyMissingShippingBill_isError_whenWithPayment() {
-        assertThat(has(validate(row("EXPWP", "exp:G:g1", "G:g1",
+        assertThat(has(validate(row("EXP", "exp:G:g1", "G:g1",
                 payload("invoiceNo", "EXP-001", "invoiceDate", "2025-04-10",
                         "exportType", "WP", "country", "United States",
                         "rate", n("0"), "taxableValue", n("1000"),
@@ -264,14 +264,14 @@ class Gstr1ValidatorTest extends TableTestSupport {
         when(fillInRepository.findByWorkflowIdAndScope(any(UUID.class),
                 org.mockito.ArgumentMatchers.eq(Gstr1FillInScope.VOUCHER)))
                 .thenReturn(List.of(billNo, billDate, portCode));
-        assertThat(has(validate(row("EXPWP", "exp:G:g1", "G:g1",
+        assertThat(has(validate(row("EXP", "exp:G:g1", "G:g1",
                 payload("invoiceNo", "EXP-001", "invoiceDate", "2025-04-10",
                         "exportType", "WP", "country", "United States",
                         "rate", n("0"), "taxableValue", n("1000"),
                         "igst", n("0"), "cgst", n("0"), "sgst", n("0"), "cess", n("0"),
                         "invoiceValue", n("1000")))), "EXP_SHIPPING_BILL_MISSING")).isFalse();
 
-        assertThat(has(validate(row("EXPWOP", "exp:G:g2", "G:g2",
+        assertThat(has(validate(row("EXP", "exp:G:g2", "G:g2",
                 payload("invoiceNo", "EXP-002", "invoiceDate", "2025-04-10",
                         "exportType", "WOP", "country", "United States",
                         "rate", n("0"), "taxableValue", n("1000"),
@@ -281,21 +281,26 @@ class Gstr1ValidatorTest extends TableTestSupport {
 
     @Test
     void creditNoteWithoutDateOrPositiveTaxable_isError() {
-        assertThat(has(validate(row("CDN", "cdn:G:g1", "G:g1",
+        assertThat(has(validate(row("CDNR", "cdn:G:g1", "G:g1",
                 payload("noteType", "credit note", "gstin", OTHER_GSTIN,
                         "noteNo", "CN-001", "rate", n("18"),
                         "taxableValue", n("-1000"), "taxes", n("-180"),
                         "invoiceValue", n("-1180")))), "CDN_NOTE_INVALID")).isTrue();
-        assertThat(has(validate(row("CDN", "cdn:G:g2", "G:g2",
+        assertThat(has(validate(row("CDNR", "cdn:G:g2", "G:g2",
                 payload("noteType", "credit note", "gstin", OTHER_GSTIN,
                         "noteNo", "CN-002", "noteDate", "2025-04-12", "rate", n("18"),
                         "taxableValue", n("1000"), "taxes", n("180"),
                         "invoiceValue", n("1180")))), "CDN_NOTE_INVALID")).isTrue();
-        assertThat(has(validate(row("CDN", "cdn:G:g3", "G:g3",
+        assertThat(has(validate(row("CDNR", "cdn:G:g3", "G:g3",
                 payload("noteType", "credit note", "gstin", OTHER_GSTIN,
                         "noteNo", "CN-003", "noteDate", "2025-04-12", "rate", n("18"),
                         "taxableValue", n("-1000"), "taxes", n("-180"),
                         "invoiceValue", n("-1180")))), "CDN_NOTE_INVALID")).isFalse();
+        assertThat(has(validate(row("CDNR", "cdn:G:g4", "G:g4",
+                payload("noteType", "credit note", "gstin", OTHER_GSTIN,
+                        "noteNo", "CN-004", "noteDate", "2025-06-12", "rate", n("18"),
+                        "taxableValue", n("-1000"), "taxes", n("-180"),
+                        "invoiceValue", n("-1180")))), "DATE_INVALID")).isTrue();
     }
 
     @Test

@@ -106,10 +106,10 @@ public class Gstr1Validator {
             checkTaxArithmetic(results, row, payload);
             checkInvoiceNumber(results, row, payload, invoiceNos);
             checkDate(results, row, payload, periodStart, periodEnd);
-            if ("EXPWP".equals(table)) {
+            if ("EXP".equals(table) && "WP".equals(text(payload, "exportType"))) {
                 checkExportShippingBill(results, row, fillIns);
             }
-            if ("CDN".equals(table) || "CDNUR".equals(table)) {
+            if ("CDNR".equals(table) || "CDNUR".equals(table)) {
                 checkCreditNote(results, row, payload);
             }
             if ("NIL".equals(table)) {
@@ -288,11 +288,11 @@ public class Gstr1Validator {
 
     private void checkDate(List<ValidationResult> results, PreparedReturnRow row,
                            Map<String, Object> payload, LocalDate periodStart, LocalDate periodEnd) {
-        boolean isNote = "CDN".equals(row.getTableCode()) || "CDNUR".equals(row.getTableCode());
+        boolean isNote = "CDNR".equals(row.getTableCode()) || "CDNUR".equals(row.getTableCode());
         String key = isNote ? "noteDate" : "invoiceDate";
         String date = text(payload, key);
         boolean required = isNote
-                || List.of("B2B", "B2CL", "EXPWP", "EXPWOP").contains(row.getTableCode());
+                || List.of("B2B", "B2CL", "EXP").contains(row.getTableCode());
         if (date == null || date.isBlank()) {
             if (required) {
                 results.add(new ValidationResult("DATE_INVALID", ValidationResult.Severity.ERROR,
@@ -435,7 +435,7 @@ public class Gstr1Validator {
     }
 
     private static BigDecimal tableValue(Map<String, Object> payload, String table) {
-        if (List.of("B2B", "B2CL", "B2CS", "EXPWP", "EXPWOP", "CDN", "CDNUR", "NIL").contains(table)) {
+        if (List.of("B2B", "B2CL", "B2CS", "EXP", "CDNR", "CDNUR", "NIL").contains(table)) {
             return number(payload, "taxableValue");
         }
         if ("ADVANCE".equals(table)) {
