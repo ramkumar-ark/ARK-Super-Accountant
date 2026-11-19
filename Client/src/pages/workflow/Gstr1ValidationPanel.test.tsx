@@ -128,6 +128,17 @@ beforeEach(() => {
 })
 
 describe('Gstr1ValidationPanel', () => {
+  it('renders nothing and makes no requests for non-GSTR1 workflows', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <Gstr1ValidationPanel workflow={workflow({ type: 'TDS_26Q' })} role="ROLE_ACCOUNTANT" />
+      </QueryClientProvider>,
+    )
+    expect(container).toBeEmptyDOMElement()
+    expect(api.get).not.toHaveBeenCalled()
+  })
+
   it('shows errors and warnings and keeps the download disabled while errors exist', async () => {
     routeApi(
       validation({

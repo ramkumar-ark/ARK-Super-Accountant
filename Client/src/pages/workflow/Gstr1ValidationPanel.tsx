@@ -37,7 +37,7 @@ interface Props {
 }
 
 export function Gstr1ValidationPanel({ workflow, role }: Props) {
-  if (!PREPARE_ONWARD.includes(workflow.stage)) return null
+  if (workflow.type !== 'GSTR1' || !PREPARE_ONWARD.includes(workflow.stage)) return null
 
   return (
     <section className="flex flex-col gap-6 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
