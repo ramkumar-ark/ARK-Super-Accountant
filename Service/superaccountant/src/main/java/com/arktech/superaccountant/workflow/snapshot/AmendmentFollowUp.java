@@ -44,6 +44,19 @@ public class AmendmentFollowUp {
     @Column(nullable = false, length = 16)
     private AmendmentStatus status;
 
+    @Convert(converter = AmendmentChangeKindConverter.class)
+    @Column(length = 16)
+    private AmendmentChangeKind change;
+
+    @Column(name = "table_code", length = 16)
+    private String tableCode;
+
+    @Column(name = "original_workflow_id")
+    private UUID originalWorkflowId;
+
+    @Column(name = "original_doc_key", length = 128)
+    private String originalDocKey;
+
     private String doneBy;
 
     private Instant doneAt;

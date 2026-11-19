@@ -124,6 +124,9 @@ public class SnapshotController {
         map.put("voucherKey", f.getVoucherKey());
         map.put("summary", f.getSummary());
         map.put("status", f.getStatus() == null ? null : f.getStatus().name());
+        map.put("change", f.getChange() == null ? null : f.getChange().name());
+        map.put("tableCode", f.getTableCode());
+        map.put("originalDocKey", f.getOriginalDocKey());
         map.put("doneBy", f.getDoneBy());
         map.put("doneAt", f.getDoneAt());
         map.put("doneNote", f.getDoneNote());
