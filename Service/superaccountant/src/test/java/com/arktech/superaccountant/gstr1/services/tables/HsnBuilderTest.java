@@ -147,9 +147,9 @@ class HsnBuilderTest extends TableTestSupport {
                 .sgst(v("900.00"))
                 .hsnItems(List.of(
                         new VoucherView.HsnItem("4407", "NOS", v("10"),
-                                v("6000.00"), v("0"), v("540.00"), v("540.00"), v("0")),
+                                v("6000.00"), v("0"), v("540.00"), v("540.00"), v("0"), v("7080.00")),
                         new VoucherView.HsnItem("4408", "NOS", v("5"),
-                                v("4000.00"), v("0"), v("360.00"), v("360.00"), v("0"))))
+                                v("4000.00"), v("0"), v("360.00"), v("360.00"), v("0"), v("4720.00"))))
                 .build();
 
         List<PreparedReturnRow> rows = new HsnBuilder().build(workflow(), List.of(mixed));

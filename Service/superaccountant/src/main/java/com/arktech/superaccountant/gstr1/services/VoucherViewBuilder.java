@@ -152,7 +152,7 @@ public class VoucherViewBuilder {
         // mixed-HSN voucher split into per-item contributions.
         List<VoucherView.HsnItem> hsnItems = hsnValue.isEmpty() && uqcValue.isEmpty() && qtyValue.isEmpty()
                 && !uniformHsnUqcItems(items)
-                ? allocateHsnItems(items, taxableValue, heads)
+                ? allocateHsnItems(items, taxableValue, totalValue, heads)
                 : List.of();
 
         VoucherView.Builder b = new VoucherView.Builder()
@@ -196,6 +196,7 @@ public class VoucherViewBuilder {
      */
     private static List<VoucherView.HsnItem> allocateHsnItems(List<ParsedVoucherItem> items,
                                                               BigDecimal taxableValue,
+                                                              BigDecimal totalValue,
                                                               Map<GstHead, BigDecimal> heads) {
         List<ParsedVoucherItem> rated = items.stream()
                 .filter(i -> i.getHsn() != null && !i.getHsn().isBlank())
@@ -224,6 +225,8 @@ public class VoucherViewBuilder {
             }
         }
         BigDecimal[] taxable = allocate(taxableValue, weights, totalWeight, largest);
+        BigDecimal[] invoice = allocate(totalValue == null ? BigDecimal.ZERO : totalValue,
+                weights, totalWeight, largest);
         BigDecimal[] igst = allocate(heads.getOrDefault(GstHead.IGST, BigDecimal.ZERO), weights, totalWeight, largest);
         BigDecimal[] cgst = allocate(heads.getOrDefault(GstHead.CGST, BigDecimal.ZERO), weights, totalWeight, largest);
         BigDecimal[] sgst = allocate(heads.getOrDefault(GstHead.SGST, BigDecimal.ZERO), weights, totalWeight, largest);
@@ -236,7 +239,7 @@ public class VoucherViewBuilder {
                     item.getHsn().trim(),
                     item.getUqc() == null ? null : item.getUqc().trim(),
                     item.getQuantity(),
-                    taxable[i], igst[i], cgst[i], sgst[i], cess[i]));
+                    taxable[i], igst[i], cgst[i], sgst[i], cess[i], invoice[i]));
         }
         return result;
     }

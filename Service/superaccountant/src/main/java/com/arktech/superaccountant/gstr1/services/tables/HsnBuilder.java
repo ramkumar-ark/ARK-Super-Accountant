@@ -57,11 +57,7 @@ public class HsnBuilder {
                     bucket.cgst = bucket.cgst.add(TableRows.orZero(item.cgst()));
                     bucket.sgst = bucket.sgst.add(TableRows.orZero(item.sgst()));
                     bucket.cess = bucket.cess.add(TableRows.orZero(item.cess()));
-                    // Invoice value follows the same weights as the allocated amounts.
-                    bucket.invoiceValue = bucket.invoiceValue.add(
-                            TableRows.orZero(v.getTotalValue()).multiply(TableRows.orZero(item.taxableValue()))
-                                    .divide(TableRows.orZero(v.getTaxableValue()), 2,
-                                            java.math.RoundingMode.HALF_UP));
+                    bucket.invoiceValue = bucket.invoiceValue.add(TableRows.orZero(item.invoiceValue()));
                 }
                 continue;
             }

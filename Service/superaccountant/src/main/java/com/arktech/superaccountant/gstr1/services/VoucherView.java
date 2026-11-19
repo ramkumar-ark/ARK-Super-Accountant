@@ -51,7 +51,8 @@ public final class VoucherView {
      */
     public record HsnItem(String hsn, String uqc, BigDecimal quantity,
                           BigDecimal taxableValue, BigDecimal igst,
-                          BigDecimal cgst, BigDecimal sgst, BigDecimal cess) {
+                          BigDecimal cgst, BigDecimal sgst, BigDecimal cess,
+                          BigDecimal invoiceValue) {
     }
 
     private VoucherView(Builder b) {
