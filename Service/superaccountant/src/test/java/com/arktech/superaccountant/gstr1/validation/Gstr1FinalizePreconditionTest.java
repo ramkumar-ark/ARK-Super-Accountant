@@ -26,6 +26,7 @@ class Gstr1FinalizePreconditionTest extends com.arktech.superaccountant.gstr1.se
     private com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository followUpRepository;
     private com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository fillInRepository;
     private Gstr1FinalizePrecondition precondition;
+    private com.arktech.superaccountant.gstr1.services.tables.AmendmentBuilder amendmentBuilder;
 
     @BeforeEach
     void setUp() {
@@ -36,8 +37,11 @@ class Gstr1FinalizePreconditionTest extends com.arktech.superaccountant.gstr1.se
         fillInRepository = mock(com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository.class);
         when(preparedReturnRepository.findByWorkflowIdAndReturnKind(any(UUID.class), any()))
                 .thenReturn(Optional.empty());
+        amendmentBuilder = mock(com.arktech.superaccountant.gstr1.services.tables.AmendmentBuilder.class);
+        when(amendmentBuilder.canAmendToZero(any())).thenReturn(true);
         precondition = new Gstr1FinalizePrecondition(validator,
-                preparedReturnRepository, rowRepository, followUpRepository, fillInRepository);
+                preparedReturnRepository, rowRepository, followUpRepository, fillInRepository,
+                amendmentBuilder);
     }
 
     @Test
@@ -80,6 +84,27 @@ class Gstr1FinalizePreconditionTest extends com.arktech.superaccountant.gstr1.se
         when(validator.validate(any(), anyList())).thenReturn(List.of());
         when(fillInRepository.findByWorkflowIdAndScopeAndKeyAndAttribute(any(UUID.class), any(), any(), any()))
                 .thenReturn(Optional.of(new com.arktech.superaccountant.gstr1.models.Gstr1FillIn()));
+
+        assertThat(precondition.unmet(workflow())).isEmpty();
+    }
+
+    @Test
+    void deletedFollowUpThatEmitsNoRowDoesNotDemandAck() {
+        seedPreparedReturn();
+        com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp followUp =
+                new com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp();
+        followUp.setOrganizationId(workflow().getOrganizationId());
+        followUp.setWorkflowId(UUID.randomUUID());
+        followUp.setVoucherKey("G:v1");
+        followUp.setStatus(com.arktech.superaccountant.workflow.snapshot.AmendmentStatus.OPEN);
+        followUp.setChange(com.arktech.superaccountant.workflow.snapshot.AmendmentChangeKind.DELETED);
+        followUp.setTableCode("NIL");
+        when(followUpRepository.findByOrganizationIdAndStatus(any(UUID.class), any()))
+                .thenReturn(List.of(followUp));
+        when(validator.validate(any(), anyList())).thenReturn(List.of());
+        when(amendmentBuilder.canAmendToZero(followUp)).thenReturn(false);
+        when(fillInRepository.findByWorkflowIdAndScopeAndKeyAndAttribute(any(UUID.class), any(), any(), any()))
+                .thenReturn(Optional.empty());
 
         assertThat(precondition.unmet(workflow())).isEmpty();
     }

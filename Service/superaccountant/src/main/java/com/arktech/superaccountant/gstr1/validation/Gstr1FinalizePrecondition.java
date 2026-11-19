@@ -7,6 +7,7 @@ import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
 import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository;
+import com.arktech.superaccountant.gstr1.services.tables.AmendmentBuilder;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.seam.FinalizePrecondition;
@@ -36,17 +37,20 @@ public class Gstr1FinalizePrecondition implements FinalizePrecondition {
     private final PreparedReturnRowRepository rowRepository;
     private final AmendmentFollowUpRepository followUpRepository;
     private final Gstr1FillInRepository fillInRepository;
+    private final AmendmentBuilder amendmentBuilder;
 
     public Gstr1FinalizePrecondition(Gstr1Validator validator,
                                      PreparedReturnRepository preparedReturnRepository,
                                      PreparedReturnRowRepository rowRepository,
                                      AmendmentFollowUpRepository followUpRepository,
-                                     Gstr1FillInRepository fillInRepository) {
+                                     Gstr1FillInRepository fillInRepository,
+                                     AmendmentBuilder amendmentBuilder) {
         this.validator = validator;
         this.preparedReturnRepository = preparedReturnRepository;
         this.rowRepository = rowRepository;
         this.followUpRepository = followUpRepository;
         this.fillInRepository = fillInRepository;
+        this.amendmentBuilder = amendmentBuilder;
     }
 
     @Override
@@ -78,7 +82,8 @@ public class Gstr1FinalizePrecondition implements FinalizePrecondition {
             if (followUp.getChange() != AmendmentChangeKind.DELETED
                     || followUp.getWorkflowId().equals(workflow.getId())
                     || followUp.getVoucherKey() == null
-                    || followUp.getTableCode() == null) {
+                    || followUp.getTableCode() == null
+                    || !amendmentBuilder.canAmendToZero(followUp)) {
                 continue;
             }
             boolean acked = fillInRepository.findByWorkflowIdAndScopeAndKeyAndAttribute(

@@ -147,8 +147,28 @@ public class Gstr1PrepareService {
         if (prepared != null && prepared.getFrozenAt() != null) {
             prepared.setFrozenAt(null);
             preparedReturnRepository.save(prepared);
+            reopenIncludedFollowUps(workflow, prepared);
         }
         return prepared;
+    }
+
+    private void reopenIncludedFollowUps(Workflow workflow, PreparedReturn prepared) {
+        Set<UUID> includedIds = rowRepository.findByPreparedReturnId(prepared.getId()).stream()
+                .map(PreparedReturnRow::getFollowUpId)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (includedIds.isEmpty()) {
+            return;
+        }
+        for (AmendmentFollowUp followUp : followUpRepository.findByOrganizationIdAndStatus(
+                workflow.getOrganizationId(), AmendmentStatus.DONE)) {
+            if (includedIds.contains(followUp.getId())) {
+                followUp.setStatus(AmendmentStatus.OPEN);
+                followUp.setDoneBy(null);
+                followUp.setDoneAt(null);
+                followUpRepository.save(followUp);
+            }
+        }
     }
 
     /**

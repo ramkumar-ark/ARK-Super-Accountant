@@ -303,6 +303,49 @@ class Gstr1AmendmentFlowIT {
     }
 
     @Test
+    void unfinalizeReopensIncludedFollowUpsAndRebuildKeepsTheAmendmentRow() throws Exception {
+        setup();
+        clearGstin();
+        Workflow april = frozenAprilReturn();
+        DayBookUploadJob job2 = mayJob();
+        seedSalesInvoice(orgId, job2.getId(), "apr-1", "INV-001-REV", LocalDate.of(2025, 4, 15));
+        Workflow may = mayWorkflow(job2);
+
+        AmendmentFollowUp changed = new AmendmentFollowUp();
+        changed.setOrganizationId(orgId);
+        changed.setWorkflowId(april.getId());
+        changed.setVoucherKey("G:apr-1");
+        changed.setStatus(AmendmentStatus.OPEN);
+        changed.setChange(AmendmentChangeKind.CHANGED);
+        changed.setTableCode("B2B");
+        changed.setOriginalWorkflowId(april.getId());
+        changed.setOriginalDocKey("b2b:G:apr-1");
+        changed.setCreatedAt(Instant.now());
+        UUID changedId = followUpRepository.save(changed).getId();
+
+        prepareService.buildOrRebuild(may);
+        workflowService.finalize(orgId, "acc", may.getId());
+        assertThat(followUpRepository.findById(changedId).orElseThrow().getStatus())
+                .isEqualTo(AmendmentStatus.DONE);
+
+        workflowService.unfinalize(orgId, "acc", may.getId(), "correction needed");
+        AmendmentFollowUp reopened = followUpRepository.findById(changedId).orElseThrow();
+        assertThat(reopened.getStatus()).isEqualTo(AmendmentStatus.OPEN);
+        assertThat(reopened.getDoneBy()).isNull();
+        assertThat(reopened.getDoneAt()).isNull();
+        assertThat(reopened.getDoneNote()).contains("2025-05");
+
+        PreparedReturn rebuilt = prepareService.buildOrRebuild(
+                workflowRepository.findById(may.getId()).orElseThrow());
+        assertThat(rowRepository.findByPreparedReturnId(rebuilt.getId()))
+                .anyMatch(row -> row.isAmendment() && changedId.equals(row.getFollowUpId()));
+
+        workflowService.finalize(orgId, "acc", may.getId());
+        assertThat(followUpRepository.findById(changedId).orElseThrow().getStatus())
+                .isEqualTo(AmendmentStatus.DONE);
+    }
+
+    @Test
     void finalizeDoesNotCloseFollowUpsWithoutRows_andClosureSurvivesRebuild() throws Exception {
         setup();
         clearGstin();

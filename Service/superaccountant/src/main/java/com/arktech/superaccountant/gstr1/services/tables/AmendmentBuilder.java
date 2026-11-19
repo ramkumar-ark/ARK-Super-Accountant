@@ -361,6 +361,11 @@ public class AmendmentBuilder {
                 .orElse(null);
     }
 
+    /** True when a DELETED follow-up can yield an amend-to-zero row (original row and amendment section exist). */
+    public boolean canAmendToZero(AmendmentFollowUp followUp) {
+        return amendmentCode(followUp.getTableCode()) != null && originalRow(followUp) != null;
+    }
+
     private boolean ackPresent(Workflow current, AmendmentFollowUp followUp) {
         return fillInRepository.findByWorkflowIdAndScopeAndKeyAndAttribute(
                 current.getId(), Gstr1FillInScope.VOUCHER, followUp.getVoucherKey(),
