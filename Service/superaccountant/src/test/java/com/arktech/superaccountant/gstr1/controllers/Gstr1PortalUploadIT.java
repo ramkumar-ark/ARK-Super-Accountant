@@ -303,6 +303,58 @@ class Gstr1PortalUploadIT {
     }
 
     @Test
+    void portalUpload_rejectsMalformedHashAndKeepsControlCharNoteValid() throws Exception {
+        String ownerJwt = signupAndLogin("puownerh", "puownerh@test.com", "owner");
+        UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
+        String accountantJwt = memberJwt(ownerJwt, orgId, "accountant",
+                "puaccountanth", "puaccountanth@test.com");
+        UUID workflowId = startedGstr1Workflow(accountantJwt);
+        setStage(workflowId, WorkflowStage.FINALIZED);
+
+        mockMvc.perform(post("/api/v1/workflows/{id}/gstr1/portal-upload", workflowId)
+                .header("Authorization", "Bearer " + accountantJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"fileHash\":\"abc\\\",\\\"x\\\":\\\"y\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/workflows/{id}/gstr1/portal-upload", workflowId)
+                .header("Authorization", "Bearer " + accountantJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"fileHash\":\"" + "b".repeat(64)
+                        + "\",\"note\":\"line1\\nline2 \\\"q\\\" \\\\ \\ttab\"}"))
+                .andExpect(status().isOk());
+
+        var ev = workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(workflowId)
+                .stream().filter(e -> e.getKind() == WorkflowEventKind.PORTAL_UPLOADED).toList();
+        assertThat(ev).hasSize(1);
+        var payload = objectMapper.readTree(ev.get(0).getPayload());
+        assertThat(payload.get("note").asText()).isEqualTo("line1\nline2 \"q\" \\ \ttab");
+        assertThat(payload.size()).isEqualTo(2);
+    }
+
+    @Test
+    void filing_unknownChannelIs400() throws Exception {
+        String ownerJwt = signupAndLogin("puowneri", "puowneri@test.com", "owner");
+        UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
+        String accountantJwt = memberJwt(ownerJwt, orgId, "accountant",
+                "puaccountanti", "puaccountanti@test.com");
+        UUID workflowId = startedGstr1Workflow(accountantJwt);
+        setStage(workflowId, WorkflowStage.FINALIZED);
+
+        for (String ch : new String[]{"PORTAL_FIL", "X".repeat(40)}) {
+            mockMvc.perform(post("/api/v1/workflows/{id}/filing", workflowId)
+                    .header("Authorization", "Bearer " + accountantJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"ref\":\"ARN1\",\"date\":\"2026-05-10\",\"channel\":\"" + ch + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+        assertThat(workflowRepository.findById(workflowId).orElseThrow().getStage())
+                .isEqualTo(WorkflowStage.FINALIZED);
+    }
+
+    @Test
     void filingOperatorForbidden() throws Exception {
         String ownerJwt = signupAndLogin("puownerg", "puownerg@test.com", "owner");
         UUID orgId = createOrganization(ownerJwt);
