@@ -19,6 +19,14 @@ public interface PrepareHook {
     /** Fired after the workflow has been finalized and its snapshot frozen. */
     void onFinalize(Workflow w);
 
+    /**
+     * Actor-aware variant fired by {@code WorkflowService.finalize}; defaults to
+     * the plain {@link #onFinalize(Workflow)} for hooks that need no actor.
+     */
+    default void onFinalize(Workflow w, String actor) {
+        onFinalize(w);
+    }
+
     /** Fired after the workflow has been un-finalized back into PREPARE. */
     void onUnfinalize(Workflow w);
 }

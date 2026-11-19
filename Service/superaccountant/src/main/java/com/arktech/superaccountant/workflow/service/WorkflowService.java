@@ -303,7 +303,7 @@ public class WorkflowService {
         snapshotService.freeze(w.getId(), organizationId, actor);
         firePrepareHooks(hook -> {
             if (hook.appliesTo(w)) {
-                hook.onFinalize(w);
+                hook.onFinalize(w, actor);
             }
         });
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.FINALIZED, null, null));

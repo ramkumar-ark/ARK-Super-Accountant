@@ -18,6 +18,11 @@ import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +34,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -54,10 +60,16 @@ import java.util.UUID;
 @Service
 public class Gstr1PrepareService {
 
+    private static final Logger logger =
+            LoggerFactory.getLogger(Gstr1PrepareService.class);
+
     static final String RETURN_KIND = "GSTR1";
 
     @Autowired
     private WorkflowRepository workflowRepository;
+
+    @Autowired
+    private AmendmentFollowUpRepository followUpRepository;
 
     @Autowired
     private PreparedReturnRepository preparedReturnRepository;
@@ -137,6 +149,45 @@ public class Gstr1PrepareService {
             preparedReturnRepository.save(prepared);
         }
         return prepared;
+    }
+
+    /**
+     * R8 closure (T21): after a successful finalize, the open follow-ups of the
+     * organization whose amendment/late row was included in THIS prepared return
+     * flip to DONE. Idempotent (only OPEN follow-ups are touched) and must never
+     * block finalize, so any failure here is logged and swallowed.
+     */
+    @Transactional
+    public void closeIncludedFollowUps(Workflow workflow, String actor) {
+        try {
+            PreparedReturn prepared = existing(workflow).orElse(null);
+            if (prepared == null) {
+                return;
+            }
+            Set<UUID> includedIds = rowRepository.findByPreparedReturnId(prepared.getId()).stream()
+                    .map(PreparedReturnRow::getFollowUpId)
+                    .filter(java.util.Objects::nonNull)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (includedIds.isEmpty()) {
+                return;
+            }
+            String note = "Closed: amendment row included in "
+                    + YearMonth.from(workflow.getPeriodStart()) + " prepared return";
+            for (AmendmentFollowUp followUp : followUpRepository.findByOrganizationIdAndStatus(
+                    workflow.getOrganizationId(), AmendmentStatus.OPEN)) {
+                if (!workflow.getId().equals(followUp.getWorkflowId())
+                        && includedIds.contains(followUp.getId())) {
+                    followUp.setStatus(AmendmentStatus.DONE);
+                    followUp.setDoneBy(actor);
+                    followUp.setDoneAt(Instant.now());
+                    followUp.setDoneNote(note);
+                    followUpRepository.save(followUp);
+                }
+            }
+        } catch (RuntimeException e) {
+            logger.warn("Follow-up closure after finalize failed for workflow {}",
+                    workflow.getId(), e);
+        }
     }
 
     // ---------- row production ----------

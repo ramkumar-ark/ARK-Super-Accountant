@@ -41,6 +41,8 @@ public class SnapshotController {
     @Autowired
     private AmendmentFollowUpRepository amendmentFollowUpRepository;
     @Autowired
+    private AmendmentRowSource amendmentRowSource;
+    @Autowired
     private com.arktech.superaccountant.masters.repository.UploadJobRepository uploadJobRepository;
 
     @GetMapping("/day-book/uploads/{uploadId}/changes")
@@ -111,14 +113,16 @@ public class SnapshotController {
     public ResponseEntity<?> amendments(@AuthenticationPrincipal UserDetailsImpl principal,
                                         @PathVariable UUID id) {
         List<Map<String, Object>> followUps = new ArrayList<>();
+        Map<UUID, AmendmentRowSource.RowRef> producedRows =
+                amendmentRowSource.rowsForFollowUps(id);
         amendmentFollowUpRepository.findByWorkflowIdOrderByCreatedAt(id).stream()
                 .filter(f -> principal.getOrganizationId() != null
                         && f.getOrganizationId().equals(principal.getOrganizationId()))
-                .forEach(f -> followUps.add(view(f)));
+                .forEach(f -> followUps.add(view(f, producedRows.get(f.getId()))));
         return ResponseEntity.ok(Map.of("followUps", followUps));
     }
 
-    private Map<String, Object> view(AmendmentFollowUp f) {
+    private Map<String, Object> view(AmendmentFollowUp f, AmendmentRowSource.RowRef producedRow) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", f.getId());
         map.put("voucherKey", f.getVoucherKey());
@@ -127,6 +131,12 @@ public class SnapshotController {
         map.put("change", f.getChange() == null ? null : f.getChange().name());
         map.put("tableCode", f.getTableCode());
         map.put("originalDocKey", f.getOriginalDocKey());
+        if (producedRow != null) {
+            map.put("producedRow", Map.of(
+                    "tableCode", producedRow.tableCode(),
+                    "rowKey", producedRow.rowKey(),
+                    "lateReporting", producedRow.lateReporting()));
+        }
         map.put("doneBy", f.getDoneBy());
         map.put("doneAt", f.getDoneAt());
         map.put("doneNote", f.getDoneNote());
@@ -162,7 +172,7 @@ public class SnapshotController {
         f.setDoneAt(Instant.now());
         f.setDoneNote(note);
         amendmentFollowUpRepository.save(f);
-        return ResponseEntity.ok(view(f));
+        return ResponseEntity.ok(view(f, amendmentRowSource.rowsForFollowUps(id).get(f.getId())));
     }
 
     @ExceptionHandler(FindingReviewException.class)

@@ -96,6 +96,8 @@ class Gstr1AmendmentFlowIT {
     private PreparedReturnRowRepository rowRepository;
     @Autowired
     private com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository followUpRepository;
+    @Autowired
+    private com.arktech.superaccountant.workflow.service.WorkflowService workflowService;
 
     private final ObjectMapper json = new ObjectMapper();
 
@@ -245,6 +247,113 @@ class Gstr1AmendmentFlowIT {
         assertThat(finalizePrecondition.unmet(may)).isEmpty();
     }
 
+    // ---------- S6: follow-up closure at finalize ----------
+
+    /** Clearing the GSTIN keeps the tax-mapping finding source from blocking finalize. */
+    private void clearGstin() {
+        Organization org = organizationRepository.findById(orgId).orElseThrow();
+        org.setGstin(null);
+        organizationRepository.save(org);
+    }
+
+    @Test
+    void finalizeClosesFollowUpsWhoseRowsWereIncluded() throws Exception {
+        setup();
+        clearGstin();
+        Workflow april = frozenAprilReturn();
+        DayBookUploadJob job2 = mayJob();
+
+        // one CHANGED follow-up (produces a B2BA amendment row) and one LATE follow-up
+        seedSalesInvoice(orgId, job2.getId(), "apr-1", "INV-001-REV", LocalDate.of(2025, 4, 15));
+        seedSalesInvoice(orgId, job2.getId(), "may-9", "INV-9", LocalDate.of(2025, 4, 30));
+        Workflow may = mayWorkflow(job2);
+
+        AmendmentFollowUp changed = new AmendmentFollowUp();
+        changed.setOrganizationId(orgId);
+        changed.setWorkflowId(april.getId());
+        changed.setVoucherKey("G:apr-1");
+        changed.setStatus(AmendmentStatus.OPEN);
+        changed.setChange(AmendmentChangeKind.CHANGED);
+        changed.setTableCode("B2B");
+        changed.setOriginalWorkflowId(april.getId());
+        changed.setOriginalDocKey("b2b:G:apr-1");
+        changed.setCreatedAt(Instant.now());
+        changed = followUpRepository.save(changed);
+
+        AmendmentFollowUp late = new AmendmentFollowUp();
+        late.setOrganizationId(orgId);
+        late.setWorkflowId(april.getId());
+        late.setVoucherKey("G:may-9");
+        late.setStatus(AmendmentStatus.OPEN);
+        late.setChange(AmendmentChangeKind.LATE);
+        late.setCreatedAt(Instant.now());
+        late = followUpRepository.save(late);
+
+        prepareService.buildOrRebuild(may);
+        workflowService.finalize(orgId, "acc", may.getId());
+
+        changed = followUpRepository.findById(changed.getId()).orElseThrow();
+        assertThat(changed.getStatus()).isEqualTo(AmendmentStatus.DONE);
+        assertThat(changed.getDoneBy()).isEqualTo("acc");
+        assertThat(changed.getDoneAt()).isNotNull();
+        assertThat(changed.getDoneNote()).contains("2025-05");
+        late = followUpRepository.findById(late.getId()).orElseThrow();
+        assertThat(late.getStatus()).isEqualTo(AmendmentStatus.DONE);
+        assertThat(late.getDoneBy()).isEqualTo("acc");
+    }
+
+    @Test
+    void finalizeDoesNotCloseFollowUpsWithoutRows_andClosureSurvivesRebuild() throws Exception {
+        setup();
+        clearGstin();
+        Workflow april = frozenAprilReturn();
+        Workflow may = mayWorkflow(mayJob());
+
+        // CHANGED follow-up without a matching voucher in May's books: no row
+        AmendmentFollowUp unmatched = new AmendmentFollowUp();
+        unmatched.setOrganizationId(orgId);
+        unmatched.setWorkflowId(april.getId());
+        unmatched.setVoucherKey("G:apr-1");
+        unmatched.setStatus(AmendmentStatus.OPEN);
+        unmatched.setChange(AmendmentChangeKind.CHANGED);
+        unmatched.setTableCode("B2B");
+        unmatched.setOriginalWorkflowId(april.getId());
+        unmatched.setOriginalDocKey("b2b:G:apr-1");
+        unmatched.setCreatedAt(Instant.now());
+        unmatched = followUpRepository.save(unmatched);
+
+        prepareService.buildOrRebuild(may);
+        workflowService.finalize(orgId, "acc", may.getId());
+        unmatched = followUpRepository.findById(unmatched.getId()).orElseThrow();
+        assertThat(unmatched.getStatus()).isEqualTo(AmendmentStatus.OPEN);
+
+        // unfinalize + rebuild: closed follow-ups stay DONE, no re-closure, no error
+        workflowService.unfinalize(orgId, "acc", may.getId(), "correction needed");
+        prepareService.buildOrRebuild(workflowRepository.findById(may.getId()).orElseThrow());
+        assertThat(followUpRepository.findById(unmatched.getId()).orElseThrow().getStatus())
+                .isEqualTo(AmendmentStatus.OPEN);
+
+        // and a follow-up already closed at finalize stays DONE after the rebuild
+        AmendmentFollowUp closed = new AmendmentFollowUp();
+        closed.setOrganizationId(orgId);
+        closed.setWorkflowId(april.getId());
+        closed.setVoucherKey("G:apr-1");
+        closed.setStatus(AmendmentStatus.DONE);
+        closed.setChange(AmendmentChangeKind.CHANGED);
+        closed.setTableCode("B2B");
+        closed.setOriginalWorkflowId(april.getId());
+        closed.setOriginalDocKey("b2b:G:apr-1");
+        closed.setDoneBy("acc");
+        closed.setDoneAt(Instant.now());
+        closed.setDoneNote("manual");
+        closed.setCreatedAt(Instant.now());
+        closed = followUpRepository.save(closed);
+        workflowService.finalize(orgId, "acc", may.getId());
+        closed = followUpRepository.findById(closed.getId()).orElseThrow();
+        assertThat(closed.getStatus()).isEqualTo(AmendmentStatus.DONE);
+        assertThat(closed.getDoneNote()).isEqualTo("manual");
+    }
+
     // ---------- seeding ----------
 
     private void setup() throws Exception {
@@ -344,6 +453,8 @@ class Gstr1AmendmentFlowIT {
         v.setVoucherTypeName("Sales");
         v.setVoucherNumber(number);
         v.setVoucherDate(date);
+        // current parser (DayBookParserService) stamps captureVersion 1
+        v.setCaptureVersion(1);
         v.setPartyLedgerName("Sundry Debtors");
         v.setPartyGstin("27AAPFU0939F1ZV");
         v.setPartyGstRegistrationType("Regular");

@@ -88,4 +88,23 @@ describe('AmendmentFollowUpList', () => {
     renderList()
     await waitFor(() => expect(screen.getByText('No amendment follow-ups.')).toBeInTheDocument())
   })
+
+  it('labels late reporting and shows the produced row', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        followUps: [
+          followUp({ change: 'LATE', producedRow: { tableCode: 'B2B', rowKey: 'late:b2b:G:g-1', lateReporting: true } }),
+          followUp({ id: 'a2', voucherKey: 'G:g-2', summary: 'Deleted after filing', change: 'CHANGED', producedRow: { tableCode: 'B2BA', rowKey: 'b2ba:G:g-2', lateReporting: false } }),
+          followUp({ id: 'a3', voucherKey: 'G:g-3', summary: 'No row yet', change: 'DELETED', producedRow: null }),
+        ],
+      },
+    })
+    renderList()
+    await waitFor(() => expect(screen.getByText('late reporting')).toBeInTheDocument())
+    expect(screen.getByText(/late B2B row late:b2b:G:g-1/)).toBeInTheDocument()
+    expect(screen.getByText('CHANGED')).toBeInTheDocument()
+    expect(screen.getByText(/B2BA row b2ba:G:g-2/)).toBeInTheDocument()
+    expect(screen.getByText('DELETED')).toBeInTheDocument()
+    expect(screen.queryByText(/row b2ba:G:g-3/)).not.toBeInTheDocument()
+  })
 })

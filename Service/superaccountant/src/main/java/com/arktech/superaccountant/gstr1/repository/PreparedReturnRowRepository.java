@@ -20,4 +20,17 @@ public interface PreparedReturnRowRepository extends JpaRepository<PreparedRetur
     @Transactional
     @Query("DELETE FROM PreparedReturnRow r WHERE r.preparedReturnId = :preparedReturnId")
     void deleteByPreparedReturnId(@Param("preparedReturnId") UUID preparedReturnId);
+
+    @Query("""
+            SELECT r FROM PreparedReturnRow r
+            WHERE r.followUpId IN :followUpIds
+              AND r.preparedReturnId IN (
+                  SELECT p.id FROM PreparedReturn p
+                  WHERE p.workflowId IN (
+                      SELECT w.id FROM Workflow w
+                      WHERE w.organizationId = :organizationId))
+            """)
+    List<PreparedReturnRow> findByOrganizationIdAndFollowUpIdIn(
+            @Param("organizationId") UUID organizationId,
+            @Param("followUpIds") java.util.Collection<UUID> followUpIds);
 }
