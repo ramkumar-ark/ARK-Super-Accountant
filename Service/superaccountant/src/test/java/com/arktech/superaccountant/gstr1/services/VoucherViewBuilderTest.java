@@ -407,6 +407,39 @@ class VoucherViewBuilderTest {
         assertEquals(0, new BigDecimal("900.00").compareTo(hsnItems.get(0).cgst()));
     }
 
+    @Test
+    void threeEqualItemsReconcileInvoiceValueWithResidual() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                taxable("Goods Sold", "100.00", "18"));
+        v.setItems(new ArrayList<>(List.of(
+                item("A", "4407", "NOS", "1"),
+                item("B", "4408", "NOS", "1"),
+                item("C", "4409", "NOS", "1"))));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        BigDecimal sumInv = view.getHsnItems().stream().map(VoucherView.HsnItem::invoiceValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumTax = view.getHsnItems().stream().map(VoucherView.HsnItem::taxableValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(3, view.getHsnItems().size());
+        assertEquals(0, view.getTotalValue().compareTo(sumInv));
+        assertEquals(0, view.getTaxableValue().compareTo(sumTax));
+    }
+
+    @Test
+    void zeroTaxableMixedHsnVoucherDoesNotThrow() {
+        ParsedVoucher v = voucher(LocalDate.of(2025, 4, 10), "Karnataka",
+                tax("Sundry Debtors", "100.00"));
+        v.setItems(new ArrayList<>(List.of(
+                item("A", "4407", "NOS", "1"),
+                item("B", "4408", "NOS", "1"))));
+        when(parsedVoucherRepository.findByUploadJobId(jobId)).thenReturn(List.of(v));
+
+        VoucherView view = builder.build(workflow()).get(0);
+        assertEquals(2, view.getHsnItems().size());
+    }
+
     private ParsedVoucherItem item(String stockItemName, String hsn, String uqc, String quantity) {
         ParsedVoucherItem item = new ParsedVoucherItem();
         item.setOrganizationId(orgId);
