@@ -33,6 +33,14 @@ OFFSET=$(( ($(echo -n "$SLUG" | cksum | cut -d' ' -f1) % 191) + 10 ))
 API_PORT=$(( 8080 + OFFSET ))
 VITE_PORT=$(( 5173 + OFFSET ))
 
+MARKER="$EVIDENCE/instance-$SLUG.json"
+[ -f "$MARKER" ] && { echo "instance marker $MARKER exists; run scripts/down --tag $SLUG first" >&2; exit 1; }
+for p in $API_PORT $VITE_PORT; do
+  if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
+    echo "port $p already in use; pick another --tag" >&2; exit 1
+  fi
+done
+
 # Idempotent DB creation (namespaced add-only; never touches `superaccountant`).
 export PGPASSWORD="$DB_PASSWORD"
 if ! psql -h localhost -U "$DB_USERNAME" -d postgres -tAc \
@@ -61,24 +69,7 @@ echo "starting frontend dev server on port $VITE_PORT..."
     npm run dev -- --port "$VITE_PORT" --strictPort >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$LOG_DIR/frontend.pid" )
 FRONTEND_PID=$(cat "$LOG_DIR/frontend.pid")
 
-cleanup_on_fail() {
-  kill -TERM -"$BACKEND_PID" -"$FRONTEND_PID" 2>/dev/null || true
-  exit 1
-}
-trap cleanup_on_fail ERR
-
-# Health check: backend answers (401 on auth = up); frontend serves index.
-deadline=$(( $(date +%s) + 120 ))
-until curl -s -o /dev/null -w '%{http_code}' "http://localhost:$API_PORT/api/auth/invite/healthcheck" 2>/dev/null | grep -qE '40[0-9]'; do
-  [ "$(date +%s)" -gt "$deadline" ] && { tail -50 "$LOG_DIR/backend.log" >&2; echo "backend health check timed out" >&2; kill -TERM -"$BACKEND_PID" 2>/dev/null; kill -TERM -"$FRONTEND_PID" 2>/dev/null; exit 1; }
-  sleep 2
-done
-until curl -s -o /dev/null -w '%{http_code}' "http://localhost:$VITE_PORT/" 2>/dev/null | grep -q 200; do
-  [ "$(date +%s)" -gt "$deadline" ] && { tail -50 "$LOG_DIR/frontend.log" >&2; echo "frontend health check timed out" >&2; kill -TERM -"$BACKEND_PID" -"$FRONTEND_PID" 2>/dev/null; exit 1; }
-  sleep 2
-done
-
-cat > "$EVIDENCE/instance-$SLUG.json" <<EOF
+cat > "$MARKER" <<EOF
 {
   "slug": "$SLUG",
   "api_port": $API_PORT,
@@ -91,4 +82,25 @@ cat > "$EVIDENCE/instance-$SLUG.json" <<EOF
   "started": "$(date -u +%FT%TZ)"
 }
 EOF
+
+cleanup_on_fail() {
+  trap - ERR
+  "$SKILL_DIR/scripts/down" --tag "$SLUG" >/dev/null 2>&1 || true
+  exit 1
+}
+trap cleanup_on_fail ERR
+
+# Health check: backend answers (401 on auth = up); frontend serves index.
+deadline=$(( $(date +%s) + 120 ))
+until curl -s -o /dev/null -w '%{http_code}' "http://localhost:$API_PORT/api/auth/invite/healthcheck" 2>/dev/null | grep -qE '40[0-9]'; do
+  kill -0 "$BACKEND_PID" 2>/dev/null || { tail -50 "$LOG_DIR/backend.log" >&2; echo "backend exited during startup" >&2; cleanup_on_fail; }
+  [ "$(date +%s)" -gt "$deadline" ] && { tail -50 "$LOG_DIR/backend.log" >&2; echo "backend health check timed out" >&2; cleanup_on_fail; }
+  sleep 2
+done
+until curl -s -o /dev/null -w '%{http_code}' "http://localhost:$VITE_PORT/" 2>/dev/null | grep -q 200; do
+  kill -0 "$FRONTEND_PID" 2>/dev/null || { tail -50 "$LOG_DIR/frontend.log" >&2; echo "frontend exited during startup" >&2; cleanup_on_fail; }
+  [ "$(date +%s)" -gt "$deadline" ] && { tail -50 "$LOG_DIR/frontend.log" >&2; echo "frontend health check timed out" >&2; cleanup_on_fail; }
+  sleep 2
+done
+
 echo "up: api=$API_PORT vite=$VITE_PORT db=$DB_NAME marker=$EVIDENCE/instance-$SLUG.json"

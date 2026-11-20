@@ -22,5 +22,5 @@ run_scenario() {
 
   VSA_JWT=""
   req "unauthenticated-me" GET /api/organizations/me/list
-  expect_status 401 || expect_status 403
+  expect_status '401|403'
 }
