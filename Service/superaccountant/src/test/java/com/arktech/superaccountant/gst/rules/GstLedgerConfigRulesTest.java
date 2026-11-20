@@ -66,6 +66,19 @@ class GstLedgerConfigRulesTest {
         GstRuleContext ctx = ctxWithTaxLedgers(ORG, java.util.Map.of(), snapshot("CGST Reimbursement", LedgerCategory.OTHER));
         assertTrue(rule5.execute(ctx, List.of(missing, cancelled)).isEmpty());
     }
+    @Test void rule5_silentForBalanceAndTdsReceivableLedgers() {
+        GstRuleContext ctx = ctxWithTaxLedgers(ORG, java.util.Map.of(),
+                snapshot("SGST Payable A/c", LedgerCategory.OTHER),
+                snapshot("CGST Cash Balance A/c", LedgerCategory.OTHER),
+                snapshot("TDS IGST Receivable A/c", LedgerCategory.OTHER),
+                snapshot("IGST Credit Balance A/c", LedgerCategory.OTHER));
+        ParsedVoucher j = voucher("Journal", D, null, null);
+        entry(j, "SGST Payable A/c", "-500.00");
+        entry(j, "CGST Cash Balance A/c", "300.00");
+        entry(j, "TDS IGST Receivable A/c", "200.00");
+        entry(j, "IGST Credit Balance A/c", "100.00");
+        assertTrue(rule5.execute(ctx, List.of(j)).isEmpty());
+    }
 
     // --- rule 6 ---
     private GstRuleContext rule6Ctx(Boolean flag, GstApplicabilityType type) {

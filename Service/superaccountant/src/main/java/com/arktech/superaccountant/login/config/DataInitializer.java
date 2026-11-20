@@ -177,9 +177,6 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Capital Account", LedgerCategory.OTHER, "Capital Account", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Current Liabilities
         rows.add(template("Sundry Creditors", LedgerCategory.PURCHASE, "Sundry Creditors", true, true, "standard", "194Q", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Output IGST", LedgerCategory.GST, "Duties & Taxes", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
-        rows.add(template("Output CGST", LedgerCategory.GST, "Duties & Taxes", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
-        rows.add(template("Output SGST", LedgerCategory.GST, "Duties & Taxes", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
         rows.add(template("TDS Payable", LedgerCategory.TDS, "Duties & Taxes", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Salary Payable", LedgerCategory.EXPENSE, "Current Liabilities", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance from Customers", LedgerCategory.OTHER, "Current Liabilities", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
@@ -197,9 +194,6 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Stock-in-Hand", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance to Suppliers", LedgerCategory.PURCHASE, "Current Assets", true, true, "standard", "194Q", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Prepaid Expenses", LedgerCategory.EXPENSE, "Current Assets", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
-        rows.add(template("Input IGST", LedgerCategory.GST, "Current Assets", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input CGST", LedgerCategory.GST, "Current Assets", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input SGST", LedgerCategory.GST, "Current Assets", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("TDS Receivable", LedgerCategory.TDS, "Current Assets", false, false, "standard", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Income
         rows.add(template("Sales (Domestic)", LedgerCategory.INCOME, "Sales Accounts", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9999", null));
@@ -252,9 +246,6 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Capital Account", LedgerCategory.OTHER, "Capital Account", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Current Liabilities
         rows.add(template("Sundry Creditors", LedgerCategory.PURCHASE, "Sundry Creditors", true, true, "simplified", "194Q", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Output IGST", LedgerCategory.GST, "Duties & Taxes", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
-        rows.add(template("Output CGST", LedgerCategory.GST, "Duties & Taxes", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
-        rows.add(template("Output SGST", LedgerCategory.GST, "Duties & Taxes", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
         rows.add(template("TDS Payable", LedgerCategory.TDS, "Duties & Taxes", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Current Assets
         rows.add(template("Cash", LedgerCategory.OTHER, "Cash-in-Hand", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
@@ -262,9 +253,6 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Sundry Debtors", LedgerCategory.OTHER, "Sundry Debtors", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Stock-in-Hand", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance to Suppliers", LedgerCategory.PURCHASE, "Current Assets", true, true, "simplified", "194Q", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input IGST", LedgerCategory.GST, "Current Assets", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input CGST", LedgerCategory.GST, "Current Assets", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input SGST", LedgerCategory.GST, "Current Assets", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("TDS Receivable", LedgerCategory.TDS, "Current Assets", false, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Income
         rows.add(template("Sales (Domestic)", LedgerCategory.INCOME, "Sales Accounts", true, false, "simplified", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9999", null));
@@ -298,9 +286,6 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Capital Account", LedgerCategory.OTHER, "Capital Account", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Current Liabilities
         rows.add(template("Sundry Creditors", LedgerCategory.PURCHASE, "Sundry Creditors", true, true, "manufacturing", "194Q", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Output IGST", LedgerCategory.GST, "Duties & Taxes", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
-        rows.add(template("Output CGST", LedgerCategory.GST, "Duties & Taxes", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
-        rows.add(template("Output SGST", LedgerCategory.GST, "Duties & Taxes", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9954", null));
         rows.add(template("TDS Payable", LedgerCategory.TDS, "Duties & Taxes", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Salary Payable", LedgerCategory.EXPENSE, "Current Liabilities", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance from Customers", LedgerCategory.OTHER, "Current Liabilities", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
@@ -323,9 +308,6 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Finished Goods", LedgerCategory.PURCHASE, "Stock-in-Hand", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         rows.add(template("Advance to Suppliers", LedgerCategory.PURCHASE, "Current Assets", true, true, "manufacturing", "194Q", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Prepaid Expenses", LedgerCategory.EXPENSE, "Current Assets", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
-        rows.add(template("Input IGST", LedgerCategory.GST, "Current Assets", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input CGST", LedgerCategory.GST, "Current Assets", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
-        rows.add(template("Input SGST", LedgerCategory.GST, "Current Assets", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("TDS Receivable", LedgerCategory.TDS, "Current Assets", false, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.NOT_APPLICABLE, null, null));
         // Income
         rows.add(template("Sales (Domestic)", LedgerCategory.INCOME, "Sales Accounts", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "9999", null));

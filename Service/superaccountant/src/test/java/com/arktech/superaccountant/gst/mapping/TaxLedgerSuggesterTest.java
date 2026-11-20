@@ -47,6 +47,24 @@ class TaxLedgerSuggesterTest {
                 TaxLedgerSuggester.suggest("SGST ITC Balance"));
         assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.GST_TDS, IGST),
                 TaxLedgerSuggester.suggest("IGST TDS Receivable"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CREDIT_BALANCE, IGST),
+                TaxLedgerSuggester.suggest("IGST Credit Balance A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CREDIT_BALANCE, CGST),
+                TaxLedgerSuggester.suggest("CGST Credit Balance A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.CREDIT_BALANCE, SGST),
+                TaxLedgerSuggester.suggest("SGST Credit Balance A/c"));
+    }
+
+    @Test
+    void payableSuggestsLiabilityBalance() {
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.LIABILITY_BALANCE, SGST),
+                TaxLedgerSuggester.suggest("SGST Payable A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.LIABILITY_BALANCE, CGST),
+                TaxLedgerSuggester.suggest("CGST Payable A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.LIABILITY_BALANCE, IGST),
+                TaxLedgerSuggester.suggest("IGST Payable A/c"));
+        assertEquals(new TaxLedgerSuggester.Suggestion(TaxLedgerRole.LIABILITY_BALANCE, CESS),
+                TaxLedgerSuggester.suggest("Cess Payable A/c"));
     }
 
     @Test

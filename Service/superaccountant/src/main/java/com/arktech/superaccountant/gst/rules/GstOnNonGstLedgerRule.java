@@ -24,7 +24,9 @@ public class GstOnNonGstLedgerRule implements GstDaybookRule {
             if (v == null || v.isCancelled() || v.getEntries() == null) continue;
             for (ParsedVoucherEntry e : v.getEntries()) {
                 if (ctx.taxLedger(e.getLedgerName()).isPresent()) continue;
-                if (TaxLedgerSuggester.suggest(e.getLedgerName()).head() == null) continue;
+                TaxLedgerSuggester.Suggestion suggestion = TaxLedgerSuggester.suggest(e.getLedgerName());
+                if (suggestion.head() == null) continue;
+                if (suggestion.role() != null && !suggestion.role().isVoucherTax()) continue;
                 if (ctx.snapshot(e.getLedgerName()).isEmpty()) continue;
                 if (ctx.category(e.getLedgerName()) == LedgerCategory.GST) continue;
                 if (e.getAmount() == null || e.getAmount().compareTo(BigDecimal.ZERO) == 0) continue;

@@ -178,6 +178,32 @@ class TaxLedgerMappingGateTest {
     }
 
     @Test
+    void standardGstLedgerSetSatisfiesEveryRequiredAreaWithSuggestedMappings() {
+        stubOrg(true);
+        UUID jobId = UUID.randomUUID();
+        when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
+        java.util.Map<String, UploadLedgerSnapshot> snapshots = new java.util.LinkedHashMap<>();
+        Map<String, TaxLedgerMapping> mappings = new java.util.LinkedHashMap<>();
+        for (com.arktech.superaccountant.masters.util.StandardGstLedgers.StandardGstLedger ledger
+                : com.arktech.superaccountant.masters.util.StandardGstLedgers.ledgers()) {
+            String key = ledger.ledgerName().trim().toLowerCase();
+            snapshots.put(key, gstLedger(ledger.ledgerName()));
+            TaxLedgerSuggester.Suggestion suggestion = TaxLedgerSuggester.suggest(ledger.ledgerName());
+            TaxLedgerMapping m = new TaxLedgerMapping();
+            m.setLedgerName(ledger.ledgerName());
+            m.setLedgerKey(key);
+            m.setRole(suggestion.role());
+            m.setHead(suggestion.head());
+            mappings.put(key, m);
+        }
+        when(findingOverrideMasterService.snapshotsByName(jobId)).thenReturn(snapshots);
+        when(mappingService.mappingsByKey(org)).thenReturn(mappings);
+
+        assertTrue(gate.isComplete(org));
+        assertEquals(Optional.empty(), gate.blockerMessage(org));
+    }
+
+    @Test
     void rcmAndCessMappingsDoNotSatisfyRequirement() {
         stubOrg(true);
         stubMapped(List.of(TaxLedgerRole.RCM_INPUT, TaxLedgerRole.RCM_LIABILITY, TaxLedgerRole.NOT_TAX),
