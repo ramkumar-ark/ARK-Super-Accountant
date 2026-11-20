@@ -62,6 +62,10 @@ class SnapshotControllerIT {
     @Autowired
     private AmendmentFollowUpRepository amendmentFollowUpRepository;
     @Autowired
+    private com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository preparedReturnRepository;
+    @Autowired
+    private com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository preparedReturnRowRepository;
+    @Autowired
     private WorkflowRepository workflowRepository;
     @Autowired
     private OrganizationRepository organizationRepository;
@@ -131,6 +135,50 @@ class SnapshotControllerIT {
                 .andExpect(jsonPath("$.followUps[0].voucherKey").value("G:g-1"))
                 .andExpect(jsonPath("$.followUps[0].status").value("OPEN"))
                 .andExpect(jsonPath("$.followUps[0].summary").value("Sales SB/1 was modified"));
+    }
+
+    @Test
+    void amendments_includeProducedRowRef_whenARowExists() throws Exception {
+        setup();
+        Workflow w = workflow(WorkflowStage.STARTED);
+        AmendmentFollowUp withRow = followUp(w.getId(), AmendmentStatus.OPEN, null, null, null);
+        AmendmentFollowUp withoutRow = followUp(w.getId(), AmendmentStatus.OPEN, null, null, null);
+
+        Workflow later = new Workflow();
+        later.setOrganizationId(orgId);
+        later.setType(WorkflowType.GSTR1);
+        later.setPeriodStart(LocalDate.of(2025, 5, 1));
+        later.setPeriodEnd(LocalDate.of(2025, 5, 31));
+        later.setPeriodKey("2025-05");
+        later.setFinancialYear(2025);
+        later.setStage(WorkflowStage.STARTED);
+        later.setActive(true);
+        later.setCreatedBy("acc");
+        later = workflowRepository.save(later);
+        com.arktech.superaccountant.gstr1.models.PreparedReturn prepared =
+                new com.arktech.superaccountant.gstr1.models.PreparedReturn();
+        prepared.setWorkflowId(later.getId());
+        prepared.setReturnKind("GSTR1");
+        prepared.setBuiltAt(java.time.Instant.now());
+        prepared = preparedReturnRepository.save(prepared);
+        com.arktech.superaccountant.gstr1.models.PreparedReturnRow row =
+                new com.arktech.superaccountant.gstr1.models.PreparedReturnRow();
+        row.setPreparedReturnId(prepared.getId());
+        row.setTableCode("B2BA");
+        row.setRowKey("b2ba:G:g-1");
+        row.setPayload("{}");
+        row.setAmendment(true);
+        row.setFollowUpId(withRow.getId());
+        preparedReturnRowRepository.save(row);
+
+        mockMvc.perform(get("/api/v1/workflows/" + w.getId() + "/amendments")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.followUps.length()").value(2))
+                .andExpect(jsonPath("$.followUps[0].producedRow.tableCode").value("B2BA"))
+                .andExpect(jsonPath("$.followUps[0].producedRow.rowKey").value("b2ba:G:g-1"))
+                .andExpect(jsonPath("$.followUps[0].producedRow.lateReporting").value(false))
+                .andExpect(jsonPath("$.followUps[1].producedRow").doesNotExist());
     }
 
     @Test

@@ -34,6 +34,8 @@ public class TamperAcceptApplier implements FindingApplier<ReviewableFinding> {
     private WorkflowEventRepository workflowEventRepository;
     @Autowired
     private MasterTamperApplier masterTamperApplier;
+    @Autowired
+    private AmendmentOriginSource amendmentOriginSource;
 
     @Override
     public void validate(ReviewableFinding finding, String proposedValue, String note) {
@@ -118,6 +120,15 @@ public class TamperAcceptApplier implements FindingApplier<ReviewableFinding> {
             followUp.setVoucherKey(f.getVoucherKey());
             followUp.setSummary(f.getMessage());
             followUp.setStatus(AmendmentStatus.OPEN);
+            followUp.setChange(changeKind(f.getChangeKind()));
+            if (followUp.getChange() == AmendmentChangeKind.CHANGED
+                    || followUp.getChange() == AmendmentChangeKind.DELETED) {
+                followUp.setOriginalWorkflowId(workflowId);
+                amendmentOriginSource.origin(workflowId, f.getVoucherKey()).ifPresent(origin -> {
+                    followUp.setTableCode(origin.tableCode());
+                    followUp.setOriginalDocKey(origin.docKey());
+                });
+            }
             followUp.setCreatedAt(Instant.now());
             amendmentFollowUpRepository.save(followUp);
 
@@ -128,6 +139,15 @@ public class TamperAcceptApplier implements FindingApplier<ReviewableFinding> {
             event.setReason(f.getMessage());
             workflowEventRepository.save(event);
         }
+    }
+
+    private AmendmentChangeKind changeKind(TamperChangeKind kind) {
+        return switch (kind) {
+            case MODIFIED -> AmendmentChangeKind.CHANGED;
+            case DELETED -> AmendmentChangeKind.DELETED;
+            case INSERTED, RETRO_FLAGGED -> AmendmentChangeKind.LATE;
+            default -> null;
+        };
     }
 
     private UUID firstAffectedWorkflowId(TamperFinding f) {

@@ -50,6 +50,22 @@ public class PreparedReturnRow {
     @Column(name = "original_doc_key", length = 128)
     private String originalDocKey;
 
+    /**
+     * True when the row is a late-reported liability (R6): it belongs to a normal
+     * table but the voucher's liability lands in this return because it was missed
+     * in the period it was dated in. Null behaves as false for pre-existing rows.
+     */
+    @Column(name = "late_reporting")
+    private Boolean lateReporting;
+
+    /** Follow-up (amendment/late) this row closes; payload JSON untouched (R7). */
+    @Column(name = "follow_up_id")
+    private UUID followUpId;
+
+    public boolean isLateReporting() {
+        return Boolean.TRUE.equals(lateReporting);
+    }
+
     @SuppressWarnings("unchecked")
     public Map<String, Object> payload() {
         try {

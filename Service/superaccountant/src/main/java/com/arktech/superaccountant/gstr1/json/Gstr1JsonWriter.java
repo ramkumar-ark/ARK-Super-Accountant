@@ -37,8 +37,9 @@ import java.util.function.Function;
  * hsn.hsn_b2b/hsn_b2c, doc_issue.doc_det, export items flat, cdnur pos only for B2CL,
  * split at 19,000 items or 4.7 MB, empty sections omitted, amounts 2 dp numbers.</p>
  *
- * <p>Amendment rows (isAmendment) are not written yet: amendment sections are Ship 6
- * (plan T20). Amendment rows are skipped.</p>
+ * <p>Amendment rows (isAmendment) are written into their amendment sections
+ * (b2ba, b2cla, b2csa, cdnra, cdnura, expa, ata, txpda — plan T20); late-reported
+ * rows (lateReporting) take the normal section path. Empty sections are omitted.</p>
  */
 @Component
 public class Gstr1JsonWriter {
@@ -51,37 +52,50 @@ public class Gstr1JsonWriter {
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     private static final List<String> SECTION_ORDER = List.of(
-            "b2b", "b2cl", "b2cs", "exp", "nil", "cdnr", "cdnur", "at", "txpd", "doc_issue", "hsn");
+            "b2b", "b2ba", "b2cl", "b2cla", "b2cs", "b2csa", "exp", "expa", "nil",
+            "cdnr", "cdnra", "cdnur", "cdnura", "at", "ata", "txpd", "txpda",
+            "doc_issue", "hsn");
 
     public List<PortalFilePart> write(PreparedReturn prepared, List<PreparedReturnRow> rows,
                                       Workflow workflow, String gstin, FilerProfile profile,
                                       WriterOptions options) {
         String fp = filingPeriod(workflow, profile);
         Map<String, List<PreparedReturnRow>> byTable = new LinkedHashMap<>();
+        Map<String, List<PreparedReturnRow>> byAmendTable = new LinkedHashMap<>();
         for (PreparedReturnRow row : rows) {
             if (row.isAmendment()) {
-                continue; // amendment sections are Ship 6 (T20)
+                byAmendTable.computeIfAbsent(row.getTableCode(), k -> new ArrayList<>()).add(row);
+            } else {
+                // late-reported rows (lateReporting) take the normal path on purpose (R6)
+                byTable.computeIfAbsent(row.getTableCode(), k -> new ArrayList<>()).add(row);
             }
-            byTable.computeIfAbsent(row.getTableCode(), k -> new ArrayList<>()).add(row);
         }
 
         List<Block> blocks = new ArrayList<>();
         boolean dropIrp = profile != null && profile.isEinvoiceEnabled() && !options.includeIrpTables();
         if (!dropIrp) {
             blocks.addAll(b2bBlocks(byTable.get("B2B"), gstin));
+            blocks.addAll(b2baBlocks(byAmendTable.get("B2BA"), gstin));
         }
         blocks.addAll(b2clBlocks(byTable.get("B2CL")));
+        blocks.addAll(b2claBlocks(byAmendTable.get("B2CLA"), gstin));
         blocks.addAll(b2csBlocks(byTable.get("B2CS"), gstin));
+        blocks.addAll(b2csaBlocks(byAmendTable.get("B2CSA"), gstin));
         if (!dropIrp) {
             blocks.addAll(expBlocks(byTable.get("EXP")));
+            blocks.addAll(expaBlocks(byAmendTable.get("EXPA"), gstin));
         }
         blocks.addAll(nilBlocks(byTable.get("NIL"), gstin));
         if (!dropIrp) {
             blocks.addAll(cdnrBlocks(byTable.get("CDNR"), gstin));
+            blocks.addAll(cdnraBlocks(byAmendTable.get("CDNRA"), gstin));
         }
         blocks.addAll(cdnurBlocks(byTable.get("CDNUR")));
+        blocks.addAll(cdnuraBlocks(byAmendTable.get("CDNURA")));
         blocks.addAll(atBlocks(byTable.get("AT"), gstin, "at", true));
+        blocks.addAll(ataBlocks(byAmendTable.get("ATA"), gstin));
         blocks.addAll(atBlocks(byTable.get("TXPD"), gstin, "txpd", false));
+        blocks.addAll(txpdaBlocks(byAmendTable.get("TXPDA"), gstin));
         blocks.addAll(docIssueBlocks(byTable.get("DOCS")));
         blocks.addAll(hsnBlocks(byTable.get("HSN")));
 
@@ -104,41 +118,41 @@ public class Gstr1JsonWriter {
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
-        return grouped("b2b", "ctin", "inv", rows,
-                row -> {
-                    Map<String, Object> p = row.payload();
-                    ObjectNode inv = NODES.objectNode();
-                    inv.put("inum", text(p, "invoiceNo"));
-                    inv.put("idt", date(text(p, "invoiceDate")));
-                    inv.put("val", amount(num(p, "invoiceValue")));
-                    inv.put("pos", text(p, "pos"));
-                    inv.put("rchrg", "N");
-                    inv.put("inv_typ", "R");
-                    inv.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue"),
-                            tax(p, orgGstin, text(p, "pos")), num(p, "cess")));
-                    return inv;
-                },
+        return grouped("b2b", "ctin", "inv", rows, row -> b2bInvoice(row.payload(), orgGstin),
                 row -> text(row.payload(), "gstin"),
                 null);
+    }
+
+    private ObjectNode b2bInvoice(Map<String, Object> p, String orgGstin) {
+        ObjectNode inv = NODES.objectNode();
+        inv.put("inum", text(p, "invoiceNo"));
+        inv.put("idt", date(text(p, "invoiceDate")));
+        inv.put("val", amount(num(p, "invoiceValue")));
+        inv.put("pos", text(p, "pos"));
+        inv.put("rchrg", "N");
+        inv.put("inv_typ", "R");
+        inv.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue"),
+                tax(p, orgGstin, text(p, "pos")), num(p, "cess")));
+        return inv;
     }
 
     private List<Block> b2clBlocks(List<PreparedReturnRow> rows) {
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
-        return grouped("b2cl", "pos", "inv", rows,
-                row -> {
-                    Map<String, Object> p = row.payload();
-                    ObjectNode inv = NODES.objectNode();
-                    inv.put("inum", text(p, "invoiceNo"));
-                    inv.put("idt", date(text(p, "invoiceDate")));
-                    inv.put("val", amount(num(p, "invoiceValue")));
-                    inv.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue"),
-                            new TaxAmounts(num(p, "igst"), null, null), num(p, "cess")));
-                    return inv;
-                },
+        return grouped("b2cl", "pos", "inv", rows, row -> b2clInvoice(row.payload()),
                 row -> text(row.payload(), "pos"),
                 null);
+    }
+
+    private ObjectNode b2clInvoice(Map<String, Object> p) {
+        ObjectNode inv = NODES.objectNode();
+        inv.put("inum", text(p, "invoiceNo"));
+        inv.put("idt", date(text(p, "invoiceDate")));
+        inv.put("val", amount(num(p, "invoiceValue")));
+        inv.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue"),
+                new TaxAmounts(num(p, "igst"), null, null), num(p, "cess")));
+        return inv;
     }
 
     private List<Block> b2csBlocks(List<PreparedReturnRow> rows, String orgGstin) {
@@ -166,23 +180,23 @@ public class Gstr1JsonWriter {
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
-        return grouped("exp", "exp_typ", "inv", rows,
-                row -> {
-                    Map<String, Object> p = row.payload();
-                    ObjectNode inv = NODES.objectNode();
-                    inv.put("inum", text(p, "invoiceNo"));
-                    inv.put("idt", date(text(p, "invoiceDate")));
-                    inv.put("val", amount(num(p, "invoiceValue")));
-                    // export items are flat in the portal JSON: no num, no itm_det wrapper
-                    ObjectNode item = inv.putArray("itms").addObject();
-                    item.put("txval", amount(num(p, "taxableValue")));
-                    item.put("rt", amount(num(p, "rate")));
-                    item.put("iamt", amount(num(p, "igst")));
-                    item.put("csamt", amount(num(p, "cess")));
-                    return inv;
-                },
+        return grouped("exp", "exp_typ", "inv", rows, row -> expInvoice(row.payload()),
                 row -> "WP".equals(text(row.payload(), "exportType")) ? "WPAY" : "WOPAY",
                 null);
+    }
+
+    private ObjectNode expInvoice(Map<String, Object> p) {
+        ObjectNode inv = NODES.objectNode();
+        inv.put("inum", text(p, "invoiceNo"));
+        inv.put("idt", date(text(p, "invoiceDate")));
+        inv.put("val", amount(num(p, "invoiceValue")));
+        // export items are flat in the portal JSON: no num, no itm_det wrapper
+        ObjectNode item = inv.putArray("itms").addObject();
+        item.put("txval", amount(num(p, "taxableValue")));
+        item.put("rt", amount(num(p, "rate")));
+        item.put("iamt", amount(num(p, "igst")));
+        item.put("csamt", amount(num(p, "cess")));
+        return inv;
     }
 
     private List<Block> nilBlocks(List<PreparedReturnRow> rows, String orgGstin) {
@@ -209,23 +223,23 @@ public class Gstr1JsonWriter {
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
-        return grouped("cdnr", "ctin", "nt", rows,
-                row -> {
-                    Map<String, Object> p = row.payload();
-                    ObjectNode nt = NODES.objectNode();
-                    nt.put("nt_num", text(p, "noteNo"));
-                    nt.put("nt_dt", date(text(p, "noteDate")));
-                    nt.put("ntty", noteTypeCode(text(p, "noteType")));
-                    nt.put("val", amount(num(p, "invoiceValue").abs()));
-                    nt.put("pos", text(p, "pos"));
-                    nt.put("rchrg", "N");
-                    nt.put("inv_typ", "R");
-                    nt.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue").abs(),
-                            tax(p, orgGstin, text(p, "pos")).map(BigDecimal::abs), num(p, "cess").abs()));
-                    return nt;
-                },
+        return grouped("cdnr", "ctin", "nt", rows, row -> cdnrNote(row.payload(), orgGstin),
                 row -> text(row.payload(), "gstin"),
                 null);
+    }
+
+    private ObjectNode cdnrNote(Map<String, Object> p, String orgGstin) {
+        ObjectNode nt = NODES.objectNode();
+        nt.put("nt_num", text(p, "noteNo"));
+        nt.put("nt_dt", date(text(p, "noteDate")));
+        nt.put("ntty", noteTypeCode(text(p, "noteType")));
+        nt.put("val", amount(num(p, "invoiceValue").abs()));
+        nt.put("pos", text(p, "pos"));
+        nt.put("rchrg", "N");
+        nt.put("inv_typ", "R");
+        nt.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue").abs(),
+                tax(p, orgGstin, text(p, "pos")).map(BigDecimal::abs), num(p, "cess").abs()));
+        return nt;
     }
 
     private List<Block> cdnurBlocks(List<PreparedReturnRow> rows) {
@@ -272,6 +286,173 @@ public class Gstr1JsonWriter {
                 },
                 row -> text(row.payload(), "pos"),
                 (key, template) -> template.put("sply_ty", intraState(orgGstin, key) ? "INTRA" : "INTER"));
+    }
+
+    // ---------- amendment sections (T20) ----------
+
+    private List<Block> b2baBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return grouped("b2ba", "ctin", "inv", rows,
+                row -> {
+                    Map<String, Object> p = row.payload();
+                    ObjectNode inv = b2bInvoice(p, orgGstin);
+                    inv.put("oinum", text(p, "oinum"));
+                    inv.put("oidt", date(text(p, "oidt")));
+                    return inv;
+                },
+                row -> text(row.payload(), "gstin"),
+                null);
+    }
+
+    private List<Block> b2claBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return grouped("b2cla", "pos", "inv", rows,
+                row -> {
+                    Map<String, Object> p = row.payload();
+                    ObjectNode inv = b2clInvoice(p);
+                    inv.put("oinum", text(p, "oinum"));
+                    inv.put("oidt", date(text(p, "oidt")));
+                    return inv;
+                },
+                row -> text(row.payload(), "pos"),
+                null);
+    }
+
+    private List<Block> expaBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return grouped("expa", "exp_typ", "inv", rows,
+                row -> {
+                    Map<String, Object> p = row.payload();
+                    ObjectNode inv = expInvoice(p);
+                    inv.put("oinum", text(p, "oinum"));
+                    inv.put("oidt", date(text(p, "oidt")));
+                    return inv;
+                },
+                row -> "WP".equals(text(row.payload(), "exportType")) ? "WPAY" : "WOPAY",
+                null);
+    }
+
+    private List<Block> cdnraBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        return grouped("cdnra", "ctin", "nt", rows,
+                row -> {
+                    Map<String, Object> p = row.payload();
+                    ObjectNode nt = cdnrNote(p, orgGstin);
+                    nt.put("ont_num", text(p, "ontNum"));
+                    nt.put("ont_dt", date(text(p, "ontDate")));
+                    return nt;
+                },
+                row -> text(row.payload(), "gstin"),
+                null);
+    }
+
+    private List<Block> cdnuraBlocks(List<PreparedReturnRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        List<Block> blocks = new ArrayList<>();
+        for (PreparedReturnRow row : rows) {
+            Map<String, Object> p = row.payload();
+            ObjectNode entry = NODES.objectNode();
+            entry.put("nt_num", text(p, "noteNo"));
+            entry.put("nt_dt", date(text(p, "noteDate")));
+            entry.put("ntty", noteTypeCode(text(p, "noteType")));
+            entry.put("val", amount(num(p, "invoiceValue").abs()));
+            entry.put("typ", "B2CL");
+            entry.put("pos", text(p, "pos"));
+            entry.put("ont_num", text(p, "ontNum"));
+            entry.put("ont_dt", date(text(p, "ontDate")));
+            entry.putArray("itms").add(item(num(p, "rate"), num(p, "taxableValue").abs(),
+                    new TaxAmounts(num(p, "igst"), null, null).map(BigDecimal::abs), num(p, "cess").abs()));
+            blocks.add(Block.flat("cdnura", entry));
+        }
+        return blocks;
+    }
+
+    /** b2csa envelopes: { omon, sply_ty, typ, pos, itms } — items nested under the omon envelope. */
+    private List<Block> b2csaBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<String, ObjectNode> envelopes = new LinkedHashMap<>();
+        List<Block> blocks = new ArrayList<>();
+        for (PreparedReturnRow row : rows) {
+            Map<String, Object> p = row.payload();
+            String pos = text(p, "pos");
+            String omon = text(p, "omon");
+            String key = omon + "|" + pos;
+            ObjectNode envelope = envelopes.get(key);
+            if (envelope == null) {
+                envelope = NODES.objectNode();
+                envelope.put("omon", omon);
+                envelope.put("sply_ty", intraState(orgGstin, pos) ? "INTRA" : "INTER");
+                envelope.put("typ", "OE");
+                envelope.put("pos", pos);
+                envelope.putArray("itms");
+                envelopes.put(key, envelope);
+            }
+            ObjectNode item = envelope.putArray("itms").addObject();
+            item.put("rt", amount(num(p, "rate")));
+            item.put("txval", amount(num(p, "taxableValue")));
+            putTaxKeys(item, tax(p, orgGstin, pos));
+            item.put("csamt", amount(num(p, "cess")));
+        }
+        for (ObjectNode envelope : envelopes.values()) {
+            blocks.add(Block.flat("b2csa", envelope));
+        }
+        return blocks;
+    }
+
+    /** ata/txpda envelopes: { omon, pos, sply_ty, itms } with amendment items (ad_amt). */
+    private List<Block> ataBlocks(List<PreparedReturnRow> rows, String orgGstin, String section,
+                                  boolean keepZeroCess) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<String, ObjectNode> envelopes = new LinkedHashMap<>();
+        List<Block> blocks = new ArrayList<>();
+        for (PreparedReturnRow row : rows) {
+            Map<String, Object> p = row.payload();
+            String pos = text(p, "pos");
+            String omon = text(p, "omon");
+            String key = omon + "|" + pos;
+            ObjectNode envelope = envelopes.get(key);
+            if (envelope == null) {
+                envelope = NODES.objectNode();
+                envelope.put("omon", omon);
+                envelope.put("pos", pos);
+                envelope.put("sply_ty", intraState(orgGstin, pos) ? "INTRA" : "INTER");
+                envelope.putArray("itms");
+                envelopes.put(key, envelope);
+            }
+            ObjectNode item = envelope.putArray("itms").addObject();
+            item.put("rt", amount(num(p, "rate")));
+            item.put("ad_amt", amount(num(p, "advanceAmount")));
+            putTaxKeys(item, tax(p, orgGstin, pos));
+            if (keepZeroCess || num(p, "cess").signum() != 0) {
+                item.put("csamt", amount(num(p, "cess")));
+            }
+        }
+        for (ObjectNode envelope : envelopes.values()) {
+            blocks.add(Block.flat(section, envelope));
+        }
+        return blocks;
+    }
+
+    private List<Block> ataBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        return ataBlocks(rows, orgGstin, "ata", true);
+    }
+
+    private List<Block> txpdaBlocks(List<PreparedReturnRow> rows, String orgGstin) {
+        return ataBlocks(rows, orgGstin, "txpda", false);
     }
 
     private List<Block> docIssueBlocks(List<PreparedReturnRow> rows) {

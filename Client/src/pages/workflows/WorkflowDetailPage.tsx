@@ -128,7 +128,9 @@ export function WorkflowDetailPage() {
 
           <MastersTamperWarningBanner findings={findingsQuery.data?.findings ?? []} />
 
-          {(workflow.stage === 'FINALIZED' || workflow.stage === 'FILED') && (
+          {(workflow.stage === 'PREPARE' ||
+            workflow.stage === 'FINALIZED' ||
+            workflow.stage === 'FILED') && (
             <section className="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
               <AmendmentFollowUpList workflowId={workflow.id} role={role as ReviewRole} />
             </section>

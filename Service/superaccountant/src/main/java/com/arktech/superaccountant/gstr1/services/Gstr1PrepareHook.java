@@ -47,6 +47,12 @@ public class Gstr1PrepareHook implements PrepareHook {
     }
 
     @Override
+    public void onFinalize(Workflow w, String actor) {
+        prepareService.freeze(w);
+        prepareService.closeIncludedFollowUps(w, actor);
+    }
+
+    @Override
     public void onUnfinalize(Workflow w) {
         prepareService.release(w);
     }

@@ -105,6 +105,10 @@ class TamperOutcomesIT {
     private TamperChangeRepository tamperChangeRepository;
     @Autowired
     private com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository amendmentFollowUpRepository;
+    @Autowired
+    private com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository preparedReturnRepository;
+    @Autowired
+    private com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository preparedReturnRowRepository;
 
     private final ObjectMapper json = new ObjectMapper();
 
@@ -368,6 +372,126 @@ class TamperOutcomesIT {
         assertThat(after.getEvidenceHash()).isNotEqualTo(originalEvidence);
         assertThat(after.getEvidenceHash()).isEqualTo(EvidenceHash.of("TAMPER_MODIFIED", after.getVoucherKey(),
                 "h1", "h3", "2025-04-15"));
+    }
+
+    @Test
+    void acceptModified_followUpRecordsStructuredOrigin() throws Exception {
+        seedModifiedFinding("h1", "h2");
+        seedPreparedReturn(gstr1Apr.getId(), "B2B", "B2B/1", "G:g-1");
+
+        assertThat(actStatus(accountantToken, "ACKNOWLEDGE", "accept as correction")).isEqualTo("200");
+
+        List<AmendmentFollowUp> followUps = amendmentFollowUpRepository
+                .findByWorkflowIdOrderByCreatedAt(gstr1Apr.getId());
+        assertThat(followUps).hasSize(1);
+        AmendmentFollowUp followUp = followUps.get(0);
+        assertThat(followUp.getChange()).isEqualTo(AmendmentChangeKind.CHANGED);
+        assertThat(followUp.getTableCode()).isEqualTo("B2B");
+        assertThat(followUp.getOriginalDocKey()).isEqualTo("B2B/1");
+        assertThat(followUp.getOriginalWorkflowId()).isEqualTo(gstr1Apr.getId());
+
+        mockMvc.perform(get("/api/v1/workflows/" + gstr1Apr.getId() + "/amendments")
+                        .header("Authorization", "Bearer " + accountantToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.followUps[0].change").value("CHANGED"))
+                .andExpect(jsonPath("$.followUps[0].tableCode").value("B2B"))
+                .andExpect(jsonPath("$.followUps[0].originalDocKey").value("B2B/1"));
+    }
+
+    @Test
+    void acceptModified_noPreparedReturnRow_followUpRecordsNulls() throws Exception {
+        seedModifiedFinding("h1", "h2");
+
+        assertThat(actStatus(accountantToken, "ACKNOWLEDGE", "accept as correction")).isEqualTo("200");
+
+        List<AmendmentFollowUp> followUps = amendmentFollowUpRepository
+                .findByWorkflowIdOrderByCreatedAt(gstr1Apr.getId());
+        assertThat(followUps).hasSize(1);
+        assertThat(followUps.get(0).getChange()).isEqualTo(AmendmentChangeKind.CHANGED);
+        assertThat(followUps.get(0).getTableCode()).isNull();
+        assertThat(followUps.get(0).getOriginalDocKey()).isNull();
+        assertThat(followUps.get(0).getOriginalWorkflowId()).isEqualTo(gstr1Apr.getId());
+    }
+
+    @Test
+    void acceptInsertion_followUpRecordsLate() throws Exception {
+        ownerToken = setupOwnerOrg();
+        Organization org = organizationRepository.findById(orgId).orElseThrow();
+        DayBookUploadJob job1 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedVoucher(org.getId(), job1.getId(), "g-1", "Sales", "SB/001", LocalDate.of(2025, 4, 15), "h1",
+                entry("Sales Account", "100"));
+        gstr1Apr = workflow(org.getId(), WorkflowType.GSTR1, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30),
+                WorkflowStage.FINALIZED, job1.getId(), false);
+        snapshotService.freeze(gstr1Apr.getId(), org.getId(), "acc");
+        gstr3bApr = workflow(org.getId(), WorkflowType.GSTR3B, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30),
+                WorkflowStage.STARTED, null, false);
+        accountantToken = memberJwt("accountant");
+
+        DayBookUploadJob job2 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedVoucher(org.getId(), job2.getId(), "g-1", "Sales", "SB/001", LocalDate.of(2025, 4, 15), "h1",
+                entry("Sales Account", "100"));
+        seedVoucher(org.getId(), job2.getId(), "g-9", "Sales", "SB/009", LocalDate.of(2025, 4, 28), "h9",
+                entry("Sales Account", "100"));
+        tamperComparisonService.compare(job2.getId());
+
+        assertThat(actStatus(accountantToken, "ACKNOWLEDGE", "accept the insertion")).isEqualTo("200");
+
+        List<AmendmentFollowUp> followUps = amendmentFollowUpRepository
+                .findByWorkflowIdOrderByCreatedAt(gstr1Apr.getId());
+        assertThat(followUps).hasSize(1);
+        assertThat(followUps.get(0).getChange()).isEqualTo(AmendmentChangeKind.LATE);
+        assertThat(followUps.get(0).getTableCode()).isNull();
+        assertThat(followUps.get(0).getOriginalDocKey()).isNull();
+        assertThat(followUps.get(0).getOriginalWorkflowId()).isNull();
+    }
+
+    @Test
+    void acceptDeletion_followUpRecordsDeletedWithOrigin() throws Exception {
+        ownerToken = setupOwnerOrg();
+        Organization org = organizationRepository.findById(orgId).orElseThrow();
+        DayBookUploadJob job1 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedVoucher(org.getId(), job1.getId(), "g-1", "Sales", "SB/001", LocalDate.of(2025, 4, 15), "h1",
+                entry("Sales Account", "100"));
+        gstr1Apr = workflow(org.getId(), WorkflowType.GSTR1, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30),
+                WorkflowStage.FINALIZED, job1.getId(), false);
+        snapshotService.freeze(gstr1Apr.getId(), org.getId(), "acc");
+        gstr3bApr = workflow(org.getId(), WorkflowType.GSTR3B, LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30),
+                WorkflowStage.STARTED, null, false);
+        accountantToken = memberJwt("accountant");
+        seedPreparedReturn(gstr1Apr.getId(), "B2B", "B2B/1", "G:g-1");
+
+        DayBookUploadJob job2 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        seedVoucher(org.getId(), job2.getId(), "g-9", "Sales", "SB/009", LocalDate.of(2025, 5, 3), "h9",
+                entry("Sales Account", "100"));
+        tamperComparisonService.compare(job2.getId());
+
+        assertThat(actStatus(accountantToken, "ACKNOWLEDGE", "accept the deletion")).isEqualTo("200");
+
+        List<AmendmentFollowUp> followUps = amendmentFollowUpRepository
+                .findByWorkflowIdOrderByCreatedAt(gstr1Apr.getId());
+        assertThat(followUps).hasSize(1);
+        assertThat(followUps.get(0).getChange()).isEqualTo(AmendmentChangeKind.DELETED);
+        assertThat(followUps.get(0).getTableCode()).isEqualTo("B2B");
+        assertThat(followUps.get(0).getOriginalDocKey()).isEqualTo("B2B/1");
+        assertThat(followUps.get(0).getOriginalWorkflowId()).isEqualTo(gstr1Apr.getId());
+    }
+
+    private void seedPreparedReturn(UUID workflowId, String tableCode, String rowKey, String voucherKey) {
+        com.arktech.superaccountant.gstr1.models.PreparedReturn prepared =
+                new com.arktech.superaccountant.gstr1.models.PreparedReturn();
+        prepared.setWorkflowId(workflowId);
+        prepared.setReturnKind("GSTR1");
+        prepared.setBuiltAt(Instant.now());
+        prepared = preparedReturnRepository.save(prepared);
+        com.arktech.superaccountant.gstr1.models.PreparedReturnRow row =
+                new com.arktech.superaccountant.gstr1.models.PreparedReturnRow();
+        row.setPreparedReturnId(prepared.getId());
+        row.setTableCode(tableCode);
+        row.setRowKey(rowKey);
+        row.setSourceVoucherKey(voucherKey);
+        row.setPayload("{\"rows\":[]}");
+        row.setAmendment(false);
+        preparedReturnRowRepository.save(row);
     }
 
     // -- helpers ------------------------------------------------------------

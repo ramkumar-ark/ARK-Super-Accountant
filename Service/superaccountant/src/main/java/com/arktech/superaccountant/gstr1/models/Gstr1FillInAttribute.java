@@ -10,5 +10,10 @@ public enum Gstr1FillInAttribute {
     SHIPPING_BILL_NO,
     SHIPPING_BILL_DATE,
     SEZ_DEEMED,
-    SUPPLY_NATURE
+    SUPPLY_NATURE,
+    /**
+     * Accountant acknowledgement that a deleted document may be amended to zero
+     * (R5). VOUCHER scope, key = voucher key; value is unused (null is fine).
+     */
+    AMENDMENT_ZERO_ACK
 }

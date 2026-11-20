@@ -4,11 +4,19 @@ import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
 import type { ReviewRole } from '@/components/review/FindingReviewPanel'
 
+interface ProducedRow {
+  tableCode: string
+  rowKey: string
+  lateReporting: boolean
+}
+
 interface FollowUp {
   id: string
   voucherKey: string
   summary: string
   status: 'OPEN' | 'DONE'
+  change: 'CHANGED' | 'DELETED' | 'LATE' | null
+  producedRow?: ProducedRow | null
   doneBy: string | null
   doneAt: string | null
   doneNote: string | null
@@ -84,14 +92,30 @@ export function AmendmentFollowUpList({
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-info-bg)] text-[var(--color-info)]">
                     {f.status}
                   </span>
+                  {f.change === 'LATE' ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-warning-bg)] text-[var(--color-warning)]">
+                      late reporting
+                    </span>
+                  ) : f.change ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)]">
+                      {f.change}
+                    </span>
+                  ) : null}
                   <span className="text-xs text-[var(--color-text-muted)] font-mono">
                     {f.voucherKey}
                   </span>
                 </div>
                 <p className="text-sm text-[var(--color-text-secondary)]">{f.summary}</p>
+                {f.producedRow && (
+                  <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                    {f.producedRow.lateReporting ? 'late ' : ''}
+                    {f.producedRow.tableCode} row {f.producedRow.rowKey}
+                  </p>
+                )}
                 {f.status === 'DONE' && f.doneNote && (
                   <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                    Done by {f.doneBy}: {f.doneNote}
+                    Done by {f.doneBy}
+                    {f.doneAt ? ` on ${f.doneAt.slice(0, 10)}` : ''}: {f.doneNote}
                   </p>
                 )}
               </div>
