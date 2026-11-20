@@ -232,10 +232,10 @@ public class Gstr1PrepareService {
         if (!iffDocKeys.isEmpty()) {
             excludeIffReportedDocs(byClass, iffDocKeys);
         }
+        // T22: IFF-reported docs leave the quarter's document tables but stay in the
+        // HSN summary (Table 12), which covers the whole quarter, consistent with DOCS
         List<VoucherView> reportable = views.stream()
                 .filter(v -> !byClass.getOrDefault(ReportingClass.NOT_REPORTED, List.of()).contains(v))
-                .filter(v -> !iffDocKeys.contains("b2b:" + v.getVoucherKey())
-                        && !iffDocKeys.contains("cdn:" + v.getVoucherKey()))
                 .toList();
 
         List<PreparedReturnRow> rows = new ArrayList<>();

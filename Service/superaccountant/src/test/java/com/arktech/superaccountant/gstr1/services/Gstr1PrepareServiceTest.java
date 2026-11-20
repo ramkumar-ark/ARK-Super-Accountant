@@ -390,6 +390,14 @@ class Gstr1PrepareServiceTest {
                 "Quarter tables must not carry the IFF-reported B2B doc: " + quarterTables);
         // DOCS stays: the series count is a book-level fact
         assertTrue(quarterTables.contains("DOCS"), "Tables were " + quarterTables);
+        // but the HSN summary (Table 12) covers the whole quarter: the IFF-reported
+        // invoice's value and tax must appear there (captain decision, msg 003)
+        Optional<PreparedReturnRow> hsn = rowOf(quarterReturn.getId(),
+                "hsn:997331:NA:18.00:b2b");
+        assertTrue(hsn.isPresent(), "HSN row missing; rows=" + rowKeys(quarterReturn.getId()));
+        assertEquals(0, new BigDecimal("10000").compareTo(num(hsn.get().payload(), "taxableValue")));
+        assertEquals(0, new BigDecimal("900").compareTo(num(hsn.get().payload(), "cgst")));
+        assertEquals(0, new BigDecimal("900").compareTo(num(hsn.get().payload(), "sgst")));
 
         // the IFF keeps its row; releasing it lets the doc flow into the quarter build
         Optional<PreparedReturnRow> iffRow = rowOf(prepareService.buildOrRebuild(iff).getId(),
