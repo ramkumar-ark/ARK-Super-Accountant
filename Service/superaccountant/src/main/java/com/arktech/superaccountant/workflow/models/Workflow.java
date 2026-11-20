@@ -82,6 +82,9 @@ public class Workflow {
     @Column(name = "filing_ref_date")
     private LocalDate filingRefDate;
 
+    @Column(name = "filing_channel", length = 32)
+    private String filingChannel;
+
     @Column(name = "created_by")
     private String createdBy;
 

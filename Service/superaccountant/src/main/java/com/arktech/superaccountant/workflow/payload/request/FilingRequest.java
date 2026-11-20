@@ -12,6 +12,16 @@ public class FilingRequest {
     @NotNull
     private LocalDate date;
 
+    private String channel;
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+
     public String getRef() {
         return ref;
     }

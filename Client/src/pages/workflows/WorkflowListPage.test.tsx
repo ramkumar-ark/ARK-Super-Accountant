@@ -42,6 +42,7 @@ function workflow(overrides: Partial<Workflow>): Workflow {
     filedAt: null,
     filingRef: null,
     filingRefDate: null,
+    filingChannel: null,
     createdBy: 'owner',
     createdAt: '2025-05-01T10:00:00Z',
     ...overrides,

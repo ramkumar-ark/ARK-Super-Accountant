@@ -31,6 +31,7 @@ export interface Workflow {
   filedAt: string | null
   filingRef: string | null
   filingRefDate: string | null
+  filingChannel: string | null
   createdBy: string
   createdAt: string
 }
@@ -174,8 +175,21 @@ export function unfinalizeWorkflow(id: string, reason: string): Promise<Workflow
   return api.post(`/v1/workflows/${id}/unfinalize`, { reason }).then((res) => res.data)
 }
 
-export function recordFiling(id: string, ref: string, date: string): Promise<Workflow> {
-  return api.post(`/v1/workflows/${id}/filing`, { ref, date }).then((res) => res.data)
+export function recordFiling(
+  id: string,
+  ref: string,
+  date: string,
+  channel: string = 'PORTAL_FILE',
+): Promise<Workflow> {
+  return api.post(`/v1/workflows/${id}/filing`, { ref, date, channel }).then((res) => res.data)
+}
+
+export function recordPortalUpload(
+  id: string,
+  fileHash?: string,
+  note?: string,
+): Promise<{ recorded: boolean }> {
+  return api.post(`/v1/workflows/${id}/gstr1/portal-upload`, { fileHash, note }).then((res) => res.data)
 }
 
 export const FILING_REF_LABEL: Record<WorkflowType, string> = {

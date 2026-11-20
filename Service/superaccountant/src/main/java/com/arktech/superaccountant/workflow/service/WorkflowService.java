@@ -361,8 +361,23 @@ public class WorkflowService {
     @Transactional
     public Workflow recordFiling(UUID organizationId, String actor, UUID id,
                                  String filingRef, LocalDate filingRefDate) {
+        return recordFiling(organizationId, actor, id, filingRef, filingRefDate,
+                "PORTAL_FILE");
+    }
+
+    @Transactional
+    public Workflow recordFiling(UUID organizationId, String actor, UUID id,
+                                 String filingRef, LocalDate filingRefDate,
+                                 String filingChannel) {
         if (filingRef == null || filingRef.isBlank() || filingRefDate == null) {
             throw new WorkflowBadRequestException("Filing reference and date are required");
+        }
+        String channel = filingChannel == null || filingChannel.isBlank()
+                ? "PORTAL_FILE" : filingChannel;
+        try {
+            com.arktech.superaccountant.gstr1.channel.ChannelKind.valueOf(channel);
+        } catch (IllegalArgumentException e) {
+            throw new WorkflowBadRequestException("Unknown filing channel: " + channel);
         }
         Workflow w = get(organizationId, id);
         if (w.getStage() != WorkflowStage.FINALIZED) {
@@ -371,12 +386,42 @@ public class WorkflowService {
         w.setStage(WorkflowStage.FILED);
         w.setFilingRef(filingRef);
         w.setFilingRefDate(filingRefDate);
+        w.setFilingChannel(channel);
         w.setFiledAt(Instant.now());
         w.setFiledBy(actor);
         workflowRepository.save(w);
         workflowEventRepository.save(event(id, actor, WorkflowEventKind.FILED,
                 null, payloadOf("filingRef", filingRef)));
         return w;
+    }
+
+    @Transactional
+    public void recordPortalUpload(UUID organizationId, String actor, UUID id,
+                                   String fileHash, String note) {
+        Workflow w = get(organizationId, id);
+        if (w.getStage() != WorkflowStage.FINALIZED) {
+            throw new WorkflowConflictException(
+                    "Portal upload can be recorded only on a FINALIZED workflow");
+        }
+        if (fileHash != null && !fileHash.isBlank() && !fileHash.matches("[0-9a-fA-F]{64}")) {
+            throw new WorkflowBadRequestException("fileHash must be a 64-character hex SHA-256");
+        }
+        String sha256 = fileHash == null || fileHash.isBlank()
+                ? PortalDownloadHashes.latestSha256(workflowEventRepository, w.getId())
+                : fileHash;
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("sha256", sha256);
+        if (note != null && !note.isBlank()) {
+            payload.put("note", note);
+        }
+        String json;
+        try {
+            json = PortalDownloadHashes.mapper().writeValueAsString(payload);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+        workflowEventRepository.save(event(w.getId(), actor,
+                WorkflowEventKind.PORTAL_UPLOADED, null, json));
     }
 
     @Transactional

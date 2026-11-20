@@ -152,7 +152,8 @@ public class WorkflowController {
                                           @Valid @RequestBody FilingRequest request) {
         return handle(principal, () -> WorkflowResponse.from(
                 workflowService.recordFiling(principal.getOrganizationId(),
-                        principal.getUsername(), id, request.getRef(), request.getDate())));
+                        principal.getUsername(), id, request.getRef(), request.getDate(),
+                        request.getChannel())));
     }
 
     private ResponseEntity<?> handle(UserDetailsImpl principal, Supplier<Object> action) {

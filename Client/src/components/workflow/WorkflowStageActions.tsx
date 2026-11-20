@@ -75,6 +75,7 @@ export function WorkflowStageActions({ detail, role }: Props) {
   const [reason, setReason] = useState('')
   const [filingRef, setFilingRef] = useState('')
   const [filingDate, setFilingDate] = useState('')
+  const [filingChannel, setFilingChannel] = useState('PORTAL_FILE')
 
   const closeDrawer = () => {
     setDrawer(null)
@@ -111,7 +112,7 @@ export function WorkflowStageActions({ detail, role }: Props) {
   })
 
   const filingMutation = useMutation({
-    mutationFn: () => recordFiling(workflow.id, filingRef, filingDate),
+    mutationFn: () => recordFiling(workflow.id, filingRef, filingDate, filingChannel),
     onSuccess: () => {
       closeDrawer()
       return invalidateWorkflow(queryClient, workflow.id)
@@ -281,6 +282,22 @@ export function WorkflowStageActions({ detail, role }: Props) {
                 onChange={(e) => setFilingDate(e.target.value)}
                 className={inputClass}
               />
+            </div>
+            <div>
+              <label
+                htmlFor="filing-channel"
+                className="mb-1 block text-sm font-semibold text-[var(--color-text-primary)]"
+              >
+                Filing channel
+              </label>
+              <select
+                id="filing-channel"
+                value={filingChannel}
+                onChange={(e) => setFilingChannel(e.target.value)}
+                className={inputClass}
+              >
+                <option value="PORTAL_FILE">Portal file (manual upload)</option>
+              </select>
             </div>
             {drawerError && (
               <p role="alert" className="text-sm text-[var(--color-danger)]">
