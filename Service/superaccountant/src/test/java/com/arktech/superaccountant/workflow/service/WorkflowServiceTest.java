@@ -285,12 +285,13 @@ class WorkflowServiceTest {
     }
 
     @Test
-    void prepare_iffIsNotSupportedYet() {
+    void prepare_iffAllowedButStillNeedsBaselineConfirmation() {
         Workflow w = prepareWorkflow(WorkflowType.IFF, "2026-04");
         w.setStage(WorkflowStage.FINDINGS_REVIEW);
         when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
 
-        assertThrows(WorkflowBadRequestException.class,
+        // T22: IFF preparation is supported; the baseline gate still applies to it
+        assertThrows(WorkflowConflictException.class,
                 () -> service.advanceToPrepare(orgId, actor, w.getId()));
     }
 

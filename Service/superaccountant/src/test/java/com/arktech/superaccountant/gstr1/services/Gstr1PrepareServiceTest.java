@@ -19,7 +19,11 @@ import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUp;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentFollowUpRepository;
 import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentChangeKind;
+import com.arktech.superaccountant.workflow.snapshot.AmendmentStatus;
 import com.arktech.superaccountant.gst.mapping.GstHead;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMapping;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingRepository;
@@ -134,6 +138,63 @@ class Gstr1PrepareServiceTest {
         return workflowRepository.save(w);
     }
 
+    private Workflow iffWorkflow(UUID orgId) {
+        Workflow w = new Workflow();
+        w.setOrganizationId(orgId);
+        w.setType(WorkflowType.IFF);
+        w.setPeriodStart(LocalDate.of(2025, 4, 1));
+        w.setPeriodEnd(LocalDate.of(2025, 4, 30));
+        w.setPeriodKey("2025-04");
+        w.setFinancialYear(2025);
+        w.setStage(WorkflowStage.PREPARE);
+        w.setActive(true);
+        w.setCreatedBy("tester");
+        return workflowRepository.save(w);
+    }
+
+    /** Apr–Jun quarterly GSTR-1 sharing the same upload job as the monthly IFF. */
+    private Workflow quarterWorkflow(UUID orgId, UUID jobId) {
+        Workflow w = new Workflow();
+        w.setOrganizationId(orgId);
+        w.setType(WorkflowType.GSTR1);
+        w.setPeriodStart(LocalDate.of(2025, 4, 1));
+        w.setPeriodEnd(LocalDate.of(2025, 6, 30));
+        w.setPeriodKey("2025-Q1");
+        w.setFinancialYear(2025);
+        w.setStage(WorkflowStage.PREPARE);
+        w.setActive(true);
+        w.setCreatedBy("tester");
+        w.setUploadJobId(jobId);
+        return workflowRepository.save(w);
+    }
+
+    @Autowired
+    private AmendmentFollowUpRepository followUpRepository;
+
+    /** Credit note to a registered party: classifies as CDNR. */
+    private ParsedVoucher creditNote(UUID orgId, UUID jobId, String number, LocalDate date,
+                                     String placeOfSupply) {
+        ParsedVoucher v = new ParsedVoucher();
+        v.setUploadJobId(jobId);
+        v.setOrganizationId(orgId);
+        v.setVoucherTypeName("Credit note");
+        v.setVoucherNumber(number);
+        v.setVoucherDate(date);
+        v.setPartyLedgerName("Sundry Debtors");
+        v.setPartyGstin("29AABCU9603R1ZM");
+        v.setPartyGstRegistrationType("Regular");
+        v.setPlaceOfSupply(placeOfSupply);
+        v.setTotalDebit(new BigDecimal("-11800.00"));
+        v.setTotalCredit(new BigDecimal("-11800.00"));
+        List<ParsedVoucherEntry> entries = new ArrayList<>();
+        entries.add(entry(v, "Sales Account", "-10000.00", false, "18", false));
+        entries.add(entry(v, "Output CGST", "-900.00", false, null, false));
+        entries.add(entry(v, "Output SGST", "-900.00", false, null, false));
+        entries.add(entry(v, "Sundry Debtors", "11800.00", true, null, true));
+        v.setEntries(entries);
+        return parsedVoucherRepository.save(v);
+    }
+
     private ParsedVoucherEntry entry(ParsedVoucher voucher, String ledger, String amount,
                                      boolean isDebit, String gstRate, boolean isParty) {
         ParsedVoucherEntry e = new ParsedVoucherEntry();
@@ -174,18 +235,30 @@ class Gstr1PrepareServiceTest {
         return parsedVoucherRepository.save(v);
     }
 
+    /** Same shape as salesInvoice but with an explicit guid (guid = VoucherKeys guid, no prefix). */
+    private ParsedVoucher salesInvoiceWithGuid(UUID orgId, UUID jobId, String guid, String number,
+                                               LocalDate date, String placeOfSupply) {
+        ParsedVoucher v = salesInvoice(orgId, jobId, number, date, placeOfSupply);
+        v.setVoucherGuid(guid);
+        return parsedVoucherRepository.save(v);
+    }
+
     private void seedMasters(UUID orgId, UUID jobId) {
+        seedLedgerSnapshot(orgId, jobId);
+        taxMapping(orgId, "Output CGST", GstHead.CGST);
+        taxMapping(orgId, "Output SGST", GstHead.SGST);
+        taxMapping(orgId, "Output IGST", GstHead.IGST);
+        taxMapping(orgId, "Output Cess", GstHead.CESS);
+    }
+
+    /** Job-scoped ledger snapshot only (safe to call again for a second job). */
+    private void seedLedgerSnapshot(UUID orgId, UUID jobId) {
         UploadLedgerSnapshot salesLedger = new UploadLedgerSnapshot();
         salesLedger.setUploadJobId(jobId);
         salesLedger.setOrganizationId(orgId);
         salesLedger.setLedgerName("Sales Account");
         salesLedger.setHsnSacCode("997331");
         snapshotRepository.save(salesLedger);
-
-        taxMapping(orgId, "Output CGST", GstHead.CGST);
-        taxMapping(orgId, "Output SGST", GstHead.SGST);
-        taxMapping(orgId, "Output IGST", GstHead.IGST);
-        taxMapping(orgId, "Output Cess", GstHead.CESS);
     }
 
     private void taxMapping(UUID orgId, String ledgerName, GstHead head) {
@@ -262,6 +335,127 @@ class Gstr1PrepareServiceTest {
                 .filter(r -> r.getTableCode().equals("DOCS"))
                 .findFirst();
         assertTrue(docs.isPresent(), "DOCS row missing");
+    }
+
+    @Test
+    void iffWorkflowBuildsOnlyB2bAndCdnrRows() {
+        Organization org = organization();
+        Workflow w = iffWorkflow(org.getId());
+        UUID jobId = seedJob(org.getId());
+        w.setUploadJobId(jobId);
+        workflowRepository.save(w);
+        salesInvoice(org.getId(), jobId, "INV-1", LocalDate.of(2025, 4, 10), "Karnataka");
+        creditNote(org.getId(), jobId, "CN-1", LocalDate.of(2025, 4, 20), "Karnataka");
+        seedMasters(org.getId(), jobId);
+        ledgerFillIn(w.getId(), "Sales Account", Gstr1FillInAttribute.HSN, "99733199");
+
+        PreparedReturn pr = prepareService.buildOrRebuild(w);
+
+        assertEquals("IFF", pr.getReturnKind());
+        List<PreparedReturnRow> rows = rowRepository.findByPreparedReturnId(pr.getId());
+        List<String> tableCodes = rows.stream().map(PreparedReturnRow::getTableCode)
+                .distinct().sorted().toList();
+        assertEquals(List.of("B2B", "CDNR"), tableCodes,
+                "IFF rows must be limited to B2B and CDNR; rows=" + rowKeys(pr.getId()));
+        assertTrue(rowOf(pr.getId(), "b2b:" + voucherKey(jobId)).isPresent(),
+                "B2B row missing; rows=" + rowKeys(pr.getId()));
+        assertTrue(rowRepository.findByPreparedReturnId(pr.getId()).stream()
+                        .anyMatch(r -> r.getRowKey().startsWith("cdn:")),
+                "CDNR row missing; rows=" + rowKeys(pr.getId()));
+    }
+
+    @Test
+    void quarterGstr1ExcludesDocsReportedInFrozenIff() {
+        Organization org = organization();
+        Workflow iff = iffWorkflow(org.getId());
+        UUID jobId = seedJob(org.getId());
+        iff.setUploadJobId(jobId);
+        workflowRepository.save(iff);
+        salesInvoice(org.getId(), jobId, "INV-1", LocalDate.of(2025, 4, 10), "Karnataka");
+        seedMasters(org.getId(), jobId);
+        String key = voucherKey(jobId);
+
+        prepareService.buildOrRebuild(iff);
+        prepareService.freeze(iff);
+
+        Workflow quarter = quarterWorkflow(org.getId(), jobId);
+        PreparedReturn quarterReturn = prepareService.buildOrRebuild(quarter);
+
+        // the April invoice was already reported in the frozen IFF
+        assertTrue(rowOf(quarterReturn.getId(), "b2b:" + key).isEmpty(),
+                "Quarter GSTR-1 must exclude IFF-reported docs; rows=" + rowKeys(quarterReturn.getId()));
+        List<String> quarterTables = rowRepository.findByPreparedReturnId(quarterReturn.getId())
+                .stream().map(PreparedReturnRow::getTableCode).distinct().sorted().toList();
+        assertTrue(!quarterTables.contains("B2B"),
+                "Quarter tables must not carry the IFF-reported B2B doc: " + quarterTables);
+        // DOCS stays: the series count is a book-level fact
+        assertTrue(quarterTables.contains("DOCS"), "Tables were " + quarterTables);
+
+        // the IFF keeps its row; releasing it lets the doc flow into the quarter build
+        Optional<PreparedReturnRow> iffRow = rowOf(prepareService.buildOrRebuild(iff).getId(),
+                "b2b:" + key);
+        assertTrue(iffRow.isPresent(), "IFF row must survive");
+    }
+
+    @Test
+    void correctionToIffReportedDocBecomesQuarterAmendmentRow() {
+        Organization org = organization();
+        Workflow iff = iffWorkflow(org.getId());
+        UUID iffJobId = seedJob(org.getId());
+        iff.setUploadJobId(iffJobId);
+        workflowRepository.save(iff);
+        salesInvoiceWithGuid(org.getId(), iffJobId, "apr-1", "INV-1", LocalDate.of(2025, 4, 10),
+                "Karnataka");
+        seedMasters(org.getId(), iffJobId);
+        String iffKey = voucherKey(iffJobId);
+        assertEquals("G:apr-1", iffKey);
+
+        prepareService.buildOrRebuild(iff);
+        prepareService.freeze(iff);
+        Map<String, Object> originalPayload = rowOf(
+                preparedReturnRepository.findByWorkflowIdAndReturnKind(iff.getId(), "IFF")
+                        .orElseThrow().getId(), "b2b:" + iffKey)
+                .orElseThrow().payload();
+
+        // the same voucher (same guid → same key) is corrected in the quarter's books
+        UUID quarterJobId = seedJob(org.getId());
+        salesInvoiceWithGuid(org.getId(), quarterJobId, iffKey.substring("G:".length()),
+                "INV-001-REV", LocalDate.of(2025, 4, 10), "Karnataka");
+        seedLedgerSnapshot(org.getId(), quarterJobId);
+        Workflow quarter = quarterWorkflow(org.getId(), quarterJobId);
+        String key = voucherKey(quarterJobId);
+        assertEquals(iffKey, key, "same guid must give the same voucher key");
+
+        AmendmentFollowUp followUp = new AmendmentFollowUp();
+        followUp.setOrganizationId(org.getId());
+        followUp.setWorkflowId(iff.getId());
+        followUp.setVoucherKey(key);
+        followUp.setStatus(AmendmentStatus.OPEN);
+        followUp.setChange(AmendmentChangeKind.CHANGED);
+        followUp.setTableCode("B2B");
+        followUp.setOriginalWorkflowId(iff.getId());
+        followUp.setOriginalDocKey("b2b:" + iffKey);
+        followUp.setCreatedAt(Instant.now());
+        followUpRepository.save(followUp);
+
+        PreparedReturn quarterReturn = prepareService.buildOrRebuild(quarter);
+
+        List<PreparedReturnRow> amendRows = rowRepository
+                .findByPreparedReturnId(quarterReturn.getId()).stream()
+                .filter(PreparedReturnRow::isAmendment).toList();
+        assertEquals(1, amendRows.size(), "rows=" + rowKeys(quarterReturn.getId()));
+        PreparedReturnRow row = amendRows.get(0);
+        assertEquals("B2BA", row.getTableCode(),
+                "correction to an IFF-reported doc must land in the quarter's amendment table");
+        assertEquals("2025-04", row.getOriginalPeriod());
+        assertEquals("b2b:" + iffKey, row.getOriginalDocKey());
+        assertEquals(followUp.getId(), row.getFollowUpId());
+        assertEquals(originalPayload.get("invoiceNo"), row.payload().get("oinum"));
+        assertEquals("INV-001-REV", row.payload().get("invoiceNo"));
+        // no duplicate normal-table row for the revised voucher
+        assertTrue(rowRepository.findByPreparedReturnId(quarterReturn.getId()).stream()
+                .filter(r -> key.equals(r.getSourceVoucherKey()) && !r.isAmendment()).toList()
+                .isEmpty());
     }
 
     @Test

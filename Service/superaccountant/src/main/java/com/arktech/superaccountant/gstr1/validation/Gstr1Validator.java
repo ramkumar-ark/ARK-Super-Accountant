@@ -12,6 +12,7 @@ import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.workflow.models.FilerProfile;
 import com.arktech.superaccountant.workflow.models.Workflow;
+import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.FilerProfileRepository;
 import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
 import org.springframework.stereotype.Component;
@@ -136,14 +137,14 @@ public class Gstr1Validator {
         // Plan Q1: a voucher captured by the pre-column parser must be re-uploaded.
         // Plan Q5: Tables 14/15 are out of v1, so a possible operator party is a warning.
         // Plan Q6: with e-invoicing enabled the default build excludes IRP-reportable B2B rows.
-        // IFF cap: ₹50 lakh of aggregate taxable value per month (plan references Task T22).
+        // IFF cap (T22): the ₹50 lakh cap of aggregate taxable value applies to IFF months only.
         if (einvoiceEnabled && rows.stream().anyMatch(r -> "B2B".equals(r.getTableCode()))) {
             results.add(new ValidationResult("EINVOICE_EXCLUDED", ValidationResult.Severity.WARNING,
                     null, null,
                     "E-invoicing is enabled for this filer, so B2B rows that are e-invoice reportable"
                             + " may be excluded from this build; confirm they are covered by IRN invoices"));
         }
-        if (aggregate.compareTo(IFF_CAP) > 0) {
+        if (workflow.getType() == WorkflowType.IFF && aggregate.compareTo(IFF_CAP) > 0) {
             results.add(new ValidationResult("IFF_CAP", ValidationResult.Severity.WARNING,
                     null, null,
                     "Aggregate value for the month exceeds the ₹50 lakh IFF cap (see T22);"

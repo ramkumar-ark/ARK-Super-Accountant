@@ -8,6 +8,7 @@ import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository;
 import com.arktech.superaccountant.gstr1.repository.PreparedReturnRowRepository;
 import com.arktech.superaccountant.gstr1.services.Gstr1FillInService;
+import com.arktech.superaccountant.gstr1.services.Gstr1PrepareService;
 import com.arktech.superaccountant.gstr1.services.ReportingClass;
 import com.arktech.superaccountant.gstr1.services.ReportingClassifier;
 import com.arktech.superaccountant.gstr1.services.VoucherView;
@@ -350,8 +351,15 @@ public class AmendmentBuilder {
         if (followUp.getOriginalWorkflowId() == null || followUp.getOriginalDocKey() == null) {
             return null;
         }
+        Optional<Workflow> originalWorkflow =
+                workflowRepository.findById(followUp.getOriginalWorkflowId());
+        if (originalWorkflow.isEmpty()) {
+            return null;
+        }
+        // T22: the original may be an IFF prepared return, not only a GSTR1 one
         Optional<PreparedReturn> prepared = preparedReturnRepository.findByWorkflowIdAndReturnKind(
-                followUp.getOriginalWorkflowId(), "GSTR1");
+                followUp.getOriginalWorkflowId(),
+                Gstr1PrepareService.returnKind(originalWorkflow.get()));
         if (prepared.isEmpty()) {
             return null;
         }
