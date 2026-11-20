@@ -62,18 +62,18 @@ CLIENT_DIR="$REPO_ROOT/Client"
 # wrapper pid that exits immediately. Instead, let the session leader write its
 # own pid before exec: that pid is guaranteed to be the session/pgid.
 echo "starting backend on port $API_PORT (db $DB_NAME)..."
-( cd "$BACKEND_DIR" && setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' "$LOG_DIR/backend.pid" \
+( cd "$BACKEND_DIR" && setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$LOG_DIR/backend.pid" \
     env SERVER_PORT="$API_PORT" DB_URL="$DB_URL" \
     DB_USERNAME="$DB_USERNAME" DB_PASSWORD="$DB_PASSWORD" JWT_SECRET="$JWT_SECRET" \
-    ./mvnw -q spring-boot:run >"$LOG_DIR/backend.log" 2>&1 & )
+    ./mvnw -q spring-boot:run >"$LOG_DIR/backend.log" 2>&1 & ) >/dev/null 2>&1
 for _ in $(seq 1 20); do [ -s "$LOG_DIR/backend.pid" ] && break; sleep 0.25; done
 BACKEND_PID=$(cat "$LOG_DIR/backend.pid")
 [ -n "$BACKEND_PID" ] || { echo "failed to capture backend pid" >&2; exit 1; }
 
 echo "starting frontend dev server on port $VITE_PORT..."
-( cd "$CLIENT_DIR" && setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' "$LOG_DIR/frontend.pid" \
+( cd "$CLIENT_DIR" && setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$LOG_DIR/frontend.pid" \
     env SA_API_PORT="$API_PORT" \
-    npm run dev -- --port "$VITE_PORT" --strictPort >"$LOG_DIR/frontend.log" 2>&1 & )
+    npm run dev -- --port "$VITE_PORT" --strictPort >"$LOG_DIR/frontend.log" 2>&1 & ) >/dev/null 2>&1
 for _ in $(seq 1 20); do [ -s "$LOG_DIR/frontend.pid" ] && break; sleep 0.25; done
 FRONTEND_PID=$(cat "$LOG_DIR/frontend.pid")
 [ -n "$FRONTEND_PID" ] || { echo "failed to capture frontend pid" >&2; exit 1; }
