@@ -63,6 +63,38 @@ class Gstr1JsonWriterTest {
     }
 
     @Test
+    void iffReturnWritesOnlyB2bB2baCdnrCdnra() throws Exception {
+        Workflow workflow = iffWorkflow();
+        PreparedReturn prepared = prepared(workflow.getId());
+        prepared.setReturnKind("IFF");
+        List<PreparedReturnRow> rows = List.of(
+                row(workflow.getId(), "B2B", "b2b:v1", b2bPayload()),
+                amendmentRow(workflow.getId(), "B2BA", "b2ba:v1", b2bPayload()),
+                row(workflow.getId(), "CDNR", "cdn:v2", cdnrPayload()),
+                amendmentRow(workflow.getId(), "CDNRA", "cdnra:v1", cdnrPayload()),
+                // rows a quarter GSTR-1 would carry but an IFF must not
+                row(workflow.getId(), "B2CL", "b2cl:v1", b2bPayload()),
+                row(workflow.getId(), "B2CS", "b2cs:v1", b2bPayload()),
+                row(workflow.getId(), "HSN", "hsn:1", b2bPayload()),
+                row(workflow.getId(), "DOCS", "doc:1", b2bPayload()));
+
+        List<PortalFilePart> parts = writer().write(prepared, rows, workflow,
+                "33AAAAA0000A1Z9", profile(FilerFrequency.QRMP), WriterOptions.defaults());
+
+        assertEquals(1, parts.size());
+        JsonNode root = MAPPER.readTree(new String(parts.get(0).bytes(), StandardCharsets.UTF_8));
+        assertTrue(root.has("b2b"));
+        assertTrue(root.has("b2ba"));
+        assertTrue(root.has("cdnr"));
+        assertTrue(root.has("cdnra"));
+        for (String section : List.of("b2cl", "b2cla", "b2cs", "b2csa", "exp", "nil",
+                "cdnur", "cdnura", "at", "ata", "txpd", "txpda", "doc_issue", "hsn")) {
+            assertTrue(!root.has(section), "IFF must not carry section " + section);
+        }
+        assertEquals("042025", root.get("fp").asText());
+    }
+
+    @Test
     void omitsAllSectionsWhenNoRows() throws Exception {
         Workflow workflow = workflow(FilerFrequency.MONTHLY);
 
@@ -381,6 +413,12 @@ class Gstr1JsonWriterTest {
         w.setPeriodKey("2025-04");
         w.setFinancialYear(2025);
         w.setStage(WorkflowStage.PREPARE);
+        return w;
+    }
+
+    private static Workflow iffWorkflow() {
+        Workflow w = workflow(FilerFrequency.QRMP);
+        w.setType(WorkflowType.IFF);
         return w;
     }
 

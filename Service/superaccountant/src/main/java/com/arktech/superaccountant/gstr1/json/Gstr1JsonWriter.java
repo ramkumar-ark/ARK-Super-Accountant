@@ -73,31 +73,36 @@ public class Gstr1JsonWriter {
 
         List<Block> blocks = new ArrayList<>();
         boolean dropIrp = profile != null && profile.isEinvoiceEnabled() && !options.includeIrpTables();
+        boolean iff = "IFF".equals(prepared.getReturnKind());
         if (!dropIrp) {
             blocks.addAll(b2bBlocks(byTable.get("B2B"), gstin));
             blocks.addAll(b2baBlocks(byAmendTable.get("B2BA"), gstin));
         }
-        blocks.addAll(b2clBlocks(byTable.get("B2CL")));
-        blocks.addAll(b2claBlocks(byAmendTable.get("B2CLA"), gstin));
-        blocks.addAll(b2csBlocks(byTable.get("B2CS"), gstin));
-        blocks.addAll(b2csaBlocks(byAmendTable.get("B2CSA"), gstin));
-        if (!dropIrp) {
-            blocks.addAll(expBlocks(byTable.get("EXP")));
-            blocks.addAll(expaBlocks(byAmendTable.get("EXPA"), gstin));
+        if (!iff) {
+            blocks.addAll(b2clBlocks(byTable.get("B2CL")));
+            blocks.addAll(b2claBlocks(byAmendTable.get("B2CLA"), gstin));
+            blocks.addAll(b2csBlocks(byTable.get("B2CS"), gstin));
+            blocks.addAll(b2csaBlocks(byAmendTable.get("B2CSA"), gstin));
+            if (!dropIrp) {
+                blocks.addAll(expBlocks(byTable.get("EXP")));
+                blocks.addAll(expaBlocks(byAmendTable.get("EXPA"), gstin));
+            }
+            blocks.addAll(nilBlocks(byTable.get("NIL"), gstin));
         }
-        blocks.addAll(nilBlocks(byTable.get("NIL"), gstin));
         if (!dropIrp) {
             blocks.addAll(cdnrBlocks(byTable.get("CDNR"), gstin));
             blocks.addAll(cdnraBlocks(byAmendTable.get("CDNRA"), gstin));
         }
-        blocks.addAll(cdnurBlocks(byTable.get("CDNUR")));
-        blocks.addAll(cdnuraBlocks(byAmendTable.get("CDNURA")));
-        blocks.addAll(atBlocks(byTable.get("AT"), gstin, "at", true));
-        blocks.addAll(ataBlocks(byAmendTable.get("ATA"), gstin));
-        blocks.addAll(atBlocks(byTable.get("TXPD"), gstin, "txpd", false));
-        blocks.addAll(txpdaBlocks(byAmendTable.get("TXPDA"), gstin));
-        blocks.addAll(docIssueBlocks(byTable.get("DOCS")));
-        blocks.addAll(hsnBlocks(byTable.get("HSN")));
+        if (!iff) {
+            blocks.addAll(cdnurBlocks(byTable.get("CDNUR")));
+            blocks.addAll(cdnuraBlocks(byAmendTable.get("CDNURA")));
+            blocks.addAll(atBlocks(byTable.get("AT"), gstin, "at", true));
+            blocks.addAll(ataBlocks(byAmendTable.get("ATA"), gstin));
+            blocks.addAll(atBlocks(byTable.get("TXPD"), gstin, "txpd", false));
+            blocks.addAll(txpdaBlocks(byAmendTable.get("TXPDA"), gstin));
+            blocks.addAll(docIssueBlocks(byTable.get("DOCS")));
+            blocks.addAll(hsnBlocks(byTable.get("HSN")));
+        }
 
         return pack(blocks, gstin, fp);
     }

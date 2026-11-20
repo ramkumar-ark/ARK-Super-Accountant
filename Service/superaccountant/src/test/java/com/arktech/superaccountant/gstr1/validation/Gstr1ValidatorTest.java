@@ -13,6 +13,7 @@ import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.workflow.models.FilerProfile;
 import com.arktech.superaccountant.workflow.models.FilerFrequency;
 import com.arktech.superaccountant.workflow.models.Workflow;
+import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.FilerProfileRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -343,16 +344,36 @@ class Gstr1ValidatorTest extends TableTestSupport {
     }
 
     @Test
-    void aggregateValueAboveIffCap_isWarning() {
-        List<ValidationResult> results = validate(
+    void aggregateValueAboveIffCap_isWarningOnlyForIffReturns() {
+        Workflow iff = iffWorkflow();
+        iff.setUploadJobId(UUID.randomUUID());
+        List<ValidationResult> iffResults = validator.validate(iff, List.of(
                 row("B2B", "b2b:G:g1", "G:g1", b2b("taxableValue", n("3000000"))),
-                row("B2B", "b2b:G:g2", "G:g2", b2b("taxableValue", n("2500000"))));
-        assertThat(count(results, "IFF_CAP")).isEqualTo(1);
-        assertThat(results.stream()
+                row("B2B", "b2b:G:g2", "G:g2", b2b("taxableValue", n("2500000")))));
+        assertThat(count(iffResults, "IFF_CAP")).isEqualTo(1);
+        assertThat(iffResults.stream()
                 .filter(r -> r.code().equals("IFF_CAP"))
                 .allMatch(r -> r.severity() == ValidationResult.Severity.WARNING)).isTrue();
-        assertThat(has(validate(row("B2B", "b2b:G:g3", "G:g3",
-                b2b("taxableValue", n("1000")))), "IFF_CAP")).isFalse();
+
+        // a monthly/quarterly GSTR-1 has no ₹50 lakh IFF cap
+        Workflow gstr1 = workflow();
+        gstr1.setUploadJobId(UUID.randomUUID());
+        assertThat(has(validator.validate(gstr1, List.of(
+                row("B2B", "b2b:G:g1", "G:g1", b2b("taxableValue", n("3000000"))),
+                row("B2B", "b2b:G:g2", "G:g2", b2b("taxableValue", n("2500000"))))),
+                "IFF_CAP")).isFalse();
+        // below the cap even an IFF carries no warning
+        Workflow smallIff = iffWorkflow();
+        smallIff.setUploadJobId(UUID.randomUUID());
+        assertThat(has(validator.validate(smallIff, List.of(
+                row("B2B", "b2b:G:g3", "G:g3", b2b("taxableValue", n("1000"))))),
+                "IFF_CAP")).isFalse();
+    }
+
+    private Workflow iffWorkflow() {
+        Workflow w = workflow();
+        w.setType(WorkflowType.IFF);
+        return w;
     }
 
     @Test

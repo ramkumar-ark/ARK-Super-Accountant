@@ -63,7 +63,9 @@ public class Gstr1PrepareService {
     private static final Logger logger =
             LoggerFactory.getLogger(Gstr1PrepareService.class);
 
-    static final String RETURN_KIND = "GSTR1";
+    /** Ship 7 / T22: an IFF carries only B2B and CDNR (their amendment variants). */
+    private static final Set<ReportingClass> IFF_CLASSES = Set.of(
+            ReportingClass.B2B, ReportingClass.CDNR);
 
     @Autowired
     private WorkflowRepository workflowRepository;
@@ -216,32 +218,96 @@ public class Gstr1PrepareService {
         List<VoucherView> views = viewBuilder.build(workflow);
         YearMonth period = YearMonth.from(workflow.getPeriodStart());
         ReportingClassifier classifier = classifier(workflow);
+        boolean iff = workflow.getType() == WorkflowType.IFF;
+        // T22: a quarter GSTR-1 leaves out documents a finalized IFF already reported
+        Set<String> iffDocKeys = iff ? Set.of() : iffReportedDocKeys(workflow);
         Map<ReportingClass, List<VoucherView>> byClass = new EnumMap<>(ReportingClass.class);
         for (VoucherView view : views) {
             ReportingClass category = classifier.classify(view, period).category();
+            if (iff && !IFF_CLASSES.contains(category)) {
+                continue;
+            }
             byClass.computeIfAbsent(category, k -> new ArrayList<>()).add(view);
         }
+        if (!iffDocKeys.isEmpty()) {
+            excludeIffReportedDocs(byClass, iffDocKeys);
+        }
+        // T22: IFF-reported docs leave the quarter's document tables but stay in the
+        // HSN summary (Table 12), which covers the whole quarter, consistent with DOCS
         List<VoucherView> reportable = views.stream()
                 .filter(v -> !byClass.getOrDefault(ReportingClass.NOT_REPORTED, List.of()).contains(v))
                 .toList();
 
         List<PreparedReturnRow> rows = new ArrayList<>();
         rows.addAll(b2bBuilder.build(workflow, byClass.getOrDefault(ReportingClass.B2B, List.of())));
-        rows.addAll(b2clBuilder.build(workflow, byClass.getOrDefault(ReportingClass.B2CL, List.of())));
-        rows.addAll(b2csBuilder.build(workflow, byClass.getOrDefault(ReportingClass.B2CS, List.of())));
-        rows.addAll(nilExemptBuilder.build(workflow, union(byClass,
-                ReportingClass.B2CS, ReportingClass.B2CL)));
-        rows.addAll(exportBuilder.build(workflow, byClass.getOrDefault(ReportingClass.EXP, List.of())));
+        if (!iff) {
+            rows.addAll(b2clBuilder.build(workflow, byClass.getOrDefault(ReportingClass.B2CL, List.of())));
+            rows.addAll(b2csBuilder.build(workflow, byClass.getOrDefault(ReportingClass.B2CS, List.of())));
+            rows.addAll(nilExemptBuilder.build(workflow, union(byClass,
+                    ReportingClass.B2CS, ReportingClass.B2CL)));
+            rows.addAll(exportBuilder.build(workflow, byClass.getOrDefault(ReportingClass.EXP, List.of())));
+            rows.addAll(advanceBuilder.build(workflow, union(byClass,
+                    ReportingClass.ADVANCE, ReportingClass.ADV_ADJ)));
+        }
         rows.addAll(cdnBuilder.build(workflow, union(byClass,
                 ReportingClass.CDNR, ReportingClass.CDNUR)));
-        rows.addAll(advanceBuilder.build(workflow, union(byClass,
-                ReportingClass.ADVANCE, ReportingClass.ADV_ADJ)));
-        rows.addAll(hsnBuilder.build(workflow, reportable));
-        rows.addAll(docsIssuedBuilder.build(workflow, views));
+        if (!iff) {
+            rows.addAll(hsnBuilder.build(workflow, reportable));
+            rows.addAll(docsIssuedBuilder.build(workflow, views));
+        }
         // amendment/late rows (T20): folded in after the normal builders
         rows.addAll(amendmentBuilder.build(workflow, rows));
         rows.forEach(row -> row.setPreparedReturnId(preparedReturnId));
         return rows;
+    }
+
+    /**
+     * T22: row keys (doc keys) of frozen IFF prepared returns whose period falls
+     * inside this workflow's period. UNVERIFIED: whether the portal keys documents
+     * the same way across IFF and quarterly GSTR-1 files; matching uses this
+     * application's row keys (b2b:&lt;voucher key&gt;, cdn:&lt;voucher key&gt;).
+     */
+    private Set<String> iffReportedDocKeys(Workflow workflow) {
+        if (!workflow.getType().equals(WorkflowType.GSTR1)) {
+            return Set.of();
+        }
+        Set<String> keys = new java.util.HashSet<>();
+        for (Workflow candidate : workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(
+                workflow.getOrganizationId())) {
+            if (candidate.getType() != WorkflowType.IFF) {
+                continue;
+            }
+            if (candidate.getPeriodStart() == null || candidate.getPeriodEnd() == null
+                    || candidate.getPeriodEnd().isBefore(workflow.getPeriodStart())
+                    || candidate.getPeriodStart().isAfter(workflow.getPeriodEnd())) {
+                continue;
+            }
+            Optional<PreparedReturn> iffReturn = preparedReturnRepository
+                    .findByWorkflowIdAndReturnKind(candidate.getId(), "IFF");
+            if (iffReturn.isEmpty() || iffReturn.get().getFrozenAt() == null) {
+                continue; // only a FROZEN (finalized) IFF counts as reported
+            }
+            rowRepository.findByPreparedReturnId(iffReturn.get().getId()).stream()
+                    .filter(row -> !row.isAmendment())
+                    .map(PreparedReturnRow::getRowKey)
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(keys::add);
+        }
+        return keys;
+    }
+
+    /** Drops IFF-reported views from the B2B/CDNR class buckets by doc key. */
+    private static void excludeIffReportedDocs(Map<ReportingClass, List<VoucherView>> byClass,
+                                               Set<String> iffDocKeys) {
+        for (ReportingClass cls : List.of(ReportingClass.B2B, ReportingClass.CDNR,
+                ReportingClass.CDNUR)) {
+            List<VoucherView> views = byClass.get(cls);
+            if (views == null) {
+                continue;
+            }
+            views.removeIf(v -> iffDocKeys.contains("b2b:" + v.getVoucherKey())
+                    || iffDocKeys.contains("cdn:" + v.getVoucherKey()));
+        }
     }
 
     private static List<VoucherView> union(Map<ReportingClass, List<VoucherView>> byClass,
@@ -256,15 +322,20 @@ public class Gstr1PrepareService {
 
     private Optional<PreparedReturn> existing(Workflow workflow) {
         return preparedReturnRepository.findByWorkflowIdAndReturnKind(
-                workflow.getId(), RETURN_KIND);
+                workflow.getId(), returnKind(workflow));
     }
 
     private PreparedReturn create(Workflow workflow) {
         PreparedReturn prepared = new PreparedReturn();
         prepared.setWorkflowId(workflow.getId());
-        prepared.setReturnKind(RETURN_KIND);
+        prepared.setReturnKind(returnKind(workflow));
         prepared.setBuiltAt(Instant.now());
         return preparedReturnRepository.save(prepared);
+    }
+
+    /** T22: IFF workflows freeze their own prepared return with returnKind=IFF. */
+    public static String returnKind(Workflow workflow) {
+        return workflow != null && workflow.getType() == WorkflowType.IFF ? "IFF" : "GSTR1";
     }
 
     private void lockWorkflow(Workflow workflow) {
@@ -273,9 +344,10 @@ public class Gstr1PrepareService {
     }
 
     private void requireGstr1(Workflow workflow) {
-        if (workflow == null || workflow.getType() != WorkflowType.GSTR1) {
+        if (workflow == null || (workflow.getType() != WorkflowType.GSTR1
+                && workflow.getType() != WorkflowType.IFF)) {
             throw new WorkflowConflictException(
-                    "The prepared-return pipeline currently applies to GSTR1 only");
+                    "The prepared-return pipeline applies to GSTR1 and IFF only");
         }
     }
 }

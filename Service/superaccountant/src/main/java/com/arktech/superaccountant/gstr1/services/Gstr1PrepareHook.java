@@ -27,7 +27,8 @@ public class Gstr1PrepareHook implements PrepareHook {
 
     @Override
     public boolean appliesTo(Workflow w) {
-        return w != null && w.getType() == WorkflowType.GSTR1;
+        return w != null && (w.getType() == WorkflowType.GSTR1
+                || w.getType() == WorkflowType.IFF);
     }
 
     @Override

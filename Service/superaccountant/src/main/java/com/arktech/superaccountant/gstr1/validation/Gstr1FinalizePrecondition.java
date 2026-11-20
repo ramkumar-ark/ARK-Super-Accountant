@@ -30,8 +30,6 @@ import java.util.Optional;
 @Component
 public class Gstr1FinalizePrecondition implements FinalizePrecondition {
 
-    private static final String RETURN_KIND = "GSTR1";
-
     private final Gstr1Validator validator;
     private final PreparedReturnRepository preparedReturnRepository;
     private final PreparedReturnRowRepository rowRepository;
@@ -55,13 +53,18 @@ public class Gstr1FinalizePrecondition implements FinalizePrecondition {
 
     @Override
     public boolean appliesTo(Workflow workflow) {
-        return workflow.getType() == WorkflowType.GSTR1;
+        return workflow.getType() == WorkflowType.GSTR1
+                || workflow.getType() == WorkflowType.IFF;
+    }
+
+    private static String returnKind(Workflow workflow) {
+        return workflow.getType() == WorkflowType.IFF ? "IFF" : "GSTR1";
     }
 
     @Override
     public List<String> unmet(Workflow workflow) {
         Optional<PreparedReturn> prepared = preparedReturnRepository
-                .findByWorkflowIdAndReturnKind(workflow.getId(), RETURN_KIND);
+                .findByWorkflowIdAndReturnKind(workflow.getId(), returnKind(workflow));
         if (prepared.isEmpty()) {
             return List.of("The GSTR-1 prepared return has not been built yet");
         }

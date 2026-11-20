@@ -234,9 +234,6 @@ public class WorkflowService {
             throw new WorkflowConflictException(
                     "Workflow is in " + w.getStage() + " stage; only a workflow in FINDINGS_REVIEW can move to PREPARE");
         }
-        if (w.getType() == WorkflowType.IFF) {
-            throw new WorkflowBadRequestException("IFF preparation is not yet supported");
-        }
         requireZeroBlocking(w);
         if (!baselineGate.isConfirmed(organizationId)) {
             throw new WorkflowConflictException("Baseline must be confirmed before Prepare");

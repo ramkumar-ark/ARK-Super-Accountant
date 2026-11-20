@@ -18,20 +18,22 @@ import java.util.UUID;
 @Component
 public class Gstr1AmendmentOriginSource implements AmendmentOriginSource {
 
-    private static final String RETURN_KIND = "GSTR1";
-
     @Autowired
     private PreparedReturnRepository preparedReturnRepository;
     @Autowired
     private PreparedReturnRowRepository preparedReturnRowRepository;
+    @Autowired
+    private com.arktech.superaccountant.workflow.repository.WorkflowRepository workflowRepository;
 
     @Override
     public Optional<AmendmentOrigin> origin(UUID workflowId, String voucherKey) {
         if (workflowId == null || voucherKey == null) {
             return Optional.empty();
         }
-        Optional<PreparedReturn> prepared =
-                preparedReturnRepository.findByWorkflowIdAndReturnKind(workflowId, RETURN_KIND);
+        // T22: the workflow may be an IFF (returnKind IFF), not only a GSTR1 one
+        Optional<PreparedReturn> prepared = workflowRepository.findById(workflowId).flatMap(
+                workflow -> preparedReturnRepository.findByWorkflowIdAndReturnKind(workflowId,
+                        Gstr1PrepareService.returnKind(workflow)));
         if (prepared.isEmpty()) {
             return Optional.empty();
         }
