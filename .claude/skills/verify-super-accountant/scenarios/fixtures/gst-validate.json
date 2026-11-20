@@ -1,0 +1,47 @@
+{
+  "tallymessage": [
+    {
+      "date": "20240401",
+      "vouchertypename": "Sales",
+      "vouchernumber": "SL-0001",
+      "guid": "SYN-GV-001",
+      "partyledgername": "Synthetic Customer",
+      "partygstin": "29AAACD1111F1Z5",
+      "cmpgstin": "29AAVCS5633D1ZL",
+      "gstregistrationtype": "Regular",
+      "placeofsupply": "Karnataka",
+      "isinvoice": true,
+      "isreversechargeapplicable": false,
+      "allledgerentries": [
+        {
+          "ledgername": "Synthetic Customer",
+          "amount": 1180,
+          "isdeemedpositive": true
+        },
+        {
+          "ledgername": "Synthetic Sales Ledger",
+          "amount": -1000,
+          "isdeemedpositive": true
+        },
+        {
+          "ledgername": "Output CGST",
+          "amount": -90,
+          "isdeemedpositive": true
+        },
+        {
+          "ledgername": "Output SGST",
+          "amount": -90,
+          "isdeemedpositive": true
+        }
+      ],
+      "allinventoryentries": [
+        {
+          "ledgername.item": "Synthetic Item A",
+          "baserate": 18,
+          "isdeemedpositive": true,
+          "amount": 1000
+        }
+      ]
+    }
+  ]
+}

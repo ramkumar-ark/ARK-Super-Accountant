@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# verify-super-accountant drive <scenario>... | all
+# Runs scenarios against the instance started by scripts/up, writing
+# evidence/run-<ts>/scenarios.jsonl and summary.json.
+set -u -o pipefail
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+lib="$SKILL_DIR/lib/common.sh"
+[ -f "$lib" ] || { echo "missing lib/common.sh" >&2; exit 1; }
+
+SLUG=$(basename "$(pwd)" | tr -c 'a-zA-Z0-9_' '_' | cut -c1-30)
+MARKER="$SKILL_DIR/evidence/instance-$SLUG.json"
+[ -f "$MARKER" ] || { echo "no instance marker for '$SLUG' — run scripts/up first" >&2; exit 1; }
+
+VSA_EVIDENCE_RUN="$SKILL_DIR/evidence/run-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$VSA_EVIDENCE_RUN/http"
+VSA_STATE_FILE="$VSA_EVIDENCE_RUN/state.json" 
+jq -n --arg slug "$(jq -r .slug "$MARKER")" '{slug:$slug}' > "$VSA_STATE_FILE"
+export VSA_EVIDENCE_RUN VSA_STATE_FILE
+
+API_PORT=$(jq -r .api_port "$MARKER"); VITE_PORT=$(jq -r .vite_port "$MARKER")
+export API_PORT VITE_PORT
+
+# Load the marker's env vars into the common.sh namespace.
+VSA_API_PORT="$API_PORT"; VSA_VITE_PORT="$VITE_PORT"
+export VSA_API_PORT VSA_VITE_PORT
+VSA_SLUG=$(jq -r .slug "$MARKER"); VSA_BASE="http://localhost:$API_PORT"
+VSA_LOG_DIR=$(jq -r '.backend_log' "$MARKER" | xargs dirname)
+VSA_MARKER="$MARKER"
+export VSA_SLUG VSA_BASE VSA_LOG_DIR VSA_MARKER
+
+. "$lib"
+
+SCENARIOS=("$@")
+if [ "${1:-}" = "all" ] || [ ${#SCENARIOS[@]} -eq 0 ]; then
+  SCENARIOS=(sign-in workflow-lifecycle gstr1-tables gstr1-fill-ins gstr1-findings gstr1-validate gstr1-export filed-returns-import)
+fi
+
+FAILED=0; RUN=0
+cp "$MARKER" "$VSA_EVIDENCE_RUN/" 2>/dev/null
+BOOT_LOG=$(mktemp)
+
+if ! ( set -e; . "$lib"; VSA_SCENARIO=bootstrap; vsa_bootstrap ) > "$VSA_EVIDENCE_RUN/bootstrap.out" 2>&1; then
+  FAILED=$((FAILED+1)); RUN=$((RUN+1))
+  echo '{"scenario":"bootstrap","error":true}' > "$VSA_EVIDENCE_RUN/bootstrap.failed"
+fi
+
+for s in "${SCENARIOS[@]}"; do
+  RUN=$((RUN+1))
+  f="$SKILL_DIR/scenarios/$s.sh"
+  if [ ! -f "$f" ]; then echo "unknown scenario: $s" >&2; FAILED=$((FAILED+1)); continue; fi
+  if ! (
+    set -e
+    . "$lib"
+    VSA_SCENARIO="$s"
+    source "$f"
+    run_scenario
+  ) 2>&1 | tee "$VSA_EVIDENCE_RUN/$s.out"; then
+    FAILED=$((FAILED+1))
+  fi
+done
+
+FAILED_STEPS=$(grep -c '"ok":false' "$VSA_EVIDENCE_RUN/scenarios.jsonl" 2>/dev/null; true)
+FAILED_STEPS=${FAILED_STEPS:-0}; FAILED_STEPS=${FAILED_STEPS##*$'\n'}
+PASSED_STEPS=$(grep -c '"ok":true' "$VSA_EVIDENCE_RUN/scenarios.jsonl" 2>/dev/null; true)
+PASSED_STEPS=${PASSED_STEPS:-0}; PASSED_STEPS=${PASSED_STEPS##*$'\n'}
+SHA=$(git -C "$(pwd)" rev-parse --short HEAD 2>/dev/null || echo unknown)
+jq -n --arg passed "$PASSED_STEPS" --arg failed_steps "$FAILED_STEPS" --arg failed "$FAILED" \
+  --arg run "$RUN" --arg sha "$SHA" \
+  '{passed_steps:($passed|tonumber), failed_steps:($failed_steps|tonumber), scenarios_failed:($failed|tonumber), scenarios_run:($run|tonumber), product_version_sha:$sha}' \
+  > "$VSA_EVIDENCE_RUN/summary.json"
+echo "evidence: $VSA_EVIDENCE_RUN"
+jq . "$VSA_EVIDENCE_RUN/summary.json"
+[ "$FAILED" -eq 0 ] && [ "$FAILED_STEPS" -eq 0 ]

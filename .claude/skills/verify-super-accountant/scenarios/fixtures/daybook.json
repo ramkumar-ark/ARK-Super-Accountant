@@ -1,0 +1,37 @@
+{
+  "tallymessage": [
+    {
+      "date": "20261005",
+      "vouchertypename": "Sales",
+      "vouchernumber": "SYN-001",
+      "guid": "SYN-V-001",
+      "partyledgername": "Synthetic Customer",
+      "allledgerentries": [
+        { "ledgername": "Synthetic Customer", "amount": 11800 },
+        { "ledgername": "Synthetic Sales Ledger", "amount": -11800 }
+      ]
+    },
+    {
+      "date": "20261007",
+      "vouchertypename": "Receipt",
+      "vouchernumber": "SYN-002",
+      "guid": "SYN-V-002",
+      "partyledgername": "Synthetic Customer",
+      "allledgerentries": [
+        { "ledgername": "Synthetic Cash", "amount": 11800 },
+        { "ledgername": "Synthetic Customer", "amount": -11800 }
+      ]
+    },
+    {
+      "date": "20261009",
+      "vouchertypename": "Purchase",
+      "vouchernumber": "SYN-003",
+      "guid": "SYN-V-003",
+      "partyledgername": "Synthetic Supplier",
+      "allledgerentries": [
+        { "ledgername": "Synthetic Purchase Ledger", "amount": 5900 },
+        { "ledgername": "Synthetic Supplier", "amount": -5900 }
+      ]
+    }
+  ]
+}

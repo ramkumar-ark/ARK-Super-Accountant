@@ -1,0 +1,242 @@
+{
+  "tallymessage": [
+    {
+      "group": {
+        "name": "Sales Accounts",
+        "parent": ""
+      }
+    },
+    {
+      "group": {
+        "name": "Sundry Debtors",
+        "parent": ""
+      }
+    },
+    {
+      "group": {
+        "name": "Cash-in-Hand",
+        "parent": ""
+      }
+    },
+    {
+      "group": {
+        "name": "Purchase Accounts",
+        "parent": ""
+      }
+    },
+    {
+      "group": {
+        "name": "Sundry Creditors",
+        "parent": ""
+      }
+    },
+    {
+      "ledger": {
+        "name": "Synthetic Sales Ledger",
+        "guid": "SYN-L-SALES",
+        "parent": "Sales Accounts",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Synthetic Customer",
+        "guid": "SYN-L-CUST",
+        "parent": "Sundry Debtors",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Synthetic Cash",
+        "guid": "SYN-L-CASH",
+        "parent": "Cash-in-Hand",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Synthetic Purchase Ledger",
+        "guid": "SYN-L-PUR",
+        "parent": "Purchase Accounts",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Synthetic Supplier",
+        "guid": "SYN-L-SUP",
+        "parent": "Sundry Creditors",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "group": {
+        "name": "Duties & Taxes",
+        "parent": ""
+      }
+    },
+    {
+      "ledger": {
+        "name": "Cash CGST",
+        "guid": "SYN-TX-CASH_BALANCE-CGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Cash SGST",
+        "guid": "SYN-TX-CASH_BALANCE-SGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Cash IGST",
+        "guid": "SYN-TX-CASH_BALANCE-IGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Credit Balance CGST",
+        "guid": "SYN-TX-CREDIT_BALANCE-CGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Credit Balance SGST",
+        "guid": "SYN-TX-CREDIT_BALANCE-SGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Credit Balance IGST",
+        "guid": "SYN-TX-CREDIT_BALANCE-IGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "GST TDS CGST",
+        "guid": "SYN-TX-GST_TDS-CGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "GST TDS SGST",
+        "guid": "SYN-TX-GST_TDS-SGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "GST TDS IGST",
+        "guid": "SYN-TX-GST_TDS-IGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Input CGST",
+        "guid": "SYN-TX-INPUT-CGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Input SGST",
+        "guid": "SYN-TX-INPUT-SGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Input IGST",
+        "guid": "SYN-TX-INPUT-IGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Liability CGST",
+        "guid": "SYN-TX-LIABILITY_BALANCE-CGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Liability SGST",
+        "guid": "SYN-TX-LIABILITY_BALANCE-SGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Liability IGST",
+        "guid": "SYN-TX-LIABILITY_BALANCE-IGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Output CGST",
+        "guid": "SYN-TX-OUTPUT-CGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Output SGST",
+        "guid": "SYN-TX-OUTPUT-SGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Output IGST",
+        "guid": "SYN-TX-OUTPUT-IGST",
+        "parent": "Duties & Taxes",
+        "taxtype": "GST",
+        "gstapplicable": "Applicable"
+      }
+    }
+  ]
+}

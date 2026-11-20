@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': `http://localhost:${process.env.SA_API_PORT ?? 8080}`,
     },
   },
   test: {

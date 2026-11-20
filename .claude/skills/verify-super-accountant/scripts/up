@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# verify-super-accountant up [--tag <slug>]
+# Boots the backend + frontend against an isolated verify database and ports,
+# writes an instance marker, and never touches the default superaccountant DB.
+set -euo pipefail
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+EVIDENCE="$SKILL_DIR/evidence"
+mkdir -p "$EVIDENCE"
+
+SLUG=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tag) SLUG="$2"; shift 2;;
+    *) echo "usage: scripts/up [--tag <slug>]" >&2; exit 2;;
+  esac
+done
+[ -z "$SLUG" ] && SLUG=$(basename "$(pwd)" | tr -c 'a-zA-Z0-9_' '_' | cut -c1-30)
+echo "verify slug: $SLUG"
+
+# db.env: load credentials into env without ever printing them.
+ENV_FILE="${HOME}/.config/super-accountant/db.env"
+[ -f "$ENV_FILE" ] || { echo "missing $ENV_FILE" >&2; exit 1; }
+set -a; . "$ENV_FILE"; set +a
+[ -n "${DB_PASSWORD:-}" ] || { echo "DB_PASSWORD not set in db.env" >&2; exit 1; }
+# JWT_SECRET is not in db.env; each verify run generates its own ephemeral secret.
+[ -n "${JWT_SECRET:-}" ] || JWT_SECRET="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+[ ${#JWT_SECRET} -ge 32 ] || { echo "JWT_SECRET must be >= 32 chars" >&2; exit 1; }
+DB_USERNAME="${DB_USERNAME:-postgres}"
+
+DB_NAME="superaccountant_verify_${SLUG}"
+# Port offset: stable hash of the slug, mapped into 10..200.
+OFFSET=$(( ($(echo -n "$SLUG" | cksum | cut -d' ' -f1) % 191) + 10 ))
+API_PORT=$(( 8080 + OFFSET ))
+VITE_PORT=$(( 5173 + OFFSET ))
+
+# Idempotent DB creation (namespaced add-only; never touches `superaccountant`).
+export PGPASSWORD="$DB_PASSWORD"
+if ! psql -h localhost -U "$DB_USERNAME" -d postgres -tAc \
+  "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" | grep -q 1; then
+  psql -h localhost -U "$DB_USERNAME" -d postgres -c "CREATE DATABASE \"$DB_NAME\""
+fi
+
+export DB_URL="jdbc:postgresql://localhost:5432/${DB_NAME}"
+unset PGPASSWORD
+
+LOG_DIR="$EVIDENCE/logs-$SLUG"
+rm -rf "$LOG_DIR"; mkdir -p "$LOG_DIR"
+
+REPO_ROOT="$(cd "$SKILL_DIR/../../.." && pwd)"
+BACKEND_DIR="$REPO_ROOT/Service/superaccountant"
+CLIENT_DIR="$REPO_ROOT/Client"
+
+echo "starting backend on port $API_PORT (db $DB_NAME)..."
+( cd "$BACKEND_DIR" && setsid env SERVER_PORT="$API_PORT" DB_URL="$DB_URL" \
+    DB_USERNAME="$DB_USERNAME" DB_PASSWORD="$DB_PASSWORD" JWT_SECRET="$JWT_SECRET" \
+    ./mvnw -q spring-boot:run >"$LOG_DIR/backend.log" 2>&1 & echo $! > "$LOG_DIR/backend.pid" )
+BACKEND_PID=$(cat "$LOG_DIR/backend.pid")
+
+echo "starting frontend dev server on port $VITE_PORT..."
+( cd "$CLIENT_DIR" && setsid env SA_API_PORT="$API_PORT" \
+    npm run dev -- --port "$VITE_PORT" --strictPort >"$LOG_DIR/frontend.log" 2>&1 & echo $! > "$LOG_DIR/frontend.pid" )
+FRONTEND_PID=$(cat "$LOG_DIR/frontend.pid")
+
+cleanup_on_fail() {
+  kill -TERM -"$BACKEND_PID" -"$FRONTEND_PID" 2>/dev/null || true
+  exit 1
+}
+trap cleanup_on_fail ERR
+
+# Health check: backend answers (401 on auth = up); frontend serves index.
+deadline=$(( $(date +%s) + 120 ))
+until curl -s -o /dev/null -w '%{http_code}' "http://localhost:$API_PORT/api/auth/invite/healthcheck" 2>/dev/null | grep -qE '40[0-9]'; do
+  [ "$(date +%s)" -gt "$deadline" ] && { tail -50 "$LOG_DIR/backend.log" >&2; echo "backend health check timed out" >&2; kill -TERM -"$BACKEND_PID" 2>/dev/null; kill -TERM -"$FRONTEND_PID" 2>/dev/null; exit 1; }
+  sleep 2
+done
+until curl -s -o /dev/null -w '%{http_code}' "http://localhost:$VITE_PORT/" 2>/dev/null | grep -q 200; do
+  [ "$(date +%s)" -gt "$deadline" ] && { tail -50 "$LOG_DIR/frontend.log" >&2; echo "frontend health check timed out" >&2; kill -TERM -"$BACKEND_PID" -"$FRONTEND_PID" 2>/dev/null; exit 1; }
+  sleep 2
+done
+
+cat > "$EVIDENCE/instance-$SLUG.json" <<EOF
+{
+  "slug": "$SLUG",
+  "api_port": $API_PORT,
+  "vite_port": $VITE_PORT,
+  "database": "$DB_NAME",
+  "backend_pid_group": $BACKEND_PID,
+  "frontend_pid_group": $FRONTEND_PID,
+  "backend_log": "$LOG_DIR/backend.log",
+  "frontend_log": "$LOG_DIR/frontend.log",
+  "started": "$(date -u +%FT%TZ)"
+}
+EOF
+echo "up: api=$API_PORT vite=$VITE_PORT db=$DB_NAME marker=$EVIDENCE/instance-$SLUG.json"
