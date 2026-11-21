@@ -197,3 +197,109 @@ describe('OrganizationSetupPage — step 2 template flow', () => {
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 })
+
+describe('OrganizationSetupPage — PAN derived from GSTIN', () => {
+  const GSTIN = '22AAAAA0000A1Z5'
+  const DERIVED_PAN = 'AAAAA0000A'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setupAuthStoreMock()
+    mockGet.mockResolvedValue({ data: [] })
+    mockPost.mockResolvedValue({ data: { id: 'org-123' } })
+  })
+
+  it('derives PAN from a complete valid GSTIN, locks it, and marks it valid', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    const panInput = screen.getByLabelText('PAN')
+    expect(panInput).not.toHaveAttribute('readonly')
+
+    await user.type(screen.getByLabelText('GSTIN'), GSTIN)
+
+    expect(panInput).toHaveValue(DERIVED_PAN)
+    expect(panInput).toHaveAttribute('readonly')
+    expect(screen.getByText('Derived from GSTIN')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('unlocks PAN and drops the derived value when GSTIN is cleared', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    const gstinInput = screen.getByLabelText('GSTIN')
+    const panInput = screen.getByLabelText('PAN')
+
+    await user.type(gstinInput, GSTIN)
+    expect(panInput).toHaveAttribute('readonly')
+
+    await user.clear(gstinInput)
+
+    expect(panInput).not.toHaveAttribute('readonly')
+    expect(panInput).toHaveValue('')
+    expect(screen.queryByText('Derived from GSTIN')).not.toBeInTheDocument()
+  })
+
+  it('unlocks PAN when GSTIN becomes invalid again', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    const gstinInput = screen.getByLabelText('GSTIN')
+    const panInput = screen.getByLabelText('PAN')
+
+    await user.type(gstinInput, GSTIN)
+    expect(panInput).toHaveAttribute('readonly')
+
+    await user.type(gstinInput, '{Backspace}')
+
+    expect(gstinInput).toHaveValue(GSTIN.slice(0, -1))
+    expect(panInput).not.toHaveAttribute('readonly')
+    expect(panInput).toHaveValue('')
+    expect(screen.queryByText('Derived from GSTIN')).not.toBeInTheDocument()
+  })
+
+  it('keeps a PAN the user typed themselves while GSTIN is empty or invalid', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    const gstinInput = screen.getByLabelText('GSTIN')
+    const panInput = screen.getByLabelText('PAN')
+
+    await user.type(panInput, 'ABCDE1234F')
+    await user.type(gstinInput, '22AAAA')
+
+    expect(panInput).toHaveValue('ABCDE1234F')
+    expect(panInput).not.toHaveAttribute('readonly')
+
+    await user.clear(gstinInput)
+
+    expect(panInput).toHaveValue('ABCDE1234F')
+    expect(panInput).not.toHaveAttribute('readonly')
+  })
+
+  it('submits the derived PAN even though the input is locked', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    await user.type(screen.getByLabelText(/Organization Name/i), 'Acme Corp')
+    await user.type(screen.getByLabelText('GSTIN'), GSTIN)
+
+    const panInput = screen.getByLabelText('PAN')
+    expect(panInput).toHaveValue(DERIVED_PAN)
+    expect(panInput).toHaveAttribute('readonly')
+
+    await user.click(screen.getByRole('button', { name: 'Create Organization' }))
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(
+        '/organizations',
+        expect.objectContaining({
+          name: 'Acme Corp',
+          gstin: GSTIN,
+          pan: DERIVED_PAN,
+        })
+      )
+    })
+  })
+})

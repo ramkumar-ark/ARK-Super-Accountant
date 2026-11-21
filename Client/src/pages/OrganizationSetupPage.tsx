@@ -44,6 +44,7 @@ export function OrganizationSetupPage() {
 
   const [fieldErrors, setFieldErrors] = useState({ gstin: '', pan: '' })
   const [fieldValid, setFieldValid] = useState({ gstin: false, pan: false })
+  const [panDerived, setPanDerived] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<1 | 2>(1)
@@ -57,6 +58,30 @@ export function OrganizationSetupPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) {
     const { name, value } = e.target
+
+    if (name === 'gstin') {
+      const gstin = value.trim().toUpperCase()
+      const derivedPan = GSTIN_REGEX.test(gstin) ? gstin.slice(2, 12) : null
+      setForm((prev) => ({
+        ...prev,
+        gstin,
+        pan: derivedPan ?? (panDerived ? '' : prev.pan),
+      }))
+      if (derivedPan) {
+        setPanDerived(true)
+        setFieldErrors((prev) => ({ ...prev, pan: '' }))
+        setFieldValid((prev) => ({ ...prev, pan: true }))
+      } else if (panDerived) {
+        // The locked value was derived from a GSTIN that is now gone/invalid:
+        // drop it and hand the field back to the user. A PAN the user typed
+        // themselves (panDerived === false) is never cleared here.
+        setPanDerived(false)
+        setFieldErrors((prev) => ({ ...prev, pan: '' }))
+        setFieldValid((prev) => ({ ...prev, pan: false }))
+      }
+      return
+    }
+
     setForm((prev) => ({
       ...prev,
       [name]: name === 'financialYearStart' ? Number(value) : value,
@@ -384,8 +409,9 @@ export function OrganizationSetupPage() {
                     value={form.pan}
                     onChange={handleChange}
                     onBlur={handlePanBlur}
+                    readOnly={panDerived}
                     aria-describedby="pan-hint"
-                    className={`${inputClass} font-mono pr-8`}
+                    className={`${inputClass} font-mono pr-8${panDerived ? ' text-[var(--color-text-muted)]' : ''}`}
                     placeholder="ABCDE1234F"
                   />
                   {fieldValid.pan && (
@@ -403,6 +429,10 @@ export function OrganizationSetupPage() {
                     className="mt-1 text-xs text-[var(--color-danger)]"
                   >
                     {fieldErrors.pan}
+                  </p>
+                ) : panDerived ? (
+                  <p id="pan-hint" className="mt-1 text-xs text-[var(--color-text-muted)]">
+                    Derived from GSTIN
                   </p>
                 ) : (
                   <p id="pan-hint" className="mt-1 text-xs text-[var(--color-text-muted)]">
