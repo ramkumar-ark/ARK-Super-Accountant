@@ -28,6 +28,7 @@ import com.arktech.superaccountant.masters.repository.ValidationRuleConfigReposi
 import com.arktech.superaccountant.masters.rules.ValidationContext;
 import com.arktech.superaccountant.masters.services.OrganizationSettingsService;
 import com.arktech.superaccountant.masters.services.ValidationOrchestrator;
+import com.arktech.superaccountant.masters.util.TallyGroups;
 import com.arktech.superaccountant.tally.services.TallyParserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -318,6 +319,7 @@ public class UploadController {
             @RequestParam(required = false) FindingSeverity severity,
             @RequestParam(required = false) String ruleCode,
             @RequestParam(required = false) MismatchType mismatchType,
+            @RequestParam(required = false) String group,
             @RequestParam(defaultValue = "false") boolean showResolved,
             @RequestParam(defaultValue = "false") boolean resolvedOnly,
             @RequestParam(defaultValue = "0") int page,
@@ -332,7 +334,8 @@ public class UploadController {
 
         int cappedSize = Math.min(size, 100);
         PageRequest pageable = PageRequest.of(page, cappedSize);
-        Page<ValidationFinding> findings = findingRepository.findFiltered(id, category, severity, ruleCode, mismatchType, showResolved, resolvedOnly, pageable);
+        Page<ValidationFinding> findings = findingRepository.findFiltered(id, orgId, category, severity, ruleCode, mismatchType,
+                topGroupParam(group), showResolved, resolvedOnly, pageable);
 
         return ResponseEntity.ok(findings.map(this::toFindingResponse));
     }
@@ -346,6 +349,7 @@ public class UploadController {
             @RequestParam(required = false) FindingSeverity severity,
             @RequestParam(required = false) String ruleCode,
             @RequestParam(required = false) MismatchType mismatchType,
+            @RequestParam(required = false) String group,
             @RequestParam(defaultValue = "false") boolean showResolved,
             @RequestParam(defaultValue = "false") boolean resolvedOnly,
             @AuthenticationPrincipal UserDetailsImpl principal) {
@@ -366,9 +370,42 @@ public class UploadController {
         UUID jobId = latestJob.get().getId();
         int cappedSize = Math.min(size, 100);
         PageRequest pageable = PageRequest.of(page, cappedSize);
-        Page<ValidationFinding> findings = findingRepository.findFiltered(jobId, category, severity, ruleCode, mismatchType, showResolved, resolvedOnly, pageable);
+        Page<ValidationFinding> findings = findingRepository.findFiltered(jobId, orgId, category, severity, ruleCode, mismatchType,
+                topGroupParam(group), showResolved, resolvedOnly, pageable);
         Page<FindingResponse> response = findings.map(this::toFindingResponse);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * The primary (top-level) Tally groups present in the latest completed upload, for the findings group filter.
+     * Sub-groups are folded into their primary group.
+     */
+    @PreAuthorize("hasRole('ACCOUNTANT') or hasRole('OPERATOR') or hasRole('OWNER') or hasRole('AUDITOR_CA')")
+    @GetMapping("/uploads/latest/groups")
+    public ResponseEntity<?> getLatestJobGroups(@AuthenticationPrincipal UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        if (orgId == null) {
+            return ResponseEntity.badRequest().body("User is not linked to an organization.");
+        }
+        Optional<UploadJob> latestJob = uploadJobRepository
+                .findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(orgId,
+                        java.util.List.of(UploadJobStatus.COMPLETED, UploadJobStatus.COMPLETED_WITH_MISMATCHES));
+        if (latestJob.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        Map<String, String> labels = new java.util.LinkedHashMap<>();
+        for (UploadLedgerSnapshot snapshot : uploadLedgerSnapshotRepository.findByUploadJobId(latestJob.get().getId())) {
+            String code = TallyGroups.topLevel(snapshot.getGroupChain());
+            if (code == null) continue;
+            labels.putIfAbsent(code, TallyGroups.displayName(code, snapshot.getParentGroup()));
+        }
+
+        List<Map<String, String>> groups = labels.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue())
+                .map(e -> Map.of("value", e.getKey(), "label", e.getValue()))
+                .toList();
+        return ResponseEntity.ok(groups);
     }
 
     @PreAuthorize("isAuthenticated()")
@@ -674,13 +711,14 @@ public class UploadController {
             if (byIds) {
                 return ResponseEntity.badRequest().body(Map.of("error", "A count applies to a filter, not to listed ids."));
             }
-            return ResponseEntity.ok(Map.of("matched", countMatching(jobId, requiredStatus, approving, request, typedRule)));
+            return ResponseEntity.ok(Map.of("matched", countMatching(jobId, orgId, requiredStatus, approving, request, typedRule)));
         }
 
         List<ValidationFinding> targets = byIds
                 ? findingRepository.findByIdsForUpdate(jobId, new java.util.LinkedHashSet<>(request.getFindingIds()))
-                : findingRepository.findMatchingForUpdate(jobId, requiredStatus, request.getCategory(), request.getSeverity(),
-                        typedRule != null ? typedRule : blankToNull(request.getRuleCode()), request.getMismatchType());
+                : findingRepository.findMatchingForUpdate(jobId, requiredStatus, orgId, request.getCategory(), request.getSeverity(),
+                        typedRule != null ? typedRule : blankToNull(request.getRuleCode()), request.getMismatchType(),
+                        topGroupParam(request.getGroup()));
         if (!byIds) {
             targets = narrow(targets, approving, typedRule != null);
         }
@@ -746,10 +784,11 @@ public class UploadController {
     }
 
     /** How many findings a filter-mode action would touch: the same targeting as the real run, without locks or changes. */
-    private long countMatching(UUID jobId, ResolveStatus status, boolean approving, BulkFindingActionRequest request,
-                               String typedRule) {
-        List<ValidationFinding> matching = findingRepository.findMatching(jobId, status, request.getCategory(),
-                request.getSeverity(), typedRule != null ? typedRule : blankToNull(request.getRuleCode()), request.getMismatchType());
+    private long countMatching(UUID jobId, UUID orgId, ResolveStatus status, boolean approving,
+                               BulkFindingActionRequest request, String typedRule) {
+        List<ValidationFinding> matching = findingRepository.findMatching(jobId, status, orgId, request.getCategory(),
+                request.getSeverity(), typedRule != null ? typedRule : blankToNull(request.getRuleCode()),
+                request.getMismatchType(), topGroupParam(request.getGroup()));
         return narrow(matching, approving, typedRule != null).size();
     }
 
@@ -762,6 +801,11 @@ public class UploadController {
 
     private static String blankToNull(String s) {
         return s == null || s.isBlank() ? null : s;
+    }
+
+    /** Group names are stored lower-case in the snapshot/master chains, so normalise the request value. */
+    private static String topGroupParam(String group) {
+        return group == null || group.isBlank() ? null : group.trim().toLowerCase(Locale.ROOT);
     }
 
     /** Mapped after the @Transactional method has rolled back, so nothing from the batch is persisted. */

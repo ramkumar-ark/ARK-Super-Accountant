@@ -368,6 +368,7 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
         const closed = (s: string) => ['APPROVED', 'RESOLVED', 'DISCARDED'].includes(s)
         let out = rows.filter((r) => (q.get('resolvedOnly') === 'true' ? closed(r.resolveStatus) : q.get('showResolved') === 'true' || !closed(r.resolveStatus)))
         if (q.get('mismatchType')) out = out.filter((r) => r.mismatchType === q.get('mismatchType'))
+        if (q.get('group')) return Promise.resolve({ data: { content: out.slice(0, 1), totalElements: 2 } })
         return Promise.resolve({ data: { content: out, totalElements: out.length } })
       }
       return Promise.resolve({ data: {} })
@@ -415,6 +416,8 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
 
   it('reason filter is sent as the mismatchType param', async () => {
     await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'MISMATCH_DETECTION')
+    await screen.findByLabelText('Filter by reason')
     await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
     await waitFor(() =>
       expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('mismatchType=MISSING_IN_CONFIGURATION')),
@@ -437,6 +440,8 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
     const confirm = stubConfirm(true)
     rows = [mk('a'), mk('b'), mk('c', { mismatchType: 'PARENT_GROUP_MISMATCH', actualValue: 'X' })]
     await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'MISMATCH_DETECTION')
+    await screen.findByLabelText('Filter by reason')
     await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
     await waitFor(() => expect(screen.queryByText('Ledger c')).toBeNull())
     await userEvent.click(screen.getByLabelText('Select all'))
@@ -618,6 +623,8 @@ describe('MastersPage — findings paging and select-all-matching', () => {
   it('all-matching carries the current filters', async () => {
     stubConfirm(true)
     await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'MISMATCH_DETECTION')
+    await screen.findByLabelText('Filter by reason')
     await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'MISSING_IN_CONFIGURATION')
     await waitFor(() => expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('mismatchType=MISSING')))
     await userEvent.click(screen.getByLabelText('Select all'))
@@ -628,6 +635,7 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     expect(realPosts()[0][1]).toEqual({
       action: 'ACKNOWLEDGE',
       allMatching: true,
+      ruleCode: 'MISMATCH_DETECTION',
       mismatchType: 'MISSING_IN_CONFIGURATION',
     })
   })
@@ -658,8 +666,10 @@ describe('MastersPage — findings paging and select-all-matching', () => {
     mockPost.mockImplementation(((url: string, body: Record<string, unknown>) =>
       body?.dryRun ? dry(url, body) : new Promise((r) => (finish = r))) as never)
     await openTab()
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'MISMATCH_DETECTION')
+    await screen.findByLabelText('Filter by reason')
     await userEvent.click(screen.getByLabelText('Select all'))
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 257 matching' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Select all 250 matching' }))
     await userEvent.click(screen.getByRole('button', { name: /Submit for review selected \(250\)/ }))
 
     expect(await screen.findByText(/Submitting 250 findings/)).toBeInTheDocument()
@@ -896,5 +906,103 @@ describe('MastersPage — upload history changes', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Show changes' }))
     expect(await screen.findByText('GSTIN: 29ABCDE1234F1Z5 → 29ABCDE1234F1Z6')).toBeInTheDocument()
     expect(mockGet).toHaveBeenCalledWith('/v1/masters/uploads/m1/changes')
+  })
+})
+
+describe('MastersPage — reason visibility and Tally group filter', () => {
+  const BULK_URL = '/v1/uploads/job-1/findings/bulk-action'
+  const GROUPS = [
+    { value: 'loans & advances (asset)', label: 'Loans & Advances (Asset)' },
+    { value: 'deposits (asset)', label: 'Deposits (Asset)' },
+  ]
+  const mk = (id: string, over: Record<string, unknown> = {}) => ({
+    ...baseFinding,
+    id,
+    ledgerName: `Ledger ${id}`,
+    ruleCode: 'MISMATCH_DETECTION',
+    mismatchType: 'MISSING_IN_CONFIGURATION',
+    ...over,
+  })
+  let rows: Array<ReturnType<typeof mk>>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setRole('ROLE_OPERATOR')
+    rows = [mk('a'), mk('b'), mk('gst', { ruleCode: 'GSTIN_PRESENCE', mismatchType: null })]
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) return Promise.resolve({ data: { totalElements: rows.length } })
+      if (url === '/v1/uploads/latest/groups') return Promise.resolve({ data: GROUPS })
+      if (url.startsWith('/v1/uploads/latest/mismatches')) {
+        const q = new URLSearchParams(url.split('?')[1])
+        let out = rows
+        if (q.get('ruleCode')) out = out.filter((r) => r.ruleCode === q.get('ruleCode'))
+        if (q.get('mismatchType')) out = out.filter((r) => r.mismatchType === q.get('mismatchType'))
+        if (q.get('group')) return Promise.resolve({ data: { content: out.slice(0, 1), totalElements: 2 } })
+        return Promise.resolve({ data: { content: out, totalElements: out.length } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    mockPost.mockImplementation(((_url: string, body: Record<string, unknown>) =>
+      body?.dryRun ? Promise.resolve({ data: { matched: 2 } }) : Promise.resolve({ data: {} })) as never)
+  })
+
+  async function openTab() {
+    render(<MastersPage />)
+    const tab = await screen.findByRole('tab', { name: /Findings/ })
+    await waitFor(() => expect(tab).not.toBeDisabled())
+    await userEvent.click(tab)
+    await screen.findByText('Ledger a')
+  }
+
+  it('shows the reason filter only for Mismatch Detection and clears it when the type changes', async () => {
+    await openTab()
+    expect(screen.queryByLabelText('Filter by reason')).toBeNull()
+
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'MISMATCH_DETECTION')
+    expect(await screen.findByLabelText('Filter by reason')).toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByLabelText('Filter by reason'), 'PARENT_GROUP_MISMATCH')
+    await waitFor(() =>
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('mismatchType=PARENT_GROUP_MISMATCH')),
+    )
+
+    await userEvent.selectOptions(screen.getByLabelText('Filter by rule type'), 'GSTIN_PRESENCE')
+    await waitFor(() => expect(screen.queryByLabelText('Filter by reason')).toBeNull())
+    await waitFor(() => {
+      const requests = mockGet.mock.calls
+        .map((c) => String(c[0]))
+        .filter((u) => u.includes('ruleCode=GSTIN_PRESENCE'))
+      expect(requests.length).toBeGreaterThan(0)
+      expect(requests[requests.length - 1]).not.toContain('mismatchType')
+    })
+  })
+
+  it('lists primary Tally groups and applies the choice to the list and bulk counts', async () => {
+    await openTab()
+
+    const groupSelect = await screen.findByLabelText('Filter by Tally group')
+    expect(await screen.findByRole('option', { name: 'Loans & Advances (Asset)' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'All groups' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Vehicle Loans' })).toBeNull()
+
+    await userEvent.selectOptions(groupSelect, 'loans & advances (asset)')
+    await waitFor(() =>
+      expect(mockGet).toHaveBeenCalledWith(expect.stringContaining('group=loans')),
+    )
+    await waitFor(() => expect(screen.queryByText('Ledger b')).toBeNull())
+
+    await waitFor(() => {
+      const counted = mockPost.mock.calls.find(
+        ([, body]) =>
+          (body as Record<string, unknown>)?.dryRun === true &&
+          (body as Record<string, unknown>)?.action === 'ACKNOWLEDGE' &&
+          (body as Record<string, unknown>)?.group === 'loans & advances (asset)',
+      )
+      expect(counted).toBeTruthy()
+      expect(counted?.[0]).toBe(BULK_URL)
+    })
   })
 })

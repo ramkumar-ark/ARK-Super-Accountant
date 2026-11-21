@@ -124,7 +124,7 @@ class BulkActionPerformanceIT {
         System.out.println("BULK-PERF " + N + " findings: " + ms + " ms, " + statements + " prepared statements");
 
         assertThat(masterRepository.findByOrganizationIdAndActiveTrue(orgId)).hasSize(N);
-        assertThat(findingRepository.findMatching(job.getId(), ResolveStatus.APPROVED, null, null, null, null)).hasSize(N);
+        assertThat(findingRepository.findMatching(job.getId(), ResolveStatus.APPROVED, orgId, null, null, null, null, null)).hasSize(N);
         assertThat(editLogRepository.count()).isGreaterThanOrEqualTo(N);
         // Work must not scale with a query or two per finding.
         assertThat(statements).isLessThan(100);

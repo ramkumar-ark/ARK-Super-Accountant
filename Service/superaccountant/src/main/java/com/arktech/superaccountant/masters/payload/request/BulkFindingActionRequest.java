@@ -27,6 +27,9 @@ public class BulkFindingActionRequest {
     private FindingSeverity severity;
     private LedgerCategory category;
 
+    /** Primary Tally group (lower-case group name) the finding's ledger must fall under. */
+    private String group;
+
     /**
      * One resolution applied to every targeted finding: a TDS section code (or NOT_SUBJECT) for TDS_SECTION_MAPPING
      * findings, or NOT_APPLICABLE for GSTIN_PRESENCE findings. Absent means the derived override of mismatch findings.
@@ -43,6 +46,7 @@ public class BulkFindingActionRequest {
     private boolean dryRun;
 
     public boolean hasFilter() {
-        return (ruleCode != null && !ruleCode.isBlank()) || mismatchType != null || severity != null || category != null;
+        return (ruleCode != null && !ruleCode.isBlank()) || mismatchType != null || severity != null
+                || category != null || (group != null && !group.isBlank());
     }
 }

@@ -108,6 +108,8 @@ export function MastersPage() {
   const [mismatchFilter, setMismatchFilter] = useState('')
   const [findingsTotal, setFindingsTotal] = useState(0)
   const [ruleFilter, setRuleFilter] = useState('')
+  const [groupFilter, setGroupFilter] = useState('')
+  const [groupOptions, setGroupOptions] = useState<{ value: string; label: string }[]>([])
   const [findingsPage, setFindingsPage] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [showResolved, setShowResolved] = useState(false)
@@ -152,6 +154,7 @@ export function MastersPage() {
       if (severityFilter) params.set('severity', severityFilter)
       if (mismatchFilter) params.set('mismatchType', mismatchFilter)
       if (ruleFilter) params.set('ruleCode', ruleFilter)
+      if (groupFilter) params.set('group', groupFilter)
       const res = await api.get(`/v1/uploads/latest/mismatches?${params}`)
       const items: ValidationFinding[] = res.data.content ?? []
       if (items.length === 0 && findingsPage > 0) {
@@ -224,10 +227,20 @@ export function MastersPage() {
     }
   }
 
+  const loadGroups = async () => {
+    try {
+      const res = await api.get('/v1/uploads/latest/groups')
+      setGroupOptions(Array.isArray(res.data) ? res.data : [])
+    } catch {
+      // The group filter stays on "All groups" when its options cannot be loaded.
+    }
+  }
+
   useEffect(() => {
     loadMasters()
     loadOpenFindingsCount()
     loadUploadHistory()
+    loadGroups()
   }, [page, categoryFilter])
 
   useEffect(() => {
@@ -236,7 +249,7 @@ export function MastersPage() {
 
   useEffect(() => {
     if (activeTab === 'findings') loadFindings()
-  }, [activeTab, showResolved, severityFilter, mismatchFilter, ruleFilter, findingsPage])
+  }, [activeTab, showResolved, severityFilter, mismatchFilter, ruleFilter, groupFilter, findingsPage])
 
   const filteredMasters = masters.filter((m) =>
     searchQuery ? m.ledgerName.toLowerCase().includes(searchQuery.toLowerCase()) : true,
@@ -540,11 +553,18 @@ export function MastersPage() {
             mismatchFilter={mismatchFilter}
             total={findingsTotal}
             ruleFilter={ruleFilter}
+            groupFilter={groupFilter}
+            groupOptions={groupOptions}
             page={findingsPage}
             onPageChange={setFindingsPage}
             onRuleFilterChange={(v) => {
               setFindingsPage(0)
               setRuleFilter(v)
+              if (v !== 'MISMATCH_DETECTION') setMismatchFilter('')
+            }}
+            onGroupFilterChange={(v) => {
+              setFindingsPage(0)
+              setGroupFilter(v)
             }}
             onMismatchFilterChange={(v) => {
               setFindingsPage(0)
@@ -683,9 +703,12 @@ function FindingsTab({
   mismatchFilter,
   total,
   ruleFilter,
+  groupFilter,
+  groupOptions,
   page,
   onPageChange,
   onRuleFilterChange,
+  onGroupFilterChange,
   onMismatchFilterChange,
   onShowResolvedChange,
   onSeverityFilterChange,
@@ -699,9 +722,12 @@ function FindingsTab({
   mismatchFilter: string
   total: number
   ruleFilter: string
+  groupFilter: string
+  groupOptions: { value: string; label: string }[]
   page: number
   onPageChange: (p: number) => void
   onRuleFilterChange: (v: string) => void
+  onGroupFilterChange: (v: string) => void
   onMismatchFilterChange: (v: string) => void
   onShowResolvedChange: (v: boolean) => void
   onSeverityFilterChange: (v: string) => void
@@ -871,6 +897,7 @@ function FindingsTab({
     if (mismatchFilter) body.mismatchType = mismatchFilter
     if (ruleFilter) body.ruleCode = ruleFilter
     if (severityFilter) body.severity = severityFilter
+    if (groupFilter) body.group = groupFilter
     return body
   }
 
@@ -1026,22 +1053,42 @@ function FindingsTab({
         ))}
       </select>
       <select
-        value={mismatchFilter}
+        value={groupFilter}
         onChange={(e) => {
           setSelectedIds(new Set())
-          onMismatchFilterChange(e.target.value)
+          setAllMatching(false)
+          onGroupFilterChange(e.target.value)
         }}
-        aria-label="Filter by reason"
+        aria-label="Filter by Tally group"
         disabled={bulkBusy}
         className="h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
       >
-        <option value="">All reasons</option>
-        {Object.entries(MISMATCH_REASONS).map(([code, label]) => (
-          <option key={code} value={code}>
-            {label}
+        <option value="">All groups</option>
+        {groupOptions.map((group) => (
+          <option key={group.value} value={group.value}>
+            {group.label}
           </option>
         ))}
       </select>
+      {ruleFilter === 'MISMATCH_DETECTION' && (
+        <select
+          value={mismatchFilter}
+          onChange={(e) => {
+            setSelectedIds(new Set())
+            onMismatchFilterChange(e.target.value)
+          }}
+          aria-label="Filter by reason"
+          disabled={bulkBusy}
+          className="h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
+        >
+          <option value="">All reasons</option>
+          {Object.entries(MISMATCH_REASONS).map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      )}
       <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)] cursor-pointer">
         <input
           type="checkbox"
@@ -1090,10 +1137,10 @@ function FindingsTab({
         <div className="flex flex-col items-center py-20 gap-3">
           <CheckCircle2 size={48} className="text-[var(--color-success)]" />
           <p className="text-sm font-semibold text-[var(--color-text-primary)]">
-            {severityFilter || ruleFilter ? 'No matching findings' : 'No findings'}
+            {severityFilter || ruleFilter || groupFilter ? 'No matching findings' : 'No findings'}
           </p>
           <p className="text-sm text-[var(--color-text-muted)]">
-            {severityFilter || ruleFilter
+            {severityFilter || ruleFilter || groupFilter
               ? 'Try adjusting your filters.'
               : 'Upload a masters file to run validation checks.'}
           </p>
