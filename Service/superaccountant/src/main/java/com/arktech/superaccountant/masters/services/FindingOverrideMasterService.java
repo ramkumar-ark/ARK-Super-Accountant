@@ -33,7 +33,7 @@ public class FindingOverrideMasterService {
             Pattern.compile("[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}");
     private static final Pattern HSN_SAC_PATTERN = Pattern.compile("\\d{4,8}");
     private static final Pattern TDS_SECTION_PATTERN =
-            Pattern.compile("NOT_SUBJECT|194C|194J_A|194J_B|194H|194I_A|194I_B|194I|194Q|194A|194B|194D|194M|OTHER");
+            Pattern.compile("NOT_SUBJECT|194C|194J_A|194J_B|194H|194I_A|194I_B|194Q|194A|194B|194D|194M|OTHER");
 
     /** Value of a GSTIN_PRESENCE override that marks the ledger's GST as not applicable instead of entering a GSTIN. */
     public static final String GST_NOT_APPLICABLE = "NOT_APPLICABLE";

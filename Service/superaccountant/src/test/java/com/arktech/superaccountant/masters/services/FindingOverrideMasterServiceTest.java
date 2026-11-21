@@ -296,14 +296,14 @@ class FindingOverrideMasterServiceTest {
     }
 
     @Test
-    void apply_tdsSection_stillAcceptsLegacy194I() {
+    void apply_tdsSection_rejectsRetired194I() {
         masters();
         ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
         f.setProposedValue("194I");
 
-        service.apply(f, orgId, "acct1");
-
-        assertThat(master.getTdsSection()).isEqualTo("194I");
+        assertThatThrownBy(() -> service.apply(f, orgId, "acct1"))
+                .isInstanceOfSatisfying(FindingOverrideException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -429,12 +429,12 @@ class FindingOverrideMasterServiceTest {
 
     @Test
     void validate_tdsSection_acceptsOnlyTheListedCodes() {
-        for (String ok : List.of("NOT_SUBJECT", "194C", "194J_A", "194J_B", "194H", "194I", "194I_A",
+        for (String ok : List.of("NOT_SUBJECT", "194C", "194J_A", "194J_B", "194H", "194I_A",
                 "194I_B", "194Q", "194A", "194B", "194D", "194M", "OTHER")) {
             ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
             assertThatCode(() -> service.validate(f, ok, orgId)).as(ok).doesNotThrowAnyException();
         }
-        for (String bad : List.of("194J", "194j_a", "194J(a)", "206AA", "Not subject to TDS", "194C ;")) {
+        for (String bad : List.of("194I", "194J", "194j_a", "194J(a)", "206AA", "Not subject to TDS", "194C ;")) {
             ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
             assertThatThrownBy(() -> service.validate(f, bad, orgId)).as(bad)
                     .isInstanceOfSatisfying(FindingOverrideException.class,

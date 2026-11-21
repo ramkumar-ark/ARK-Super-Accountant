@@ -55,8 +55,8 @@ public class DataMigrationService {
      * plant-hire ledgers are re-mapped by the user afterwards.
      *
      * <p>When a 194I_B config row already exists (a partially migrated database) the
-     * legacy 194I config row is left in place rather than clashing with the unique
-     * section_code constraint; the legacy alias in the engine still resolves it.
+     * legacy 194I config row is retired, since every stored 194I value has already been
+     * moved to 194I_B above.
      *
      * @return total number of rows updated (0 once migrated)
      */
@@ -87,6 +87,10 @@ public class DataMigrationService {
         if (buildingExists == 0) {
             updated += entityManager.createQuery(
                             "UPDATE TdsSectionConfig c SET c.sectionCode = '194I_B' WHERE c.sectionCode = '194I'")
+                    .executeUpdate();
+        } else {
+            updated += entityManager.createQuery(
+                            "DELETE FROM TdsSectionConfig c WHERE c.sectionCode = '194I'")
                     .executeUpdate();
         }
         return updated;

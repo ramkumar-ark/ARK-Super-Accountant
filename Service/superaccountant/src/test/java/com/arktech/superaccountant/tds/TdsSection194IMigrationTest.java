@@ -64,6 +64,26 @@ class TdsSection194IMigrationTest {
         assertEquals(0, dataMigrationService.split194ISection());
     }
 
+    @Test
+    void retiresLegacyConfigRowWhenLandBuildingRowAlreadyExists() {
+        jdbc.update("DELETE FROM tds_section_configs WHERE section_code = '194I_B'");
+        jdbc.update("INSERT INTO tds_section_configs "
+                + "(id, section_code, rate_company, rate_non_company, threshold_annual, higher_rate_if_no_pan) "
+                + "VALUES (gen_random_uuid(), '194I_B', 10, 10, 240000, 20)");
+        jdbc.update("INSERT INTO tds_section_configs "
+                + "(id, section_code, rate_company, rate_non_company, threshold_annual, higher_rate_if_no_pan) "
+                + "VALUES (gen_random_uuid(), '194I', 10, 10, 240000, 20)");
+        jdbc.update("INSERT INTO preconfigured_masters "
+                + "(id, ledger_name, category, is_active, is_template, tds_section, created_at, updated_at) "
+                + "VALUES (gen_random_uuid(), 'Old Rent', 'EXPENSE', true, false, '194I', now(), now())");
+
+        dataMigrationService.split194ISection();
+
+        assertEquals(0, count("tds_section_configs", "section_code = '194I'"));
+        assertEquals(1, count("tds_section_configs", "section_code = '194I_B'"));
+        assertEquals(1, count("preconfigured_masters", "ledger_name = 'Old Rent' AND tds_section = '194I_B'"));
+    }
+
     private int count(String table, String where) {
         Integer rows = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + table + " WHERE " + where, Integer.class);
