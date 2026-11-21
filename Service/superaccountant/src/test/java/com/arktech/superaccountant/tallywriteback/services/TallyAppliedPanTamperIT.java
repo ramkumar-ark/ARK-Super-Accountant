@@ -66,6 +66,7 @@ class TallyAppliedPanTamperIT {
     private static final String LEDGER_KEY = "tds payable";
     private static final String BASELINE = "AAAAA1111A";
     private static final String NEW_PAN = "BBBBB2222B";
+    private static final String DRIFTED_PAN = "CCCCC3333C";
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -132,6 +133,41 @@ class TallyAppliedPanTamperIT {
                 .satisfies(row -> assertThat(row.getValue()).isNull());
         assertThat(tamperChangeRepository.findByOrganizationId(org.getId())).isEmpty();
         assertThat(tamperFindingRepository.findByOrganizationId(org.getId())).isEmpty();
+    }
+
+    @Test
+    void appliedPanChange_withDriftedFrozenValue_stillRaisesFinding() throws Exception {
+        Organization org = organization();
+        String token = token(org);
+
+        UUID job1 = upload(token, mastersFile(BASELINE));
+        freezeTdsPayment(org, job1);
+        FrozenMasterAttribute drifted = frozenPanRows(org).get(0);
+        drifted.setValue(DRIFTED_PAN);
+        frozenMasterAttributeRepository.saveAndFlush(drifted);
+
+        TallyChangeItem item = pendingItem(org, BASELINE, NEW_PAN);
+
+        upload(token, mastersFile(NEW_PAN));
+
+        // The item really was applied by this upload, yet the frozen row had
+        // already drifted away from the item baseline, so suppression must not run.
+        assertThat(awaitStatus(item.getId(), TallyChangeStatus.APPLIED).getAppliedUploadJobId())
+                .isNotNull();
+        TamperChange change = awaitTamperChange(org);
+        assertThat(change.getChangeKind()).isEqualTo(TamperChangeKind.MASTER_MODIFIED);
+        assertThat(change.getAttributeName()).isEqualTo("pan");
+        assertThat(change.getOldValue()).isEqualTo(DRIFTED_PAN);
+        assertThat(change.getNewValue()).isEqualTo(NEW_PAN);
+
+        List<TamperFinding> findings = tamperFindingRepository.findByOrganizationId(org.getId());
+        assertThat(findings).singleElement().satisfies(f -> {
+            assertThat(f.getFindingKey()).isEqualTo("MASTER_MODIFIED|" + LEDGER_KEY + "|pan");
+            assertThat(f.getOldValue()).isEqualTo(DRIFTED_PAN);
+            assertThat(f.getNewValue()).isEqualTo(NEW_PAN);
+        });
+        assertThat(frozenPanRows(org)).singleElement()
+                .satisfies(row -> assertThat(row.getValue()).isEqualTo(DRIFTED_PAN));
     }
 
     @Test
@@ -269,6 +305,21 @@ class TallyAppliedPanTamperIT {
         }
         fail("Item " + (item == null ? "missing" : item.getStatus())
                 + "; frozen PAN row " + (panRow == null ? "missing" : panRow.getValue()));
+    }
+
+    private TallyChangeItem awaitStatus(UUID itemId, TallyChangeStatus expected) throws Exception {
+        long deadline = System.currentTimeMillis() + 10_000;
+        TallyChangeItem item = null;
+        while (System.currentTimeMillis() < deadline) {
+            item = itemRepository.findById(itemId).orElse(null);
+            if (item != null && item.getStatus() == expected) {
+                return item;
+            }
+            Thread.sleep(100);
+        }
+        fail("Item " + itemId + " stayed " + (item == null ? "missing" : item.getStatus())
+                + ", expected " + expected);
+        return null;
     }
 
     private TamperChange awaitTamperChange(Organization org) throws Exception {
