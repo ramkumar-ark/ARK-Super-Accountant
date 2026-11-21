@@ -193,12 +193,12 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     expect(screen.getByRole('option', { name: 'Not subject to TDS' })).toBeInTheDocument()
     expect(
       screen.getByRole('option', {
-        name: '194J(a) - Fees for technical services, royalty for films, call centre (2%)',
+        name: '194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)] – Fees for technical services, royalty for films, call centre',
       }),
     ).toHaveValue('194J_A')
     expect(
       screen.getByRole('option', {
-        name: '194J(b) - Fees for professional services, royalty, non-compete fees, director fees (10%)',
+        name: '194J_B / 393(1) [Table: Sl. No. 6(iii).D(b)] – Fees for professional services, royalty, non-compete fees, director fees',
       }),
     ).toHaveValue('194J_B')
 

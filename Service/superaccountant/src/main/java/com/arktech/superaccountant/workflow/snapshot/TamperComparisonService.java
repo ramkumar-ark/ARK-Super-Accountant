@@ -10,6 +10,7 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.review.EvidenceHash;
+import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -370,7 +371,8 @@ public class TamperComparisonService {
         LocalDate date = changeDate(change.getOldDate(), change.getNewDate());
         if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED) {
             return change.getVoucherTypeName() + " " + change.getVoucherNumber() + " dated " + date
-                    + " is retro-flagged under section " + change.getRetroSection()
+                    + " is retro-flagged under section "
+                    + TdsSectionRefs.forDate(change.getRetroSection(), date)
                     + " for deductee " + change.getPartyLedgerName() + ": TDS shortfall "
                     + change.getRetroShortfall() + " now due because " + where
                     + " crossed the annual threshold";

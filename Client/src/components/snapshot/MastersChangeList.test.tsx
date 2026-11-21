@@ -48,6 +48,34 @@ describe('MastersChangeList', () => {
     expect(screen.getByText('Blocking')).toBeInTheDocument()
   })
 
+  it('shows TDS section changes with the old and new Act names', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        changes: [
+          {
+            id: 'c2',
+            changeKind: 'MASTER_MODIFIED',
+            ledgerName: 'Subcontractor Charges',
+            attributeName: 'tdsSection',
+            oldValue: '194C',
+            newValue: '194J_B',
+            touchedScopes: ['TDS'],
+            blocking: true,
+            createdAt: '2025-05-10T10:00:00Z',
+          },
+        ],
+      },
+    })
+    renderList()
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'TDS section: 194C / 393(1) [Table: Sl. No. 6(i).D(b)] – Payments to contractors and sub-contractors → 194J_B / 393(1) [Table: Sl. No. 6(iii).D(b)] – Fees for professional services, royalty, non-compete fees, director fees',
+        ),
+      ).toBeInTheDocument(),
+    )
+  })
+
   it('shows the empty state', async () => {
     mockGet.mockResolvedValueOnce({ data: { changes: [] } })
     renderList()

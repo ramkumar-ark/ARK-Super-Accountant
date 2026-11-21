@@ -63,6 +63,11 @@ public class TdsSectionConfig {
 
     public static final LocalDate NEW_ACT_EFFECTIVE_DATE = LocalDate.of(2026, 4, 1);
 
+    /** Human-facing reference for a TDS date: old section code before 1 April 2026, s.393 after. */
+    public String displayFor(LocalDate tdsDate) {
+        return TdsSectionRefs.forDate(sectionCode, tdsDate);
+    }
+
     /**
      * Returns the values in force for a TDS date (earlier of credit or payment): the new-Act
      * values on/after 1 April 2026 when populated, otherwise the stored values. Never mutates

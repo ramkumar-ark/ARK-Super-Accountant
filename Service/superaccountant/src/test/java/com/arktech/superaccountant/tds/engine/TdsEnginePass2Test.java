@@ -76,6 +76,7 @@ class TdsEnginePass2Test {
         TdsFinding f = findingsOf(result).get(0);
         assertEquals(TdsFindingType.NOT_DEDUCTED, f.getFindingType());
         assertEquals(new BigDecimal("350.00"), f.getExpectedAmount());
+        assertTrue(f.getMessage().contains("393(1) [Table: Sl. No. 6(i).D(b)]"), f.getMessage());
     }
 
     @Test
