@@ -60,7 +60,8 @@ Client/                             # React + Vite frontend
   public/                                  # Static assets (favicon, etc.)
   .vite/                                   # Vite dep pre-bundling cache (TRACKED)
   src/
-    main.tsx                               # App entry — router setup, renders <App/>
+    main.tsx                               # App entry — renders RouterProvider
+    router.tsx                             # Route definitions + auth guards (createAppRouter)
     index.css                              # Global styles (Tailwind)
     components/                            # Reusable UI components
       landing/                             # Landing page sections
@@ -132,7 +133,7 @@ npm run test:run              # Vitest (single run)
 ### Frontend
 
 - Path alias: `@` → `src/` (configured in `vite.config.ts` and `tsconfig.app.json`)
-- TanStack Router with manual route definitions in `main.tsx` (not file-based)
+- TanStack Router with manual route definitions in `router.tsx` (not file-based)
 - Auth guards via `beforeLoad` + `redirect` on protected routes
 - Zustand store for auth state; token persisted in store
 - Axios instance in `lib/api.ts` for all API calls
