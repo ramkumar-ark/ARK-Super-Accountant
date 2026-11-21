@@ -8,11 +8,14 @@ import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
 import com.arktech.superaccountant.masters.models.*;
 import com.arktech.superaccountant.masters.repository.*;
+import com.arktech.superaccountant.tds.models.TdsPanOverride;
+import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -29,6 +32,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -67,6 +71,7 @@ class PanFormatFindingIT {
     @Autowired OrganizationRepository organizationRepository;
     @Autowired ValidationFindingRepository findingRepository;
     @Autowired ValidationRuleConfigRepository ruleConfigRepository;
+    @Autowired TdsPanOverrideRepository panOverrideRepository;
 
     private UUID orgId;
     private String accountantJwt;
@@ -122,5 +127,47 @@ class PanFormatFindingIT {
         assertThat(f.getActualValue()).isEqualTo("AAPPK2262D1");
         assertThat(f.getSeverity()).isEqualTo(FindingSeverity.HIGH);
         assertThat(f.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
+    }
+
+    @Test
+    void accountantCorrectsPanAndStoreSuppressesNextUpload() throws Exception {
+        String token = accountantJwt;
+        UUID jobId = upload(token, MASTERS_JSON, "masters-pan.json");
+        UUID findingId = panFindingId(token, jobId);
+
+        mockMvc.perform(post("/api/v1/uploads/{jobId}/findings/{findingId}/action", jobId, findingId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"action":"ACKNOWLEDGE","note":"","value":" aappk2262d "}
+                                """))
+                .andExpect(status().isOk());
+
+        ValidationFinding approved = findingRepository.findById(findingId).orElseThrow();
+        assertThat(approved.getResolveStatus()).isEqualTo(ResolveStatus.APPROVED);
+
+        TdsPanOverride override = panOverrideRepository
+                .findByOrganizationIdAndPartyKey(orgId, "anandha timber depot").orElseThrow();
+        assertThat(override.getPan()).isEqualTo("AAPPK2262D");
+        assertThat(override.getPartyLedgerName()).isEqualTo("ANANDHA TIMBER DEPOT");
+        assertThat(override.getSourceFindingId()).isEqualTo(findingId);
+        assertThat(override.getApprovedBy()).isNotBlank();
+        assertThat(override.getApprovedAt()).isNotNull();
+
+        UUID secondJob = upload(token, MASTERS_JSON, "masters-pan-2.json");
+        assertThat(panFindingIds(token, secondJob)).isEmpty();
+    }
+
+    private UUID panFindingId(String token, UUID jobId) throws Exception {
+        List<UUID> ids = panFindingIds(token, jobId);
+        assertThat(ids).hasSize(1);
+        return ids.get(0);
+    }
+
+    private List<UUID> panFindingIds(String token, UUID jobId) throws Exception {
+        return findingRepository.findByUploadJobId(jobId).stream()
+                .filter(f -> "PAN_FORMAT".equals(f.getRuleCode()))
+                .map(ValidationFinding::getId)
+                .toList();
     }
 }

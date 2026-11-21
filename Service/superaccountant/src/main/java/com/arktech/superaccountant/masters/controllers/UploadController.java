@@ -16,6 +16,7 @@ import com.arktech.superaccountant.masters.services.FindingAutoResolveService;
 import com.arktech.superaccountant.masters.services.BulkFindingActionException;
 import com.arktech.superaccountant.masters.services.FindingOverrideException;
 import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
+import com.arktech.superaccountant.masters.services.PanFormatOverrideService;
 import com.arktech.superaccountant.masters.payload.response.FindingResponse;
 import com.arktech.superaccountant.masters.payload.response.UploadJobResponse;
 import com.arktech.superaccountant.masters.repository.PreconfiguredMasterRepository;
@@ -86,6 +87,9 @@ public class UploadController {
 
     @Autowired
     private FindingOverrideMasterService findingOverrideMasterService;
+
+    @Autowired
+    private PanFormatOverrideService panFormatOverrideService;
 
     @Autowired
     private FindingReviewService findingReviewService;
@@ -570,7 +574,7 @@ public class UploadController {
         try {
             findingReviewService.act(finding, request.getAction(), request.getValue(), request.getNote(),
                     ReviewActor.of(principal), Instant.now(),
-                    new MastersFindingApplier(findingOverrideMasterService, orgId, null, null));
+                    new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, null, null));
         } catch (FindingReviewException e) {
             return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
         }
@@ -701,7 +705,7 @@ public class UploadController {
                 }
             }
         }
-        MastersFindingApplier applier = new MastersFindingApplier(findingOverrideMasterService, orgId, masters, snapshots);
+        MastersFindingApplier applier = new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, masters, snapshots);
         ReviewActor actor = ReviewActor.of(principal);
         for (ValidationFinding f : targets) {
             if (f.getResolveStatus() != requiredStatus) {

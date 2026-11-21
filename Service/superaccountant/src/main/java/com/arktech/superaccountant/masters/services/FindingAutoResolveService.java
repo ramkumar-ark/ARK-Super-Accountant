@@ -23,6 +23,9 @@ public class FindingAutoResolveService {
     private FindingOverrideMasterService findingOverrideMasterService;
 
     @Autowired
+    private PanFormatOverrideService panFormatOverrideService;
+
+    @Autowired
     private FindingReviewService findingReviewService;
 
     /**
@@ -66,7 +69,7 @@ public class FindingAutoResolveService {
         try {
             findingReviewService.submit(finding, typedValue(finding.getRuleCode(), snapshot),
                     "Ledger data corrected inline.", new ReviewActor(username, false, true), now,
-                    new MastersFindingApplier(findingOverrideMasterService, orgId, null, null));
+                    new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, null, null));
             return true;
         } catch (FindingOverrideException | FindingReviewException e) {
             return false;
