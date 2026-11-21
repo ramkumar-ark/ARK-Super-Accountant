@@ -3,6 +3,7 @@ import { useNavigate, Link } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import { InviteSignupBanner } from '@/components/InviteSignupBanner'
+import { toast } from '@/components/toast/toastStore'
 
 const ROLES = [
   { value: 'owner', label: 'Owner' },
@@ -97,6 +98,7 @@ export function SignupPage() {
       if (inviteToken) {
         navigate({ to: '/dashboard' })
       } else {
+        toast.success('Account created successfully. Please sign in with your new account.')
         navigate({ to: '/login' })
       }
     } catch (err: unknown) {
