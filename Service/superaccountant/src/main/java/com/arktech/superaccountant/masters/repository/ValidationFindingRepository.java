@@ -41,14 +41,14 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
            "AND (:topGroup IS NULL OR ("
            + "EXISTS (SELECT s.id FROM UploadLedgerSnapshot s WHERE s.uploadJobId = f.uploadJobId "
            + "AND LOWER(s.ledgerName) = LOWER(f.ledgerName) "
-           + "AND (LOWER(s.groupChain) = :topGroup OR LOWER(s.groupChain) LIKE CONCAT('%,', :topGroup) "
+           + "AND (LOWER(s.groupChain) = :topGroup OR LOWER(s.groupChain) LIKE CONCAT('%|', :topGroup) "
            + "OR ((s.groupChain IS NULL OR s.groupChain = '') AND LOWER(s.parentGroup) = :topGroup))) "
            + "OR (NOT EXISTS (SELECT s2.id FROM UploadLedgerSnapshot s2 WHERE s2.uploadJobId = f.uploadJobId "
            + "AND LOWER(s2.ledgerName) = LOWER(f.ledgerName) "
            + "AND ((s2.groupChain IS NOT NULL AND s2.groupChain <> '') OR s2.parentGroup IS NOT NULL)) "
            + "AND EXISTS (SELECT m.id FROM PreconfiguredMaster m WHERE m.organizationId = :orgId "
            + "AND LOWER(m.ledgerName) = LOWER(f.ledgerName) "
-           + "AND (LOWER(m.groupChain) = :topGroup OR LOWER(m.groupChain) LIKE CONCAT('%,', :topGroup) "
+           + "AND (LOWER(m.groupChain) = :topGroup OR LOWER(m.groupChain) LIKE CONCAT('%|', :topGroup) "
            + "OR ((m.groupChain IS NULL OR m.groupChain = '') AND LOWER(m.expectedParentGroup) = :topGroup))))"
            + ")) ";
 
