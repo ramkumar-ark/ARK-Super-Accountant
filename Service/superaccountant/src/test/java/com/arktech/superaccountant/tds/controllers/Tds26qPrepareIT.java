@@ -472,6 +472,7 @@ class Tds26qPrepareIT {
         seedPaymentWorkflow(2026, "2026-06", "2026-06", true, 333);
         TdsDeducteeEntry e1 = seedEntry(quarter, "194J_B", LocalDate.of(2026, 5, 10));
         TdsDeducteeEntry e2 = seedEntry(quarter, "194C", LocalDate.of(2026, 6, 15));
+        TdsDeducteeEntry e3 = seedEntry(quarter, "194J_B", LocalDate.of(2026, 6, 20));
 
         post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
                 "{\"challanId\":\"" + challanIdsByPeriod.get("2026-04")
@@ -479,6 +480,9 @@ class Tds26qPrepareIT {
         post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
                 "{\"challanId\":\"" + challanIdsByPeriod.get("2026-05")
                         + "\",\"entryIds\":[\"" + e2.getId() + "\"]}");
+        post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
+                "{\"challanId\":\"" + challanIdsByPeriod.get("2026-06")
+                        + "\",\"entryIds\":[\"" + e3.getId() + "\"]}");
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .post("/api/v1/workflows/" + quarter.getId() + "/finalize")
