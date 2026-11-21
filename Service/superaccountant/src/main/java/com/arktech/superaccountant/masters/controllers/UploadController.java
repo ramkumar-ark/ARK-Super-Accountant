@@ -29,6 +29,7 @@ import com.arktech.superaccountant.masters.services.ValidationOrchestrator;
 import com.arktech.superaccountant.tally.services.TallyParserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -47,6 +48,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1")
 public class UploadController {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(UploadController.class);
 
     @Autowired
     private OrganizationSettingsService organizationSettingsService;
@@ -583,6 +586,27 @@ public class UploadController {
     @ExceptionHandler(FindingOverrideException.class)
     public ResponseEntity<?> handleFindingOverride(FindingOverrideException e) {
         return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
+    }
+
+    /**
+     * Last-resort net for any persistence error that escapes the upload path (the transaction has
+     * already rolled back by the time this runs): a clear message instead of a stack trace. The
+     * known length traps are handled up front — the pan column is widened to 255 — so this catches
+     * whatever else the file can throw at the schema (e.g. an absurdly long ledger name).
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        log.error("Data integrity violation in upload controller", e);
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.sql.SQLException sql && "22001".equals(sql.getSQLState())) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "The upload could not be saved: the file contains a value that is too long. "
+                                + "Correct the file and re-upload."));
+            }
+            if (t.getCause() == t) break;
+        }
+        return ResponseEntity.status(409).body(Map.of("error",
+                "The request conflicts with existing data and could not be saved. Please retry."));
     }
 
     /**

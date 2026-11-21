@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.masters.controllers;
 
+import com.arktech.superaccountant.login.config.DataMigrationService;
 import com.arktech.superaccountant.login.models.ERole;
 import com.arktech.superaccountant.login.models.Role;
 import com.arktech.superaccountant.login.models.User;
@@ -7,14 +8,18 @@ import com.arktech.superaccountant.login.repository.RoleRepository;
 import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
 import com.arktech.superaccountant.masters.models.Organization;
+import com.arktech.superaccountant.masters.models.UploadJob;
+import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -215,6 +220,15 @@ class UploadControllerIT {
     @Autowired
     private UploadLedgerSnapshotRepository snapshotRepository;
 
+    @Autowired
+    private UploadJobRepository uploadJobRepository;
+
+    @Autowired
+    private DataMigrationService dataMigrationService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     // Masters upload snapshots carry the classified ledger category.
     @Test
     void upload_snapshotsCarryLedgerCategory() throws Exception {
@@ -246,5 +260,60 @@ class UploadControllerIT {
         assertThat(snapshots).isNotEmpty();
         snapshots.forEach(s ->
                 assertThat(s.getCategory()).isNotNull());
+    }
+
+    // Regression: an over-length PAN from Tally (11 chars vs the old varchar(10)) used to fail the
+    // whole batch insert with a 500. The raw value must now be stored as-is, never truncated.
+    @Test
+    void upload_withOverLengthPan_keepsRawValueAndCompletes() throws Exception {
+        Organization org = organizationRepository.save(
+                new Organization("Overlength PAN Org " + UUID.randomUUID()));
+        String jwt = jwtUtils.generateJwtTokenForUser("upload_accountant", org.getId());
+
+        String masters = """
+                {"tallymessage": [
+                  {"group": {"name": "Creditors - Material Purchase", "parent": ""}},
+                  {"ledger": {"name": "ANANDHA TIMBER DEPOT", "guid": "g-pan-001",
+                              "parent": "Creditors - Material Purchase",
+                              "incometaxnumber": "AAPPK2262D1"}}
+                ]}
+                """;
+        MockMultipartFile file = new MockMultipartFile("file", "masters.json",
+                "application/json", masters.getBytes());
+        mockMvc.perform(multipart("/api/v1/uploads")
+                        .file(file)
+                        .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isCreated());
+
+        UploadJob job = uploadJobRepository
+                .findTopByOrganizationIdAndStatusNotInOrderByCreatedAtDesc(org.getId(),
+                        java.util.List.of(UploadJobStatus.DISCARDED, UploadJobStatus.FAILED))
+                .orElse(null);
+        assertThat(job).isNotNull();
+        java.util.List<UploadLedgerSnapshot> snapshots = snapshotRepository
+                .findByUploadJobId(job.getId());
+        assertThat(snapshots).hasSize(1);
+        assertThat(snapshots.get(0).getPan()).isEqualTo("AAPPK2262D1");
+    }
+
+    // Databases created with the old varchar(10) pan must end up widened: the guarded startup
+    // migration does it once, idempotently, independent of what ddl-auto does on any given boot.
+    @Test
+    void widenUploadLedgerSnapshotPan_widensNarrowColumnIdempotently() {
+        jdbcTemplate.execute("DELETE FROM upload_ledger_snapshots");
+        jdbcTemplate.execute("ALTER TABLE upload_ledger_snapshots ALTER COLUMN pan TYPE varchar(10)");
+        assertThat(panColumnLength()).isEqualTo(10L);
+
+        assertThat(dataMigrationService.widenUploadLedgerSnapshotPan()).isTrue();
+        assertThat(panColumnLength()).isEqualTo(255L);
+
+        assertThat(dataMigrationService.widenUploadLedgerSnapshotPan()).isFalse();
+    }
+
+    private long panColumnLength() {
+        return jdbcTemplate.queryForObject(
+                "SELECT character_maximum_length FROM information_schema.columns "
+                        + "WHERE table_name = 'upload_ledger_snapshots' AND column_name = 'pan'",
+                Long.class);
     }
 }

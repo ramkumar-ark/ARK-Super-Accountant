@@ -5,6 +5,8 @@ import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * Handles one-time data migrations that must run atomically.
  * Extracted from DataInitializer so that Spring's AOP proxy intercepts
@@ -44,5 +46,31 @@ public class DataMigrationService {
                 "UPDATE ValidationFinding f SET f.severity = 'HIGH' WHERE f.severity = 'ERROR'")
                 .executeUpdate();
         return updated;
+    }
+
+    /**
+     * Widens upload_ledger_snapshots.pan from the old varchar(10) to varchar(255) (the width of
+     * every other string column on that table) on databases created before the column was widened:
+     * an over-length PAN from Tally would otherwise fail the whole masters batch insert. Reads
+     * information_schema first, so the ALTER only runs when the column is actually narrower than
+     * the target (idempotent, safe to call on every boot, and independent of whatever ddl-auto
+     * happens to do). Keeps the raw value — never truncates.
+     *
+     * @return true when the column was widened by this call
+     */
+    @Transactional
+    public boolean widenUploadLedgerSnapshotPan() {
+        List<?> rows = entityManager.createNativeQuery(
+                        "SELECT character_maximum_length FROM information_schema.columns "
+                                + "WHERE table_schema = current_schema() "
+                                + "AND table_name = 'upload_ledger_snapshots' AND column_name = 'pan'")
+                .getResultList();
+        if (rows.isEmpty() || rows.get(0) == null) return false;
+        int currentLength = ((Number) rows.get(0)).intValue();
+        if (currentLength >= 255) return false;
+        entityManager.createNativeQuery(
+                        "ALTER TABLE upload_ledger_snapshots ALTER COLUMN pan TYPE varchar(255)")
+                .executeUpdate();
+        return true;
     }
 }

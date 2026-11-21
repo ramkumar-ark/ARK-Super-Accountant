@@ -61,6 +61,9 @@ public class DataInitializer implements CommandLineRunner {
         }
         int backfilled = dataMigrationService.backfillFindingSeverities();
         if (backfilled > 0) System.out.println("Backfilled " + backfilled + " finding severity values to HIGH/MEDIUM/LOW.");
+        if (dataMigrationService.widenUploadLedgerSnapshotPan()) {
+            System.out.println("Widened upload_ledger_snapshots.pan to varchar(255).");
+        }
     }
 
     private record NewActValues(String rateCompany, String rateNonCompany, String perTxn, String annual) {}
