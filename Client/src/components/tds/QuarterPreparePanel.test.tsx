@@ -319,7 +319,7 @@ describe('QuarterPreparePanel', () => {
     routeApi({ entries: [entry({ section: '194C' })] })
     renderPanel('ROLE_ACCOUNTANT', 'PREPARE', { periodStart: '2026-04-01' })
 
-    await screen.findByText('393(1) [Table: Sl. No. 6(i).D(b)]')
+    await screen.findByText('393(1) [Table: Sl. No. 6(i)]')
   })
 
   it('shows plain section codes in old-Act quarters', async () => {

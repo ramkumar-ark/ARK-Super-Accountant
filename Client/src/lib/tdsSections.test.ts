@@ -4,7 +4,13 @@ import { TDS_SECTION_OPTIONS, tdsSectionBothNames } from './tdsSections'
 describe('TDS_SECTION_OPTIONS', () => {
   it('shows the old section and the s.393 reference together, old first', () => {
     expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194C')?.label).toBe(
-      '194C / 393(1) [Table: Sl. No. 6(i).D(b)] – Payments to contractors and sub-contractors',
+      '194C / 393(1) [Table: Sl. No. 6(i)] – Payments to contractors and sub-contractors',
+    )
+    expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194I')?.label).toBe(
+      '194I / 393(1) [Table: Sl. No. 2(ii)] – Rent',
+    )
+    expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194A')?.label).toBe(
+      '194A / 393(1) [Table: Sl. No. 5(ii) and 5(iii)] – Interest other than interest on securities',
     )
     expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194J_A')?.label).toBe(
       '194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)] – Fees for technical services, royalty for films, call centre',
@@ -27,7 +33,7 @@ describe('TDS_SECTION_OPTIONS', () => {
 describe('tdsSectionBothNames', () => {
   it('returns the combined label for a stored section code', () => {
     expect(tdsSectionBothNames('194C')).toBe(
-      '194C / 393(1) [Table: Sl. No. 6(i).D(b)] – Payments to contractors and sub-contractors',
+      '194C / 393(1) [Table: Sl. No. 6(i)] – Payments to contractors and sub-contractors',
     )
   })
 

@@ -16,7 +16,9 @@ describe('isNewActPeriod', () => {
 
 describe('tdsSectionDisplay', () => {
   it('shows the s.393 table reference in new-Act periods', () => {
-    expect(tdsSectionDisplay('194C', '2026-04-01')).toBe('393(1) [Table: Sl. No. 6(i).D(b)]')
+    expect(tdsSectionDisplay('194C', '2026-04-01')).toBe('393(1) [Table: Sl. No. 6(i)]')
+    expect(tdsSectionDisplay('194I', '2026-04-01')).toBe('393(1) [Table: Sl. No. 2(ii)]')
+    expect(tdsSectionDisplay('194A', '2026-04-01')).toBe('393(1) [Table: Sl. No. 5(ii) and 5(iii)]')
     expect(tdsSectionDisplay('194J_B', '2026-06-15')).toBe('393(1) [Table: Sl. No. 6(iii).D(b)]')
   })
 
