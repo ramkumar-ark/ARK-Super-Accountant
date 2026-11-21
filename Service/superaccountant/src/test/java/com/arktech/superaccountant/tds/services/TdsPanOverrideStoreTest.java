@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.services;
 
+import com.arktech.superaccountant.masters.pan.PanChangeRecorder;
 import com.arktech.superaccountant.tds.models.TdsPanOverride;
 import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,8 @@ class TdsPanOverrideStoreTest {
 
     private static final UUID ORG = UUID.randomUUID();
     private final TdsPanOverrideRepository repository = mock(TdsPanOverrideRepository.class);
-    private final TdsPanOverrideStore store = new TdsPanOverrideStore(repository);
+    private final PanChangeRecorder recorder = mock(PanChangeRecorder.class);
+    private final TdsPanOverrideStore store = new TdsPanOverrideStore(repository, recorder);
 
     @Test
     void findPanLooksUpNormalizedPartyKey() {
@@ -47,6 +49,25 @@ class TdsPanOverrideStoreTest {
         assertThat(saved.getSourceFindingId()).isEqualTo(findingId);
         assertThat(saved.getApprovedBy()).isEqualTo("acct");
         assertThat(saved.getApprovedAt()).isEqualTo(at);
+    }
+
+    @Test
+    void savePanNotifiesChangeRecorderWithSavedOverrideId() {
+        UUID findingId = UUID.randomUUID();
+        UUID overrideId = UUID.randomUUID();
+        Instant at = Instant.parse("2026-11-21T10:00:00Z");
+        when(repository.findByOrganizationIdAndPartyKey(ORG, "anandha timber depot"))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(TdsPanOverride.class))).thenAnswer(invocation -> {
+            TdsPanOverride override = invocation.getArgument(0);
+            override.setId(overrideId);
+            return override;
+        });
+
+        store.savePan(ORG, "ANANDHA TIMBER DEPOT", " aappk2262d ", findingId, "acct", at);
+
+        verify(recorder).onPanSaved(ORG, "ANANDHA TIMBER DEPOT", "AAPPK2262D",
+                overrideId, findingId, "acct", at);
     }
 
     @Test

@@ -81,6 +81,7 @@ class TallyLedgerDirectoryTest {
 
         assertEquals(ExistenceOutcome.FOUND, lookup.outcome());
         assertEquals("Sales", lookup.currentName());
+        assertEquals("guid-1", lookup.tallyGuid());
     }
 
     @Test

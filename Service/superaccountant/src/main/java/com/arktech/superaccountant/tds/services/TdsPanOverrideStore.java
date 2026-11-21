@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.services;
 
+import com.arktech.superaccountant.masters.pan.PanChangeRecorder;
 import com.arktech.superaccountant.masters.pan.PanFormat;
 import com.arktech.superaccountant.masters.pan.PanOverrideGateway;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
@@ -15,9 +16,11 @@ import java.util.UUID;
 public class TdsPanOverrideStore implements PanOverrideGateway {
 
     private final TdsPanOverrideRepository repository;
+    private final PanChangeRecorder panChangeRecorder;
 
-    public TdsPanOverrideStore(TdsPanOverrideRepository repository) {
+    public TdsPanOverrideStore(TdsPanOverrideRepository repository, PanChangeRecorder panChangeRecorder) {
         this.repository = repository;
+        this.panChangeRecorder = panChangeRecorder;
     }
 
     @Override
@@ -41,5 +44,7 @@ public class TdsPanOverrideStore implements PanOverrideGateway {
         override.setApprovedBy(approvedBy);
         override.setApprovedAt(approvedAt);
         repository.save(override);
+        panChangeRecorder.onPanSaved(organizationId, override.getPartyLedgerName(), override.getPan(),
+                override.getId(), sourceFindingId, approvedBy, approvedAt);
     }
 }

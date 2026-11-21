@@ -49,7 +49,7 @@ public class TallyLedgerDirectory {
     public LedgerLookup lookup(UUID organizationId, String tallyGuid, String ledgerName) {
         Optional<UUID> latestJob = mastersJobGate.latestCompletedMastersJob(organizationId);
         if (latestJob.isEmpty()) {
-            return new LedgerLookup(ExistenceOutcome.NOT_FOUND, null, null, null, null,
+            return new LedgerLookup(ExistenceOutcome.NOT_FOUND, null, null, null, null, null,
                     LookupReason.NO_MASTERS_UPLOAD, false);
         }
 
@@ -80,7 +80,7 @@ public class TallyLedgerDirectory {
             return result(ExistenceOutcome.FOUND, byName.get(), mastersJobId, uploadedAt, stale);
         }
 
-        return new LedgerLookup(ExistenceOutcome.NOT_FOUND, null, null, mastersJobId, uploadedAt, null, stale);
+        return new LedgerLookup(ExistenceOutcome.NOT_FOUND, null, null, null, mastersJobId, uploadedAt, null, stale);
     }
 
     public Optional<MastersUpload> latestUpload(UUID organizationId) {
@@ -91,8 +91,8 @@ public class TallyLedgerDirectory {
 
     private LedgerLookup result(ExistenceOutcome outcome, UploadLedgerSnapshot snapshot,
                                 UUID mastersJobId, Instant uploadedAt, boolean stale) {
-        return new LedgerLookup(outcome, snapshot.getLedgerName(), pan(snapshot), mastersJobId,
-                uploadedAt, null, stale);
+        return new LedgerLookup(outcome, snapshot.getLedgerName(), pan(snapshot), snapshot.getTallyGuid(),
+                mastersJobId, uploadedAt, null, stale);
     }
 
     private static String pan(UploadLedgerSnapshot snapshot) {

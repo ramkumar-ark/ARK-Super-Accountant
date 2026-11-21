@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.masters.models.FindingSeverity;
+import com.arktech.superaccountant.masters.pan.PanChangeRecorder;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.tan.DebtorTanGateway;
 import com.arktech.superaccountant.review.FindingReviewException;
@@ -35,7 +36,8 @@ class TdsFindingApplierTest {
     void setUp() {
         repository = mock(TdsPanOverrideRepository.class);
         debtorTans = mock(DebtorTanGateway.class);
-        applier = new TdsFindingApplier(new TdsPanOverrideStore(repository), debtorTans,
+        applier = new TdsFindingApplier(
+                new TdsPanOverrideStore(repository, mock(PanChangeRecorder.class)), debtorTans,
                 TdsEngineFixtures.ORG);
     }
 

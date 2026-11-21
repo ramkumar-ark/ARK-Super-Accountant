@@ -9,6 +9,7 @@ public record LedgerLookup(
         ExistenceOutcome outcome,
         String currentName,
         String tallyPan,
+        String tallyGuid,
         UUID mastersJobId,
         Instant mastersUploadedAt,
         LookupReason reason,
