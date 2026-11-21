@@ -11,6 +11,31 @@ const ROLES = [
   { value: 'auditor_ca', label: 'CA Auditor' },
 ]
 
+type SignupField = 'username' | 'email' | 'password'
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function fieldError(field: SignupField, value: string): string | undefined {
+  switch (field) {
+    case 'username':
+      if (!value.trim()) return 'Username is required.'
+      if (value.length < 3 || value.length > 20)
+        return 'Username must be 3–20 characters.'
+      return undefined
+    case 'email':
+      if (!value.trim()) return 'Email is required.'
+      if (value.length > 50) return 'Email must be 50 characters or fewer.'
+      if (!EMAIL_PATTERN.test(value))
+        return 'Enter a valid email address, like you@company.com.'
+      return undefined
+    case 'password':
+      if (!value) return 'Password is required.'
+      if (value.length < 6) return 'Password must be at least 6 characters.'
+      if (value.length > 40) return 'Password must be 40 characters or fewer.'
+      return undefined
+  }
+}
+
 export function SignupPage() {
   const navigate = useNavigate()
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -24,6 +49,12 @@ export function SignupPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [touched, setTouched] = useState<Record<SignupField, boolean>>({
+    username: false,
+    email: false,
+    password: false,
+  })
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const [inviteContext, setInviteContext] = useState<{ orgName: string; role: string } | null>(null)
   const [inviteError, setInviteError] = useState('')
 
@@ -87,9 +118,15 @@ export function SignupPage() {
       setForm((prev) => ({ ...prev, [field]: e.target.value }))
   }
 
+  function markTouched(field: SignupField) {
+    return () => setTouched((prev) => ({ ...prev, [field]: true }))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setSubmitAttempted(true)
+    if (!isValid) return
     setLoading(true)
     try {
       const url = inviteToken ? `/auth/signup?invite=${inviteToken}` : '/auth/signup'
@@ -110,10 +147,38 @@ export function SignupPage() {
     }
   }
 
-  const isValid =
-    form.username.length >= 3 &&
-    form.email.includes('@') &&
-    form.password.length >= 6
+  const errors: Record<SignupField, string | undefined> = {
+    username: fieldError('username', form.username),
+    email: fieldError('email', form.email),
+    password: fieldError('password', form.password),
+  }
+  const isValid = !errors.username && !errors.email && !errors.password
+
+  function visibleError(field: SignupField): string | undefined {
+    return submitAttempted || touched[field] ? errors[field] : undefined
+  }
+
+  function fieldA11y(field: SignupField) {
+    const message = visibleError(field)
+    return {
+      'aria-invalid': message ? true : undefined,
+      'aria-describedby': message ? `${field}-error` : undefined,
+    }
+  }
+
+  function renderFieldError(field: SignupField) {
+    const message = visibleError(field)
+    if (!message) return null
+    return (
+      <p
+        id={`${field}-error`}
+        role="alert"
+        className="mt-1.5 text-sm text-[var(--color-danger)]"
+      >
+        {message}
+      </p>
+    )
+  }
 
   const formDisabled = loading || !!inviteError
 
@@ -213,9 +278,12 @@ export function SignupPage() {
                 disabled={formDisabled}
                 value={form.username}
                 onChange={set('username')}
+                onBlur={markTouched('username')}
+                {...fieldA11y('username')}
                 className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
                 placeholder="3–20 characters"
               />
+              {renderFieldError('username')}
             </div>
 
             <div>
@@ -230,12 +298,16 @@ export function SignupPage() {
                 type="email"
                 autoComplete="email"
                 required
+                maxLength={50}
                 disabled={formDisabled}
                 value={form.email}
                 onChange={set('email')}
+                onBlur={markTouched('email')}
+                {...fieldA11y('email')}
                 className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
                 placeholder="you@company.com"
               />
+              {renderFieldError('email')}
             </div>
 
             <div>
@@ -273,12 +345,19 @@ export function SignupPage() {
                 autoComplete="new-password"
                 required
                 minLength={6}
+                maxLength={40}
                 disabled={formDisabled}
                 value={form.password}
                 onChange={set('password')}
+                onBlur={markTouched('password')}
+                {...fieldA11y('password')}
                 className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm placeholder:text-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors disabled:opacity-50"
                 placeholder="Minimum 6 characters"
               />
+              <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
+                Use 6–40 characters.
+              </p>
+              {renderFieldError('password')}
             </div>
 
             {error && (
@@ -292,7 +371,7 @@ export function SignupPage() {
 
             <button
               type="submit"
-              disabled={formDisabled || !isValid}
+              disabled={formDisabled}
               className="w-full h-11 rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account…' : 'Create account'}
