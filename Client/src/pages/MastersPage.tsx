@@ -11,6 +11,7 @@ import { DebtorTanPanel } from '@/components/tds/DebtorTanPanel'
 import { MastersChangeList } from '@/components/snapshot/MastersChangeList'
 import { apiErrorMessage } from '@/lib/apiError'
 import { FindingReviewPanel, type ReviewRole } from '@/components/review/FindingReviewPanel'
+import { TallyChangesPanel } from '@/components/tally/TallyChangesPanel'
 
 interface PreconfiguredMaster {
   id: string
@@ -96,7 +97,9 @@ const VALUE_LABELS: Record<string, string> = {
 }
 
 export function MastersPage() {
-  const [activeTab, setActiveTab] = useState<'ledgers' | 'findings' | 'debtor-tans' | 'settings'>('ledgers')
+  const [activeTab, setActiveTab] = useState<
+    'ledgers' | 'findings' | 'debtor-tans' | 'tally-changes' | 'settings'
+  >('ledgers')
   const [masters, setMasters] = useState<PreconfiguredMaster[]>([])
   const [findings, setFindings] = useState<ValidationFinding[]>([])
   const [openFindingsCount, setOpenFindingsCount] = useState(0)
@@ -350,6 +353,19 @@ export function MastersPage() {
           </button>
           <button
             role="tab"
+            aria-selected={activeTab === 'tally-changes'}
+            aria-controls="tally-changes-panel"
+            onClick={() => setActiveTab('tally-changes')}
+            className={`h-11 px-4 text-sm font-normal border-b-2 transition-colors ${
+              activeTab === 'tally-changes'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)]'
+            }`}
+          >
+            Tally changes
+          </button>
+          <button
+            role="tab"
             aria-selected={activeTab === 'settings'}
             aria-controls="settings-panel"
             onClick={() => setActiveTab('settings')}
@@ -547,6 +563,13 @@ export function MastersPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TALLY CHANGES TAB */}
+        {activeTab === 'tally-changes' && (
+          <div id="tally-changes-panel" role="tabpanel">
+            <TallyChangesPanel />
           </div>
         )}
 
