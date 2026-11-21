@@ -69,8 +69,13 @@ public class TallyChangeReconciler implements TallyUploadReconciliation {
     private Optional<UploadLedgerSnapshot> snapshot(TallyChangeItem item, UUID uploadJobId) {
         String tallyGuid = trimToNull(item.getTallyGuid());
         if (tallyGuid != null) {
-            return snapshotRepository.findByUploadJobIdAndTallyGuid(uploadJobId, tallyGuid);
+            Optional<UploadLedgerSnapshot> byGuid =
+                    snapshotRepository.findByUploadJobIdAndTallyGuid(uploadJobId, tallyGuid);
+            if (byGuid.isPresent()) {
+                return byGuid;
+            }
         }
+        // Found by GUID, else name: a ledger deleted and recreated in Tally keeps its name but gets a new GUID.
         return snapshotRepository.findByUploadJobIdAndNormalizedName(
                         uploadJobId, LedgerNames.normalize(item.getLedgerName()))
                 .stream()

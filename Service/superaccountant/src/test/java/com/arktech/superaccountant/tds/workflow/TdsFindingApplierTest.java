@@ -1,7 +1,9 @@
 package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.masters.models.FindingSeverity;
+import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.pan.PanChangeRecorder;
+import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.review.FindingReviewException;
 import com.arktech.superaccountant.tds.engine.TdsEngineFixtures;
@@ -33,8 +35,14 @@ class TdsFindingApplierTest {
     @BeforeEach
     void setUp() {
         repository = mock(TdsPanOverrideRepository.class);
+        OrganizationRepository organizationRepository = mock(OrganizationRepository.class);
+        Organization organization = new Organization();
+        organization.setId(TdsEngineFixtures.ORG);
+        when(organizationRepository.findByIdForUpdate(TdsEngineFixtures.ORG))
+                .thenReturn(Optional.of(organization));
         applier = new TdsFindingApplier(
-                new TdsPanOverrideStore(repository, mock(PanChangeRecorder.class)), TdsEngineFixtures.ORG);
+                new TdsPanOverrideStore(repository, organizationRepository, mock(PanChangeRecorder.class)),
+                TdsEngineFixtures.ORG);
     }
 
     private TdsFinding finding(TdsFindingType type, String party) {
