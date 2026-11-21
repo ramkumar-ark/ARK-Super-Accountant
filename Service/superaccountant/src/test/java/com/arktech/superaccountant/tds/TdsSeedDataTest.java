@@ -35,23 +35,11 @@ class TdsSeedDataTest {
     }
 
     @Test
-    void s194iSeedsNewActMonthlyThresholdAndForm140Code() {
+    void s194iSeedsNewActMonthlyThreshold() {
         TdsSectionConfig c = repo.findBySectionCode("194I").orElseThrow();
         // Rs 50,000/month per landlord => Rs 6,00,000 annual per payee
         assertEquals(0, new BigDecimal("600000.00").compareTo(c.getNewActThresholdAnnual()));
         assertEquals(0, new BigDecimal("10.00").compareTo(c.getNewActRateNonCompany()));
-        assertEquals("1009", c.getNewActRpuCode());
-        assertEquals("393(1) [Table: Sl. No. 2(ii).D(b)]", c.getNewActDisplayRef());
-    }
-
-    @Test
-    void newActSeeds_coverForm140Codes() {
-        assertEquals("1022", repo.findBySectionCode("194A").orElseThrow().getNewActRpuCode());
-        assertEquals("1024", repo.findBySectionCode("194C").orElseThrow().getNewActRpuCode());
-        assertEquals("1006", repo.findBySectionCode("194H").orElseThrow().getNewActRpuCode());
-        assertEquals("1026", repo.findBySectionCode("194J_A").orElseThrow().getNewActRpuCode());
-        assertEquals("1027", repo.findBySectionCode("194J_B").orElseThrow().getNewActRpuCode());
-        assertEquals("1031", repo.findBySectionCode("194Q").orElseThrow().getNewActRpuCode());
     }
 
     @Test
@@ -63,7 +51,7 @@ class TdsSeedDataTest {
     }
 
     @Test
-    void s194mHasNoNewActCode() {
-        assertNull(repo.findBySectionCode("194M").orElseThrow().getNewActRpuCode());
+    void s194mHasNoNewActValues() {
+        assertNull(repo.findBySectionCode("194M").orElseThrow().getNewActRateCompany());
     }
 }

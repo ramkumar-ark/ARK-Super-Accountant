@@ -1,5 +1,5 @@
 // Form 140 display references under the Income-tax Act 2025 (s.393), effective 1 Apr 2026.
-// Mirrors TdsSectionConfig seeds — see docs/tds-income-tax-act-2025-research.md.
+// Frontend copy of the s.393 refs (cannot read the DB); Form 140 codes live in Rpu140FormatSpec.SECTION_CODES — see docs/tds-income-tax-act-2025-research.md.
 export const NEW_ACT_EFFECTIVE = '2026-04-01'
 
 export function isNewActPeriod(periodStart: string | null | undefined): boolean {

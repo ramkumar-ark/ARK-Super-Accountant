@@ -148,14 +148,12 @@ class TdsAnalysisInputFactoryTest {
         c.setNewActRateCompany(new java.math.BigDecimal("2.00"));
         c.setNewActRateNonCompany(new java.math.BigDecimal("2.00"));
         c.setNewActThresholdAnnual(new java.math.BigDecimal("50000.00"));
-        c.setNewActDisplayRef("393(1) [Table: Sl. No. 6(i).D(a)]");
         when(configRepository.findAll()).thenReturn(List.of(c));
 
         var input = factory.build(ctx);
 
         var resolved = input.configsBySection().get("194J_A");
         assertEquals("50000.00", resolved.getThresholdAnnual().toPlainString());
-        assertEquals("393(1) [Table: Sl. No. 6(i).D(a)]", resolved.getDisplayRef());
         assertEquals("30000.00", c.getThresholdAnnual().toPlainString());
     }
 
@@ -174,6 +172,5 @@ class TdsAnalysisInputFactoryTest {
 
         var resolved = input.configsBySection().get("194J_A");
         assertEquals("30000.00", resolved.getThresholdAnnual().toPlainString());
-        assertEquals("194J_A", resolved.getDisplayRef());
     }
 }

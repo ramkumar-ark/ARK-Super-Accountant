@@ -57,21 +57,6 @@ public class TdsSectionConfig {
     @Column(name = "new_act_threshold_annual", precision = 19, scale = 2)
     private BigDecimal newActThresholdAnnual;
 
-    /** Human-facing reference under the new Act, e.g. "393(1) [Table: Sl. No. 6(i).D(a)]". */
-    @Column(name = "new_act_display_ref", length = 100)
-    private String newActDisplayRef;
-
-    /** Form 140 (Rule 219) 4-digit tax code; null when the section has no Form 140 code. */
-    @Column(name = "new_act_rpu_code", length = 4)
-    private String newActRpuCode;
-
-    @Column(name = "display_ref", length = 100)
-    private String displayRef;
-
-    public String getDisplayRef() {
-        return displayRef != null ? displayRef : sectionCode;
-    }
-
     public static boolean newActApplies(LocalDate tdsDate) {
         return !tdsDate.isBefore(NEW_ACT_EFFECTIVE_DATE);
     }
@@ -94,19 +79,6 @@ public class TdsSectionConfig {
         copy.setRateNonCompany(getNewActRateNonCompany());
         copy.setThresholdPerTransaction(getNewActThresholdPerTransaction());
         copy.setThresholdAnnual(getNewActThresholdAnnual());
-        copy.setDisplayRef(getNewActDisplayRef() != null ? getNewActDisplayRef() : getSectionCode());
-        copy.setRpuCode(getNewActRpuCode());
         return copy;
-    }
-
-    @Transient
-    private String rpuCode;
-
-    public String getRpuCode() {
-        return rpuCode;
-    }
-
-    public void setRpuCode(String rpuCode) {
-        this.rpuCode = rpuCode;
     }
 }

@@ -8,7 +8,6 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TdsSectionConfigActResolutionTest {
@@ -24,8 +23,6 @@ class TdsSectionConfigActResolutionTest {
         c.setNewActRateCompany(new BigDecimal("2.00"));
         c.setNewActRateNonCompany(new BigDecimal("2.00"));
         c.setNewActThresholdAnnual(new BigDecimal("50000.00"));
-        c.setNewActDisplayRef("393(1) [Table: Sl. No. 6(i).D(a)]");
-        c.setNewActRpuCode("1026");
         return c;
     }
 
@@ -41,16 +38,12 @@ class TdsSectionConfigActResolutionTest {
     void beforeEffectiveDateReturnsOldValuesUntouched() {
         TdsSectionConfig resolved = config().effectiveFor(LocalDate.of(2026, 3, 31));
         assertEquals("30000.00", resolved.getThresholdAnnual().toPlainString());
-        assertEquals("194J_A", resolved.getDisplayRef());
-        assertNull(resolved.getRpuCode());
     }
 
     @Test
     void onEffectiveDateReturnsNewActValues() {
         TdsSectionConfig resolved = config().effectiveFor(LocalDate.of(2026, 4, 1));
         assertEquals("50000.00", resolved.getThresholdAnnual().toPlainString());
-        assertEquals("393(1) [Table: Sl. No. 6(i).D(a)]", resolved.getDisplayRef());
-        assertEquals("1026", resolved.getRpuCode());
         assertEquals("2.00", resolved.getRateCompany().toPlainString());
     }
 
@@ -59,7 +52,6 @@ class TdsSectionConfigActResolutionTest {
         TdsSectionConfig original = config();
         TdsSectionConfig resolved = original.effectiveFor(LocalDate.of(2026, 4, 1));
         assertEquals("30000.00", original.getThresholdAnnual().toPlainString());
-        assertEquals("194J_A", original.getDisplayRef());
         assertEquals("50000.00", resolved.getThresholdAnnual().toPlainString());
     }
 
@@ -69,6 +61,5 @@ class TdsSectionConfigActResolutionTest {
         c.setNewActRateCompany(null);
         TdsSectionConfig resolved = c.effectiveFor(LocalDate.of(2026, 4, 1));
         assertEquals("30000.00", resolved.getThresholdAnnual().toPlainString());
-        assertEquals("194J_A", resolved.getDisplayRef());
     }
 }
