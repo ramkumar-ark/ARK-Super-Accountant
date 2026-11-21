@@ -31,21 +31,45 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
      * Findings of one job. {@code resolvedOnly} lists only closed findings (APPROVED, RESOLVED, DISCARDED);
      * otherwise {@code showResolved} decides whether closed findings are mixed in with the open and pending ones.
      */
+    /**
+     * A finding belongs to the selected primary Tally group when its uploaded snapshot's group chain ends with
+     * that group (so any sub-group below it matches), or, for a ledger missing from the upload (or uploaded
+     * without a group), when its configured master's chain or expected parent group is that group. Findings
+     * with no Tally group at all only match when no group is selected.
+     */
+    String GROUP_CLAUSE =
+           "AND (:topGroup IS NULL OR ("
+           + "EXISTS (SELECT s.id FROM UploadLedgerSnapshot s WHERE s.uploadJobId = f.uploadJobId "
+           + "AND LOWER(s.ledgerName) = LOWER(f.ledgerName) "
+           + "AND (LOWER(s.groupChain) = :topGroup OR LOWER(s.groupChain) LIKE CONCAT('%,', :topGroup) "
+           + "OR ((s.groupChain IS NULL OR s.groupChain = '') AND LOWER(s.parentGroup) = :topGroup))) "
+           + "OR (NOT EXISTS (SELECT s2.id FROM UploadLedgerSnapshot s2 WHERE s2.uploadJobId = f.uploadJobId "
+           + "AND LOWER(s2.ledgerName) = LOWER(f.ledgerName) "
+           + "AND ((s2.groupChain IS NOT NULL AND s2.groupChain <> '') OR s2.parentGroup IS NOT NULL)) "
+           + "AND EXISTS (SELECT m.id FROM PreconfiguredMaster m WHERE m.organizationId = :orgId "
+           + "AND LOWER(m.ledgerName) = LOWER(f.ledgerName) "
+           + "AND (LOWER(m.groupChain) = :topGroup OR LOWER(m.groupChain) LIKE CONCAT('%,', :topGroup) "
+           + "OR ((m.groupChain IS NULL OR m.groupChain = '') AND LOWER(m.expectedParentGroup) = :topGroup))))"
+           + ")) ";
+
     @Query("SELECT f FROM ValidationFinding f WHERE f.uploadJobId = :jobId " +
            "AND (:category IS NULL OR f.category = :category) " +
            "AND (:severity IS NULL OR f.severity = :severity) " +
            "AND (:ruleCode IS NULL OR f.ruleCode = :ruleCode) " +
            "AND (:mismatchType IS NULL OR f.mismatchType = :mismatchType) " +
+           GROUP_CLAUSE +
            "AND ((:resolvedOnly = true AND f.resolveStatus IN (com.arktech.superaccountant.masters.models.ResolveStatus.APPROVED, com.arktech.superaccountant.masters.models.ResolveStatus.RESOLVED, com.arktech.superaccountant.masters.models.ResolveStatus.DISCARDED)) " +
            "OR (:resolvedOnly = false AND (:showResolved = true " +
            "OR f.resolveStatus NOT IN (com.arktech.superaccountant.masters.models.ResolveStatus.APPROVED, com.arktech.superaccountant.masters.models.ResolveStatus.RESOLVED, com.arktech.superaccountant.masters.models.ResolveStatus.DISCARDED)))) " +
            "ORDER BY f.ledgerName, f.id")
     Page<ValidationFinding> findFiltered(
             @Param("jobId") UUID jobId,
+            @Param("orgId") UUID orgId,
             @Param("category") LedgerCategory category,
             @Param("severity") FindingSeverity severity,
             @Param("ruleCode") String ruleCode,
             @Param("mismatchType") MismatchType mismatchType,
+            @Param("topGroup") String topGroup,
             @Param("showResolved") boolean showResolved,
             @Param("resolvedOnly") boolean resolvedOnly,
             Pageable pageable);
@@ -58,14 +82,17 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
            "AND (:severity IS NULL OR f.severity = :severity) " +
            "AND (:ruleCode IS NULL OR f.ruleCode = :ruleCode) " +
            "AND (:mismatchType IS NULL OR f.mismatchType = :mismatchType) " +
+           GROUP_CLAUSE +
            "ORDER BY f.ledgerName, f.id")
     List<ValidationFinding> findMatchingForUpdate(
             @Param("jobId") UUID jobId,
             @Param("status") com.arktech.superaccountant.masters.models.ResolveStatus status,
+            @Param("orgId") UUID orgId,
             @Param("category") LedgerCategory category,
             @Param("severity") FindingSeverity severity,
             @Param("ruleCode") String ruleCode,
-            @Param("mismatchType") MismatchType mismatchType);
+            @Param("mismatchType") MismatchType mismatchType,
+            @Param("topGroup") String topGroup);
 
     /** Same targeting as {@link #findMatchingForUpdate} without the lock, for counting. */
     @Query("SELECT f FROM ValidationFinding f WHERE f.uploadJobId = :jobId " +
@@ -73,14 +100,17 @@ public interface ValidationFindingRepository extends JpaRepository<ValidationFin
            "AND (:category IS NULL OR f.category = :category) " +
            "AND (:severity IS NULL OR f.severity = :severity) " +
            "AND (:ruleCode IS NULL OR f.ruleCode = :ruleCode) " +
-           "AND (:mismatchType IS NULL OR f.mismatchType = :mismatchType)")
+           "AND (:mismatchType IS NULL OR f.mismatchType = :mismatchType) " +
+           GROUP_CLAUSE)
     List<ValidationFinding> findMatching(
             @Param("jobId") UUID jobId,
             @Param("status") com.arktech.superaccountant.masters.models.ResolveStatus status,
+            @Param("orgId") UUID orgId,
             @Param("category") LedgerCategory category,
             @Param("severity") FindingSeverity severity,
             @Param("ruleCode") String ruleCode,
-            @Param("mismatchType") MismatchType mismatchType);
+            @Param("mismatchType") MismatchType mismatchType,
+            @Param("topGroup") String topGroup);
 
     /** The listed findings of one job, locked for update, whatever their status. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

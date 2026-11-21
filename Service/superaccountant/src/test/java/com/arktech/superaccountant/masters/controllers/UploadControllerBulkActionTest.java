@@ -94,8 +94,8 @@ class UploadControllerBulkActionTest {
     void operatorBulkOverride_submitsEveryMatchingFindingForReview_masterUntouched() {
         ValidationFinding a = finding("A", ResolveStatus.OPEN);
         ValidationFinding b = finding("B", ResolveStatus.OPEN);
-        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, null, null,
-                MismatchType.MISSING_IN_CONFIGURATION)).thenReturn(List.of(a, b));
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, orgId, null, null, null,
+                MismatchType.MISSING_IN_CONFIGURATION, null)).thenReturn(List.of(a, b));
 
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, filterReq("ACKNOWLEDGE"), user("op", "ROLE_OPERATOR"));
 
@@ -120,7 +120,7 @@ class UploadControllerBulkActionTest {
         absentFlag.setActualValue("null");
         BulkFindingActionRequest r = new BulkFindingActionRequest();
         r.setSeverity(FindingSeverity.MEDIUM);
-        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, FindingSeverity.MEDIUM, null, null))
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, orgId, null, FindingSeverity.MEDIUM, null, null, null))
                 .thenReturn(List.of(derivable, typed, missingInUpload, absentFlag));
 
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR"));
@@ -142,7 +142,7 @@ class UploadControllerBulkActionTest {
         typed.setMismatchType(null);
         BulkFindingActionRequest r = new BulkFindingActionRequest();
         r.setRuleCode("HSN_SAC_CODE");
-        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, null, "HSN_SAC_CODE", null))
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, orgId, null, null, "HSN_SAC_CODE", null, null))
                 .thenReturn(List.of(typed));
 
         assertThat(controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR")).getStatusCode().value())
@@ -153,7 +153,7 @@ class UploadControllerBulkActionTest {
     void accountantBulkOverride_approvesEachInOneStep_withItsOwnApplyCall() {
         ValidationFinding a = finding("A", ResolveStatus.OPEN);
         ValidationFinding b = finding("B", ResolveStatus.OPEN);
-        when(findingRepository.findMatchingForUpdate(any(), eq(ResolveStatus.OPEN), any(), any(), any(), any()))
+        when(findingRepository.findMatchingForUpdate(any(), eq(ResolveStatus.OPEN), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(a, b));
 
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, filterReq("ACKNOWLEDGE"), user("acct", "ROLE_ACCOUNTANT"));
@@ -176,7 +176,7 @@ class UploadControllerBulkActionTest {
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR"));
 
         assertThat(res.getStatusCode().value()).isEqualTo(200);
-        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any());
+        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -221,8 +221,8 @@ class UploadControllerBulkActionTest {
         a.setSubmittedBy("op");
         ValidationFinding b = finding("B", ResolveStatus.ACKNOWLEDGED);
         b.setSubmittedBy("op");
-        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.ACKNOWLEDGED, null, null, null,
-                MismatchType.MISSING_IN_CONFIGURATION)).thenReturn(List.of(a, b));
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.ACKNOWLEDGED, orgId, null, null, null,
+                MismatchType.MISSING_IN_CONFIGURATION, null)).thenReturn(List.of(a, b));
 
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, filterReq("APPROVE"), user("acct", "ROLE_ACCOUNTANT"));
 
@@ -238,7 +238,7 @@ class UploadControllerBulkActionTest {
     void bulkApprove_staleMasterOnOneFinding_failsWholeBatch() {
         ValidationFinding a = finding("A", ResolveStatus.ACKNOWLEDGED);
         ValidationFinding b = finding("B", ResolveStatus.ACKNOWLEDGED);
-        when(findingRepository.findMatchingForUpdate(any(), eq(ResolveStatus.ACKNOWLEDGED), any(), any(), any(), any()))
+        when(findingRepository.findMatchingForUpdate(any(), eq(ResolveStatus.ACKNOWLEDGED), any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(a, b));
         lenient().doThrow(new FindingOverrideException(HttpStatus.CONFLICT, "Master changed since submission; reject and resubmit."))
                 .when(overrideService).apply(eq(b), any(), anyString(), any(), any());
@@ -257,7 +257,7 @@ class UploadControllerBulkActionTest {
         ResponseEntity<?> res = controller.bulkFindingAction(jobId, filterReq("APPROVE"), user("op", "ROLE_OPERATOR"));
 
         assertThat(res.getStatusCode().value()).isEqualTo(403);
-        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any());
+        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -283,7 +283,7 @@ class UploadControllerBulkActionTest {
 
     @Test
     void bulkAction_nothingMatches_returns400() {
-        when(findingRepository.findMatchingForUpdate(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(findingRepository.findMatchingForUpdate(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(List.of());
 
         assertThat(controller.bulkFindingAction(jobId, filterReq("ACKNOWLEDGE"), user("op", "ROLE_OPERATOR"))
                 .getStatusCode().value()).isEqualTo(400);
@@ -300,7 +300,7 @@ class UploadControllerBulkActionTest {
     @Test
     void bulkOverride_allMatchingWithNoFilter_isAllowedOnlyWithTheExplicitFlag() {
         ValidationFinding a = finding("A", ResolveStatus.OPEN);
-        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, null, null, null, null))
+        when(findingRepository.findMatchingForUpdate(jobId, ResolveStatus.OPEN, orgId, null, null, null, null, null))
                 .thenReturn(List.of(a));
         BulkFindingActionRequest r = new BulkFindingActionRequest();
         r.setAllMatching(true);
@@ -317,7 +317,7 @@ class UploadControllerBulkActionTest {
         ValidationFinding typed = finding("Typed", ResolveStatus.OPEN);
         typed.setRuleCode("GSTIN_PRESENCE");
         typed.setMismatchType(null);
-        when(findingRepository.findMatching(jobId, ResolveStatus.OPEN, null, null, null, null))
+        when(findingRepository.findMatching(jobId, ResolveStatus.OPEN, orgId, null, null, null, null, null))
                 .thenReturn(List.of(derivable, typed));
         BulkFindingActionRequest r = new BulkFindingActionRequest();
         r.setAllMatching(true);
@@ -327,14 +327,14 @@ class UploadControllerBulkActionTest {
 
         assertThat(((Map<?, ?>) res.getBody()).get("matched")).isEqualTo(1L);
         assertThat(derivable.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
-        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any());
+        verify(findingRepository, never()).findMatchingForUpdate(any(), any(), any(), any(), any(), any(), any(), any());
         verify(findingRepository, never()).saveAll(any());
     }
 
     @Test
     void dryRun_ofApprove_countsPendingFindings_andIsForbiddenForOperators() {
-        when(findingRepository.findMatching(jobId, ResolveStatus.ACKNOWLEDGED, null, null, null,
-                MismatchType.MISSING_IN_CONFIGURATION))
+        when(findingRepository.findMatching(jobId, ResolveStatus.ACKNOWLEDGED, orgId, null, null, null,
+                MismatchType.MISSING_IN_CONFIGURATION, null))
                 .thenReturn(List.of(finding("A", ResolveStatus.ACKNOWLEDGED), finding("B", ResolveStatus.ACKNOWLEDGED)));
         BulkFindingActionRequest r = filterReq("APPROVE");
         r.setDryRun(true);
