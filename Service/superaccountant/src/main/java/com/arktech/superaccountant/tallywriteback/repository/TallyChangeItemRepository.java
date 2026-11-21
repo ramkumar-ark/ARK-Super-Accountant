@@ -38,6 +38,21 @@ public interface TallyChangeItemRepository extends JpaRepository<TallyChangeItem
     List<TallyChangeItem> findByOrganizationIdAndStatusInOrderByCreatedAtDesc(
             UUID organizationId, Collection<TallyChangeStatus> statuses);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM TallyChangeItem i WHERE i.organizationId = :organizationId " +
+           "AND i.status IN :statuses ORDER BY i.createdAt DESC")
+    List<TallyChangeItem> findForExport(
+            @Param("organizationId") UUID organizationId,
+            @Param("statuses") Collection<TallyChangeStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM TallyChangeItem i WHERE i.organizationId = :organizationId " +
+           "AND i.id IN :ids AND i.status IN :statuses ORDER BY i.createdAt DESC")
+    List<TallyChangeItem> findForExportByIds(
+            @Param("organizationId") UUID organizationId,
+            @Param("ids") Collection<UUID> ids,
+            @Param("statuses") Collection<TallyChangeStatus> statuses);
+
     Optional<TallyChangeItem> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
     Optional<TallyChangeItem> findByOrganizationIdAndLedgerKeyAndFieldAndStatusIn(
