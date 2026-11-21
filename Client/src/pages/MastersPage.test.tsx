@@ -181,6 +181,33 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     })
   })
 
+  it('requires and submits a typed PAN for a PAN_FORMAT finding', async () => {
+    current = {
+      ...current,
+      ruleCode: 'PAN_FORMAT',
+      mismatchType: null,
+      actualValue: 'AAPPK2262D1',
+    }
+    await openFindingsTab()
+
+    await userEvent.click(await screen.findByRole('button', { name: /Override Value/ }))
+
+    const input = screen.getByLabelText(/PAN \(required\)/i)
+    expect(input).toHaveAttribute('placeholder', 'AAAAA9999A')
+    expect(screen.getByRole('button', { name: /Submit for Review/ })).toBeDisabled()
+
+    await userEvent.type(input, 'AAPPK2262D')
+    await userEvent.click(screen.getByRole('button', { name: /Submit for Review/ }))
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(ACTION_URL, {
+        action: 'ACKNOWLEDGE',
+        note: '',
+        value: 'AAPPK2262D',
+      })
+    })
+  })
+
   it('TDS section override is a dropdown with readable labels, posting the stored code', async () => {
     current = { ...baseFinding, ruleCode: 'TDS_SECTION_MAPPING', mismatchType: null } as typeof baseFinding
     await openFindingsTab()
