@@ -235,6 +235,23 @@ class Tds26qPrepareIT {
         return saved;
     }
 
+    /** Finalized TDS_26Q for the immediately preceding quarter, required by finalize dependencies. */
+    private Workflow seedFinalizedPreviousQuarter(int fy, String periodKey, LocalDate periodStart) {
+        Workflow w = new Workflow();
+        w.setOrganizationId(orgId);
+        w.setType(WorkflowType.TDS_26Q);
+        w.setPeriodStart(periodStart);
+        w.setPeriodEnd(periodStart.plusMonths(3).minusDays(1));
+        w.setPeriodKey(periodKey);
+        w.setFinancialYear(fy);
+        w.setStage(WorkflowStage.FINALIZED);
+        w.setFinalizedAt(java.time.Instant.now());
+        w.setFinalizedBy("it");
+        w.setFrozenThrough(w.getPeriodEnd());
+        w.setCreatedBy("it");
+        return workflowRepository.save(w);
+    }
+
     private Workflow seedQuarter() {
         return seedQuarter(2025, "2025-Q1", LocalDate.of(2025, 4, 1));
     }
@@ -467,6 +484,7 @@ class Tds26qPrepareIT {
     @Test
     void export_newActQuarter_generatesForm140() throws Exception {
         Workflow quarter = seedQuarter(2026, "2026-Q1", LocalDate.of(2026, 4, 1));
+        seedFinalizedPreviousQuarter(2025, "2025-Q4", LocalDate.of(2026, 1, 1));
         seedPaymentWorkflow(2026, "2026-04", "2026-04", true, 111);
         seedPaymentWorkflow(2026, "2026-05", "2026-05", true, 222);
         seedPaymentWorkflow(2026, "2026-06", "2026-06", true, 333);
@@ -498,7 +516,7 @@ class Tds26qPrepareIT {
                         .status().isOk())
                 .andReturn();
         String body = result.getResponse().getContentAsString();
-        assertTrue(body.contains("^BH^1^1^140^"), body);
+        assertTrue(body.contains("^BH^1^3^140^"), body);
         assertTrue(body.contains("^202627^") || body.contains("202627"), body);
         assertTrue(body.contains("1027"), body);
         assertTrue(result.getResponse().getHeader("Content-Disposition")
