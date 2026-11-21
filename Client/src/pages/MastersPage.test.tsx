@@ -192,7 +192,7 @@ describe('MastersPage — findings resolution (two-stage)', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Override Value/ }))
 
-    const input = screen.getByLabelText(/PAN \(required\)/i)
+    const input = screen.getByLabelText(/^PAN$/)
     expect(input).toHaveAttribute('placeholder', 'AAAAA9999A')
     expect(screen.getByRole('button', { name: /Submit for Review/ })).toBeDisabled()
 
@@ -206,6 +206,54 @@ describe('MastersPage — findings resolution (two-stage)', () => {
         value: 'AAPPK2262D',
       })
     })
+  })
+
+  it('PAN_FORMAT can be resolved explicitly as No PAN / not available', async () => {
+    current = {
+      ...current,
+      ruleCode: 'PAN_FORMAT',
+      mismatchType: null,
+      actualValue: 'AAPPK2262D1',
+    }
+    await openFindingsTab()
+
+    await userEvent.click(await screen.findByRole('button', { name: /Override Value/ }))
+
+    const input = screen.getByLabelText(/^PAN$/)
+    const submit = screen.getByRole('button', { name: /Submit for Review/ })
+    expect(submit).toBeDisabled()
+
+    await userEvent.click(screen.getByLabelText('No PAN / not available'))
+    expect(input).toBeDisabled()
+    expect(submit).toBeEnabled()
+
+    await userEvent.click(submit)
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(ACTION_URL, {
+        action: 'ACKNOWLEDGE',
+        note: '',
+        noPan: true,
+      })
+    })
+    const panPosts = mockPost.mock.calls.filter((c) => c[0] === ACTION_URL)
+    expect(panPosts).toHaveLength(1)
+    expect(panPosts[0][1]).not.toHaveProperty('value')
+  })
+
+  it('shows No PAN / not available for a pending PAN_FORMAT finding with an empty proposal', async () => {
+    current = {
+      ...current,
+      ruleCode: 'PAN_FORMAT',
+      mismatchType: null,
+      resolveStatus: 'ACKNOWLEDGED',
+      proposedValue: '',
+      submittedBy: 'op1',
+    }
+    await openFindingsTab()
+
+    expect(screen.getByText('Pending accountant review')).toBeInTheDocument()
+    expect(screen.getByText('No PAN / not available')).toBeInTheDocument()
   })
 
   it('TDS section override is a dropdown with readable labels, posting the stored code', async () => {

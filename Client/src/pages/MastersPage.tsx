@@ -754,6 +754,7 @@ function FindingsTab({
   onFindingResolved: () => void
 }) {
   const [overrideValue, setOverrideValue] = useState('')
+  const [noPan, setNoPan] = useState(false)
   const role = useAuthStore((st) => st.user?.role)
   // Server is the authority; these only decide which buttons to show.
   const isAccountant = role === 'ROLE_ACCOUNTANT'
@@ -802,7 +803,8 @@ function FindingsTab({
     TYPED_INPUT_RULES.includes(finding.ruleCode) ? (
       <div className="mb-2">
         <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-          {VALUE_LABELS[finding.ruleCode]} (required)
+          {VALUE_LABELS[finding.ruleCode]}
+          {finding.ruleCode !== 'PAN_FORMAT' && ' (required)'}
           {finding.ruleCode === 'TDS_SECTION_MAPPING' ? (
             <TdsSectionSelect
               value={overrideValue}
@@ -826,7 +828,7 @@ function FindingsTab({
             <input
               type="text"
               value={overrideValue}
-              disabled={overrideValue === GST_NOT_APPLICABLE}
+              disabled={overrideValue === GST_NOT_APPLICABLE || (finding.ruleCode === 'PAN_FORMAT' && noPan)}
               onChange={(e) => setOverrideValue(e.target.value)}
               placeholder={finding.ruleCode === 'PAN_FORMAT' ? 'AAAAA9999A' : undefined}
               maxLength={finding.ruleCode === 'PAN_FORMAT' ? 10 : undefined}
@@ -835,8 +837,21 @@ function FindingsTab({
           )}
         </label>
         {finding.ruleCode === 'PAN_FORMAT' && (
+          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
+            <input
+              type="checkbox"
+              checked={noPan}
+              onChange={(e) => {
+                setNoPan(e.target.checked)
+                if (e.target.checked) setOverrideValue('')
+              }}
+            />
+            No PAN / not available
+          </label>
+        )}
+        {finding.ruleCode === 'PAN_FORMAT' && (
           <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
-            10 characters: 5 letters, 4 digits, 1 letter (e.g. AAPPK2262D).
+            10 characters: 5 letters, 4 digits, 1 letter (e.g. AAPPK2262D). Or choose No PAN / not available.
           </p>
         )}
         {finding.ruleCode === 'GSTIN_PRESENCE' && (
@@ -877,10 +892,14 @@ function FindingsTab({
         : action === 'REJECT'
           ? 'Could not reject this finding. Try again.'
           : 'Could not resolve this finding. Try again.'
-    const payload: Record<string, string> = { action }
+    const payload: Record<string, string | boolean> = { action }
     if (action === 'ACKNOWLEDGE') {
       payload.note = body.note ?? ''
-      if (TYPED_INPUT_RULES.includes(finding.ruleCode)) payload.value = overrideValue.trim()
+      if (finding.ruleCode === 'PAN_FORMAT' && noPan) {
+        payload.noPan = true
+      } else if (TYPED_INPUT_RULES.includes(finding.ruleCode)) {
+        payload.value = overrideValue.trim()
+      }
     } else if (action === 'REJECT') {
       payload.note = body.note ?? ''
     }
@@ -889,6 +908,7 @@ function FindingsTab({
       await api.post(actionUrl(finding), payload)
       onFindingResolved()
       setOverrideValue('')
+      setNoPan(false)
     } catch (err) {
       setFindingErrors((prev) => ({ ...prev, [finding.id]: apiErrorMessage(err, fallback) }))
       throw err
@@ -980,7 +1000,11 @@ function FindingsTab({
 
   // What the master will take if this finding is approved.
   const proposedDisplay = (f: ValidationFinding) =>
-    TYPED_INPUT_RULES.includes(f.ruleCode) ? f.proposedValue : f.actualValue
+    f.ruleCode === 'PAN_FORMAT' && (f.proposedValue == null || f.proposedValue.trim() === '')
+      ? 'No PAN / not available'
+      : TYPED_INPUT_RULES.includes(f.ruleCode)
+        ? f.proposedValue
+        : f.actualValue
 
   // Every filter, the rule type included, is applied by the server so paging and counts are exact.
   const filteredFindings = findings
@@ -1446,8 +1470,13 @@ function FindingsTab({
                 label={finding.ledgerName}
                 proposedDisplay={proposedDisplay(finding)}
                 valueInput={overrideValueForm(finding)}
-                submitDisabled={TYPED_INPUT_RULES.includes(finding.ruleCode) && overrideValue.trim() === ''}
+                submitDisabled={
+                  TYPED_INPUT_RULES.includes(finding.ruleCode) &&
+                  overrideValue.trim() === '' &&
+                  !(finding.ruleCode === 'PAN_FORMAT' && noPan)
+                }
                 onOpenChange={(open) => {
+                  setNoPan(false)
                   if (open) {
                     setOverrideValue(finding.proposedValue ?? '')
                   } else {
