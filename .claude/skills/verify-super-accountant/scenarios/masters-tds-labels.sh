@@ -11,8 +11,8 @@ run_scenario() {
   local fix; fix=$(echo "$RESP" | jq -r '.content[0].suggestedFix // empty')
   VSA_STEP="suggested-fix-both-names"
   if [ -n "$fix" ] \
-     && [[ "$fix" == *"194C / 393(1) [Table: Sl. No. 6(i).D(b)]"* ]] \
-     && [[ "$fix" == *"194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)]"* ]]; then
+     && [[ "$fix" == *"194C / 393(1) [Table: Sl. No. 6(i).D(b)] – Payments to contractors and sub-contractors"* ]] \
+     && [[ "$fix" == *"194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)] – Fees for technical services, royalty for films, call centre"* ]]; then
     ok=true
   else
     ok=false

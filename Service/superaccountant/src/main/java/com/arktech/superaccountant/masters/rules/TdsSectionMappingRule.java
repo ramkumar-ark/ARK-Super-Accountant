@@ -43,9 +43,9 @@ public class TdsSectionMappingRule implements ValidationRule {
                 f.setSeverity(severity);
                 f.setResolveStatus(ResolveStatus.OPEN);
                 f.setMessage("Ledger '" + master.getLedgerName() + "' has no TDS section assigned.");
-                f.setSuggestedFix("Assign a TDS section (e.g., " + TdsSectionRefs.both("194C") + ", "
-                        + TdsSectionRefs.both("194J_A")
-                        + ") or mark as 'NOT_SUBJECT' if not applicable to TDS.");
+                f.setSuggestedFix("Assign a TDS section (e.g., " + TdsSectionRefs.both("194C")
+                        + " \u2013 Payments to contractors and sub-contractors, " + TdsSectionRefs.both("194J_A")
+                        + " \u2013 Fees for technical services, royalty for films, call centre) or mark as 'NOT_SUBJECT' if not applicable to TDS.");
                 findings.add(f);
             }
         }
