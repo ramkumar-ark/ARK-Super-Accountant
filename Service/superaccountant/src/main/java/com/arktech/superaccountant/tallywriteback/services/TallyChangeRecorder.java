@@ -42,7 +42,7 @@ public class TallyChangeRecorder implements PanChangeRecorder {
 
         List<TallyChangeItem> open = repository.findOpenForUpdate(organizationId, ledgerKey, TallyField.PAN);
 
-        if (newValue.equals(baseline)) {
+        if (canonical(newValue).equals(canonical(baseline))) {
             // One open item per (organization, ledger key, field): supersede before returning.
             for (TallyChangeItem item : open) {
                 item.setStatus(TallyChangeStatus.SUPERSEDED);
@@ -53,7 +53,7 @@ public class TallyChangeRecorder implements PanChangeRecorder {
         }
 
         for (TallyChangeItem item : open) {
-            if (newValue.equals(item.getNewValue())) {
+            if (canonical(newValue).equals(canonical(item.getNewValue()))) {
                 return;
             }
         }
@@ -83,5 +83,13 @@ public class TallyChangeRecorder implements PanChangeRecorder {
             item.setSupersededBy(created.getId());
             item.setResolvedAt(approvedAt);
         }
+    }
+
+    /** Null and blank mean the same "no PAN" for comparison, while the stored new value stays as-is. */
+    private static String canonical(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim();
     }
 }

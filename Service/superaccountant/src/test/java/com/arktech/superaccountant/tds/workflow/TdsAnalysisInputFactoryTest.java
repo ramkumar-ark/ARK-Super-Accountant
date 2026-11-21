@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -228,6 +229,33 @@ class TdsAnalysisInputFactoryTest {
         assertEquals("50000.00",
                 input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
         assertEquals("10000.00", c.getNewActThresholdAnnual().toPlainString());
+    }
+
+    @Test
+    void overlay_emptyOverride_missingSnapshot_hasNullSyntheticPan() {
+        when(panOverrideRepository.findByOrganizationIdOrderByPartyLedgerNameAsc(
+                TdsEngineFixtures.ORG)).thenReturn(List.of(override("")));
+
+        var input = factory.build(ctx);
+
+        UploadLedgerSnapshot synthetic = input.snapshotsByName()
+                .get(TdsEngine.key("ABC Contractors"));
+        assertTrue(synthetic != null);
+        assertNull(synthetic.getPan());
+    }
+
+    @Test
+    void overlay_emptyOverride_invalidMastersPan_copiesNullPan() {
+        UploadLedgerSnapshot masters = partySnapshot("BAD");
+        when(snapshotRepository.findByUploadJobId(MASTERS_JOB)).thenReturn(List.of(masters));
+        when(panOverrideRepository.findByOrganizationIdOrderByPartyLedgerNameAsc(
+                TdsEngineFixtures.ORG)).thenReturn(List.of(override("")));
+
+        var input = factory.build(ctx);
+
+        assertNull(input.snapshotsByName()
+                .get(TdsEngine.key("ABC Contractors")).getPan());
+        assertEquals("BAD", masters.getPan());
     }
 
     @Test

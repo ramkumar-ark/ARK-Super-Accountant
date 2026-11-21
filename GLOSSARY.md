@@ -79,3 +79,11 @@ _Avoid_: export, push, sync
 **Existence outcome**:
 FOUND (same name), RENAMED (GUID found under another name; the current name is sent), NOT_FOUND (blocked).
 _Avoid_: match status, lookup result
+
+## No PAN resolution
+
+A deliberate resolution of a `PAN_FORMAT` masters finding (or a TDS PAN finding) saying the party
+has no PAN. It is stored as an empty-string `pan` in `tds_pan_overrides`; the override row still
+suppresses `PAN_FORMAT`. Every read treats blank and null alike, and the Tally write-back clears
+the field by sending `incometaxnumber` as an empty string.
+_Avoid_: blank PAN, empty PAN

@@ -80,4 +80,35 @@ class TdsPanOverrideStoreTest {
 
         verify(repository).save(existing);
     }
+
+    @Test
+    void savePanWithEmptyPanStoresNoPanAndNotifiesRecorderWithEmptyString() {
+        UUID findingId = UUID.randomUUID();
+        UUID overrideId = UUID.randomUUID();
+        Instant at = Instant.parse("2026-11-21T10:00:00Z");
+        when(repository.findByOrganizationIdAndPartyKey(ORG, "anandha timber depot"))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(TdsPanOverride.class))).thenAnswer(invocation -> {
+            TdsPanOverride override = invocation.getArgument(0);
+            override.setId(overrideId);
+            return override;
+        });
+
+        store.savePan(ORG, "ANANDHA TIMBER DEPOT", "", findingId, "acct", at);
+
+        ArgumentCaptor<TdsPanOverride> captor = ArgumentCaptor.forClass(TdsPanOverride.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getPan()).isEmpty();
+        verify(recorder).onPanSaved(ORG, "ANANDHA TIMBER DEPOT", "", overrideId, findingId, "acct", at);
+    }
+
+    @Test
+    void findPanReturnsEmptyStringForNoPanOverride() {
+        TdsPanOverride existing = new TdsPanOverride();
+        existing.setPan("");
+        when(repository.findByOrganizationIdAndPartyKey(ORG, "anandha timber depot"))
+                .thenReturn(Optional.of(existing));
+
+        assertThat(store.findPan(ORG, "ANANDHA TIMBER DEPOT")).contains("");
+    }
 }

@@ -174,4 +174,47 @@ class TallyChangeRecorderTest {
         assertThat(item.getLedgerKey()).isEqualTo("anandha timber depot");
         assertThat(item.getLedgerName()).isEqualTo("  Anandha Timber Depot  ");
     }
+
+    @Test
+    void emptyCorrectionAgainstRealBaselineCreatesClearingItem() {
+        when(directory.lookup(ORG, null, "Sales"))
+                .thenReturn(lookup(ExistenceOutcome.FOUND, "ABCDE1234F", JOB, "guid-1"));
+        when(repository.findOpenForUpdate(ORG, "sales", TallyField.PAN)).thenReturn(List.of());
+
+        recorder.onPanSaved(ORG, "Sales", "", OVERRIDE, FINDING, "acct", AT);
+
+        TallyChangeItem item = saveCaptured();
+        assertThat(item.getNewValue()).isEmpty();
+        assertThat(item.getBaselineValue()).isEqualTo("ABCDE1234F");
+        assertThat(item.getStatus()).isEqualTo(TallyChangeStatus.PENDING);
+    }
+
+    @Test
+    void emptyCorrectionAgainstNullBaselineSupersedesOpenItemsAndCreatesNothing() {
+        when(directory.lookup(ORG, null, "Sales"))
+                .thenReturn(lookup(ExistenceOutcome.FOUND, null, JOB, "guid-1"));
+        TallyChangeItem open = openItem("PQRST5678U");
+        when(repository.findOpenForUpdate(ORG, "sales", TallyField.PAN)).thenReturn(List.of(open));
+
+        recorder.onPanSaved(ORG, "Sales", "", OVERRIDE, FINDING, "acct", AT);
+
+        verify(repository, never()).save(any());
+        assertThat(open.getStatus()).isEqualTo(TallyChangeStatus.SUPERSEDED);
+        assertThat(open.getSupersededBy()).isNull();
+        assertThat(open.getResolvedAt()).isEqualTo(AT);
+    }
+
+    @Test
+    void duplicateOpenEmptyItemIsKeptWithoutDuplicate() {
+        when(directory.lookup(ORG, null, "Sales"))
+                .thenReturn(lookup(ExistenceOutcome.FOUND, "ABCDE1234F", JOB, "guid-1"));
+        TallyChangeItem open = openItem("");
+        when(repository.findOpenForUpdate(ORG, "sales", TallyField.PAN)).thenReturn(List.of(open));
+
+        recorder.onPanSaved(ORG, "Sales", "", OVERRIDE, FINDING, "acct", AT);
+
+        verify(repository, never()).save(any());
+        assertThat(open.getStatus()).isEqualTo(TallyChangeStatus.PENDING);
+        assertThat(open.getSupersededBy()).isNull();
+    }
 }
