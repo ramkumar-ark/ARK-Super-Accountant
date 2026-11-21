@@ -14,8 +14,10 @@ import com.arktech.superaccountant.tallywriteback.repository.TallyChangeItemRepo
 import com.arktech.superaccountant.tallywriteback.repository.TallyExportBatchItemRepository;
 import com.arktech.superaccountant.tallywriteback.repository.TallyExportBatchRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -147,6 +149,24 @@ public class TallyExportService {
         String filename = "tally-pan-changes-"
                 + LocalDate.ofInstant(now, ZoneOffset.UTC) + ".json";
         return ExportResult.success(body, filename, skipped);
+    }
+
+    @Transactional
+    public TallyChangeItemResponse retry(UUID organizationId, UUID itemId) {
+        TallyChangeItem item = itemRepository.findByIdAndOrganizationId(itemId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Tally change item not found"));
+        if (item.getStatus() != TallyChangeStatus.FAILED) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Only FAILED items can be retried");
+        }
+
+        item.setStatus(TallyChangeStatus.PENDING);
+        item.setBaselineValue(item.getObservedValue());
+        item.setFailureReason(null);
+        item.setResolvedAt(null);
+        itemRepository.save(item);
+        return toResponse(item);
     }
 
     private List<TallyChangeItem> select(UUID organizationId, List<UUID> itemIds) {

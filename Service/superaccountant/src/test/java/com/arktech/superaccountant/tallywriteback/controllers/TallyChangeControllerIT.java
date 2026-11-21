@@ -21,6 +21,7 @@ import com.arktech.superaccountant.tallywriteback.models.TallyChangeStatus;
 import com.arktech.superaccountant.tallywriteback.models.TallyChangeType;
 import com.arktech.superaccountant.tallywriteback.models.TallyExportBatch;
 import com.arktech.superaccountant.tallywriteback.models.TallyExportBatchItem;
+import com.arktech.superaccountant.tallywriteback.models.TallyFailureReason;
 import com.arktech.superaccountant.tallywriteback.models.TallyField;
 import com.arktech.superaccountant.tallywriteback.repository.TallyChangeItemRepository;
 import com.arktech.superaccountant.tallywriteback.repository.TallyExportBatchItemRepository;
@@ -325,6 +326,111 @@ class TallyChangeControllerIT {
     }
 
     @Test
+    void retry_failedValueChanged_resetsToPendingWithObservedBaseline() throws Exception {
+        TallyChangeItem failed = item(orgId, "retry changed", "RETRY CHANGED", "g-retry-changed",
+                TallyChangeStatus.FAILED, "BBBBB2222B");
+        failed.setObservedValue("BBBBB2222B");
+        failed.setFailureReason(TallyFailureReason.TALLY_VALUE_CHANGED);
+        failed.setResolvedAt(Instant.parse("2026-03-01T00:00:00Z"));
+        itemRepository.saveAndFlush(failed);
+
+        MockHttpServletResponse response = retry(accountantJwt, failed.getId());
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        JsonNode body = objectMapper.readTree(response.getContentAsByteArray());
+        assertThat(body.get("id").asText()).isEqualTo(failed.getId().toString());
+        assertThat(body.get("status").asText()).isEqualTo("PENDING");
+        assertThat(body.get("baselineValue").asText()).isEqualTo("BBBBB2222B");
+        assertThat(body.get("failureReason").isNull()).isTrue();
+        assertThat(body.get("resolvedAt").isNull()).isTrue();
+
+        TallyChangeItem loaded = itemRepository.findById(failed.getId()).orElseThrow();
+        assertThat(loaded.getStatus()).isEqualTo(TallyChangeStatus.PENDING);
+        assertThat(loaded.getBaselineValue()).isEqualTo("BBBBB2222B");
+        assertThat(loaded.getFailureReason()).isNull();
+        assertThat(loaded.getResolvedAt()).isNull();
+        assertThat(batchRepository.findByOrganizationIdOrderByGeneratedAtDesc(orgId)).isEmpty();
+    }
+
+    @Test
+    void retry_failedLedgerMissingWithNullObserved_leavesBaselineNull() throws Exception {
+        TallyChangeItem failed = item(orgId, "retry missing", "RETRY MISSING", "g-retry-missing",
+                TallyChangeStatus.FAILED, "BBBBB2222B");
+        failed.setObservedValue(null);
+        failed.setFailureReason(TallyFailureReason.LEDGER_MISSING);
+        itemRepository.saveAndFlush(failed);
+
+        MockHttpServletResponse response = retry(accountantJwt, failed.getId());
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        JsonNode body = objectMapper.readTree(response.getContentAsByteArray());
+        assertThat(body.get("status").asText()).isEqualTo("PENDING");
+        assertThat(body.get("baselineValue").isNull()).isTrue();
+        assertThat(body.get("failureReason").isNull()).isTrue();
+
+        TallyChangeItem loaded = itemRepository.findById(failed.getId()).orElseThrow();
+        assertThat(loaded.getStatus()).isEqualTo(TallyChangeStatus.PENDING);
+        assertThat(loaded.getBaselineValue()).isNull();
+        assertThat(loaded.getFailureReason()).isNull();
+    }
+
+    @Test
+    void retry_nonFailedStatuses_return409AndLeaveStateUnchanged() throws Exception {
+        for (TallyChangeStatus status : List.of(TallyChangeStatus.PENDING, TallyChangeStatus.EXPORTED,
+                TallyChangeStatus.APPLIED, TallyChangeStatus.SUPERSEDED)) {
+            TallyChangeItem existing = item(orgId, "retry " + status.name().toLowerCase(),
+                    "RETRY " + status.name(), "g-retry-" + status.name().toLowerCase(),
+                    status, "BBBBB2222B");
+            existing.setObservedValue("BBBBB2222B");
+            existing.setFailureReason(TallyFailureReason.TALLY_VALUE_CHANGED);
+            itemRepository.saveAndFlush(existing);
+
+            MockHttpServletResponse response = retry(accountantJwt, existing.getId());
+
+            assertThat(response.getStatus()).isEqualTo(409);
+            TallyChangeItem loaded = itemRepository.findById(existing.getId()).orElseThrow();
+            assertThat(loaded.getStatus()).isEqualTo(status);
+            assertThat(loaded.getBaselineValue()).isEqualTo("OLDVALUE00X");
+            assertThat(loaded.getFailureReason()).isEqualTo(TallyFailureReason.TALLY_VALUE_CHANGED);
+        }
+    }
+
+    @Test
+    void retry_unknownOrForeignItem_returns404() throws Exception {
+        Organization otherOrg = organizationRepository.save(new Organization("Other Org " + UUID.randomUUID()));
+        TallyChangeItem theirs = item(otherOrg.getId(), "theirs retry", "THEIRS RETRY", "g-theirs-retry",
+                TallyChangeStatus.FAILED, "BBBBB2222B");
+        theirs.setObservedValue("BBBBB2222B");
+        theirs.setFailureReason(TallyFailureReason.TALLY_VALUE_CHANGED);
+        itemRepository.saveAndFlush(theirs);
+
+        assertThat(retry(accountantJwt, UUID.randomUUID()).getStatus()).isEqualTo(404);
+        assertThat(retry(accountantJwt, theirs.getId()).getStatus()).isEqualTo(404);
+
+        TallyChangeItem loaded = itemRepository.findById(theirs.getId()).orElseThrow();
+        assertThat(loaded.getStatus()).isEqualTo(TallyChangeStatus.FAILED);
+        assertThat(loaded.getFailureReason()).isEqualTo(TallyFailureReason.TALLY_VALUE_CHANGED);
+    }
+
+    @Test
+    void retry_asOperatorOrAuditor_returns403_ownerAllowed() throws Exception {
+        TallyChangeItem failed = item(orgId, "role retry", "ROLE RETRY", "g-role-retry",
+                TallyChangeStatus.FAILED, "BBBBB2222B");
+        failed.setObservedValue("BBBBB2222B");
+        failed.setFailureReason(TallyFailureReason.TALLY_VALUE_CHANGED);
+        itemRepository.saveAndFlush(failed);
+
+        assertThat(retry(operatorJwt, failed.getId()).getStatus()).isEqualTo(403);
+        assertThat(retry(auditorJwt, failed.getId()).getStatus()).isEqualTo(403);
+        assertThat(itemRepository.findById(failed.getId()).orElseThrow().getStatus())
+                .isEqualTo(TallyChangeStatus.FAILED);
+
+        assertThat(retry(ownerJwt, failed.getId()).getStatus()).isEqualTo(200);
+        assertThat(itemRepository.findById(failed.getId()).orElseThrow().getStatus())
+                .isEqualTo(TallyChangeStatus.PENDING);
+    }
+
+    @Test
     void get_returnsMastersUploadAndItemsNewestFirstWithLivePreview() throws Exception {
         UploadJob job = completedJob(orgId, Instant.now().minus(Duration.ofHours(1)));
         snapshot(job.getId(), orgId, "PREVIEW NEW NAME", "g-preview", "AAAAA1111A");
@@ -498,6 +604,12 @@ class TallyChangeControllerIT {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
+                .andReturn().getResponse();
+    }
+
+    private MockHttpServletResponse retry(String token, UUID id) throws Exception {
+        return mockMvc.perform(post("/api/v1/tally-changes/" + id + "/retry")
+                        .header("Authorization", "Bearer " + token))
                 .andReturn().getResponse();
     }
 
