@@ -13,7 +13,7 @@ class TdsSectionRefsTest {
     @Test
     void newActRefKnowsMappedSectionsAndIgnoresOthers() {
         assertEquals("393(1) [Table: Sl. No. 6(i)]", TdsSectionRefs.newActRef("194C"));
-        assertEquals("393(1) [Table: Sl. No. 2(ii)]", TdsSectionRefs.newActRef("194I"));
+        assertEquals("393(1) [Table: Sl. No. 2(ii).D(b)]", TdsSectionRefs.newActRef("194I"));
         assertEquals("393(1) [Table: Sl. No. 5(ii) and 5(iii)]", TdsSectionRefs.newActRef("194A"));
         assertEquals("393(1) [Table: Sl. No. 6(iii).D(a)]", TdsSectionRefs.newActRef("194J_A"));
         assertEquals("393(1) [Table: Sl. No. 6(iii).D(b)]", TdsSectionRefs.newActRef("194J_B"));

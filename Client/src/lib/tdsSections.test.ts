@@ -7,7 +7,7 @@ describe('TDS_SECTION_OPTIONS', () => {
       '194C / 393(1) [Table: Sl. No. 6(i)] – Payments to contractors and sub-contractors',
     )
     expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194I')?.label).toBe(
-      '194I / 393(1) [Table: Sl. No. 2(ii)] – Rent',
+      '194I / 393(1) [Table: Sl. No. 2(ii).D(b)] – Rent',
     )
     expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194A')?.label).toBe(
       '194A / 393(1) [Table: Sl. No. 5(ii) and 5(iii)] – Interest other than interest on securities',
