@@ -207,7 +207,7 @@ class TallyChangeItemRepositoryIT {
         batchItems.saveAllAndFlush(List.of(first, second));
         entityManager.clear();
 
-        TallyExportBatch loadedBatch = batches.findById(savedBatch.getId()).orElseThrow();
+        TallyExportBatch loadedBatch = batches.findByIdAndOrganizationId(savedBatch.getId(), organizationId).orElseThrow();
         assertThat(loadedBatch.getOrganizationId()).isEqualTo(organizationId);
         assertThat(loadedBatch.getGeneratedBy()).isEqualTo("generator@example.com");
         assertThat(loadedBatch.getGeneratedAt()).isEqualTo(generatedAt);
@@ -217,7 +217,8 @@ class TallyChangeItemRepositoryIT {
         assertThat(loadedBatch.getItemCount()).isEqualTo(2);
         assertThat(loadedBatch.getFileSha256()).isEqualTo("a".repeat(64));
 
-        List<TallyExportBatchItem> loadedItems = batchItems.findByBatchId(savedBatch.getId());
+        List<TallyExportBatchItem> loadedItems =
+                batchItems.findByBatchIdAndOrganizationId(savedBatch.getId(), organizationId);
         assertThat(loadedItems).hasSize(2);
         assertThat(loadedItems)
                 .extracting(TallyExportBatchItem::getItemId)
@@ -225,6 +226,7 @@ class TallyChangeItemRepositoryIT {
         assertThat(loadedItems)
                 .extracting(TallyExportBatchItem::getCheckOutcome)
                 .containsExactlyInAnyOrder(ExistenceOutcome.FOUND, ExistenceOutcome.NOT_FOUND);
+        assertThat(batchItems.findByBatchIdAndOrganizationId(savedBatch.getId(), UUID.randomUUID())).isEmpty();
     }
 
     private TallyChangeItem item(UUID organizationId, String ledgerKey, TallyChangeStatus status) {
