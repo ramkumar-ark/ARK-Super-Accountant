@@ -148,11 +148,15 @@ function routeApi({
   })
 }
 
-function renderPanel(role = 'ROLE_ACCOUNTANT', stage: Workflow['stage'] = 'PREPARE') {
+function renderPanel(
+  role = 'ROLE_ACCOUNTANT',
+  stage: Workflow['stage'] = 'PREPARE',
+  workflowOverrides: Partial<Workflow> = {},
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const view = render(
     <QueryClientProvider client={client}>
-      <QuarterPreparePanel workflow={workflow({ stage })} role={role} />
+      <QuarterPreparePanel workflow={workflow({ stage, ...workflowOverrides })} role={role} />
     </QueryClientProvider>,
   )
   return view
@@ -309,5 +313,19 @@ describe('QuarterPreparePanel', () => {
     await screen.findByText('No PAN Party')
     expect(screen.getByText('missing PAN')).toBeInTheDocument()
     expect(screen.getByText('invalid PAN')).toBeInTheDocument()
+  })
+
+  it('shows s.393 table references instead of section codes in new-Act quarters', async () => {
+    routeApi({ entries: [entry({ section: '194C' })] })
+    renderPanel('ROLE_ACCOUNTANT', 'PREPARE', { periodStart: '2026-04-01' })
+
+    await screen.findByText('393(1) [Table: Sl. No. 6(i).D(b)]')
+  })
+
+  it('shows plain section codes in old-Act quarters', async () => {
+    routeApi({ entries: [entry({ section: '194C' })] })
+    renderPanel()
+
+    await screen.findByText('194C')
   })
 })

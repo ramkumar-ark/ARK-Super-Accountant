@@ -237,6 +237,80 @@
         "taxtype": "GST",
         "gstapplicable": "Applicable"
       }
+    },
+    {
+      "group": {
+        "name": "Indirect Expenses",
+        "parent": ""
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Contract Expense",
+        "guid": "SYN-L-TDS-EXP",
+        "parent": "Indirect Expenses"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Contract Expense 194M",
+        "guid": "SYN-L-TDS-EXP-M",
+        "parent": "Indirect Expenses"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Payee Individual",
+        "guid": "SYN-L-TDS-IND",
+        "parent": "Sundry Creditors",
+        "incometaxnumber": "ABCPE1234F"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Payee Company",
+        "guid": "SYN-L-TDS-CO",
+        "parent": "Sundry Creditors",
+        "incometaxnumber": "ABCCE1234F"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Payee No PAN",
+        "guid": "SYN-L-TDS-NOPAN",
+        "parent": "Sundry Creditors"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Payee Resident Individual 194M",
+        "guid": "SYN-L-TDS-M",
+        "parent": "Sundry Creditors",
+        "incometaxnumber": "ABCPE5678F"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Payable 194C",
+        "guid": "SYN-L-TDS-PAY",
+        "parent": "Duties & Taxes",
+        "istdsapplicable": "Yes"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Payable 194M",
+        "guid": "SYN-L-TDS-PAY-M",
+        "parent": "Duties & Taxes",
+        "istdsapplicable": "Yes"
+      }
+    },
+    {
+      "ledger": {
+        "name": "TDS Professional Expense",
+        "guid": "SYN-L-TDS-EXP-J",
+        "parent": "Indirect Expenses"
+      }
     }
   ]
 }

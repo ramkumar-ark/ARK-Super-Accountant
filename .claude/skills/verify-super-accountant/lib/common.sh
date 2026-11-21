@@ -195,10 +195,12 @@ ensure_masters() {
   state_set masters_done 1
 }
 
-# fresh_workflow <type> <periodKey>: create workflow, upload daybook, analyze,
-# acknowledge blocking findings, advance to PREPARE. Echoes workflow id.
+# fresh_workflow <type> <periodKey> [daybook-file]: create workflow, upload
+# daybook, analyze, acknowledge blocking findings, advance to PREPARE. Echoes
+# workflow id. periodKey may be a quarter (YYYY-Qn, FY starts April); an
+# explicit daybook-file is uploaded as-is instead of the date-remapped default.
 fresh_workflow() {
-  local type="$1" period="$2"
+  local type="$1" period="$2" custom_daybook="${3:-}"
   ensure_masters
   as_accountant
   req "create-workflow" POST /api/v1/workflows "{\"type\":\"$type\",\"periodKey\":\"$period\"}"
@@ -210,13 +212,22 @@ fresh_workflow() {
   # workflow period end. Upload must cover both.
   local y m from to db
   y=${period%%-*}; m=${period#*-}
+  if [[ "$m" =~ ^Q([1-4])$ ]]; then
+    m=$(( 3 * ${BASH_REMATCH[1]} + 3 ))
+    if [ "$m" -gt 12 ]; then m=$((m-12)); y=$((y+1)); fi
+  fi
+  m=$(printf '%02d' "$((10#$m))")
   if [ "$m" -ge 4 ]; then from="$y-04-01"; else from="$((y-1))-04-01"; fi
   to=$(date -d "$y-$m-01 +1 month -1 day" +%F)
-  db=$(jq --arg pre "$y$m" \
-        '[.tallymessage | to_entries[] | .value.date = ($pre + (["01","05","07","09"])[.key % 4]) | .value] | {tallymessage: .}' \
-        "$VSA_DIR/scenarios/fixtures/daybook.json")
   local dbfile="$VSA_EVIDENCE_RUN/daybook-$type-$period.json"
-  echo "$db" > "$dbfile"
+  if [ -n "$custom_daybook" ]; then
+    cp "$custom_daybook" "$dbfile"
+  else
+    db=$(jq --arg pre "$y$m" \
+          '[.tallymessage | to_entries[] | .value.date = ($pre + (["01","05","07","09"])[.key % 4]) | .value] | {tallymessage: .}' \
+          "$VSA_DIR/scenarios/fixtures/daybook.json")
+    echo "$db" > "$dbfile"
+  fi
   VSA_FORM_PARAM=""
   local url="http://localhost:${VSA_API_PORT}/api/v1/workflows/$id/upload"
   local out
@@ -283,8 +294,11 @@ tds_nil_challan() {
   local cid
   cid=$(echo "$RESP" | jq -r '[.challans[]? | select(.status=="APPROVED" or .status=="PROPOSED")][0].id // empty')
   [ -n "$cid" ] && return 0
+  # Deposit date sits inside the workflow's own month.
+  req "workflow-period" GET "/api/v1/workflows/$id"
+  local pk; pk=$(echo "$RESP" | jq -r '.workflow.periodKey // .periodKey')
   req "challan-propose" POST "/api/v1/workflows/$id/tds/challans" \
-    '{"bsrCode":"1234567","depositDate":"2026-04-15","challanSerialNumber":"123","cin":"CINVERIFY123","tdsAmount":0,"surcharge":0,"educationCess":0,"interest":0,"penalty":0,"nilChallan":true}'
+    "{\"bsrCode\":\"1234567\",\"depositDate\":\"$pk-15\",\"challanSerialNumber\":\"123\",\"cin\":\"CINVERIFY123\",\"tdsAmount\":0,\"surcharge\":0,\"educationCess\":0,\"interest\":0,\"penalty\":0,\"nilChallan\":true}"
   expect_status "200|201" || vsa_fail "challan propose failed: $RESP"
   cid=$(echo "$RESP" | jq -r .id)
   req "challan-approve" POST "/api/v1/workflows/$id/tds/challans/$cid/approve"
@@ -296,4 +310,13 @@ tds_nil_challan() {
 next_period() {
   local n; n=$(state_get period_n); [ -z "$n" ] && n=4; n=$((n+1)); state_set period_n "$n"
   if [ "$n" -le 12 ]; then printf '2026-%02d' "$n"; else printf '2027-%02d' "$((n-12))"; fi
+}
+
+# vsa_psql <sql>: SQL against the isolated verify DB only (never the default
+# one), for ids / settings the HTTP API does not expose (ledger snapshot ids,
+# organization books start date). Credentials come from db.env, never printed.
+vsa_psql() {
+  local db; db=$(jq -r .database "$VSA_MARKER")
+  ( set -a; . "$HOME/.config/super-accountant/db.env"; set +a
+    PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "${DB_USERNAME:-postgres}" -d "$db" -tA -c "$1" )
 }

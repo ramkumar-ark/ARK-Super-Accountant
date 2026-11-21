@@ -32,7 +32,7 @@ export VSA_SLUG VSA_BASE VSA_LOG_DIR VSA_MARKER
 
 SCENARIOS=("$@")
 if [ "${1:-}" = "all" ] || [ ${#SCENARIOS[@]} -eq 0 ]; then
-  SCENARIOS=(sign-in workflow-lifecycle gstr1-tables gstr1-fill-ins gstr1-findings gstr1-validate gstr1-export filed-returns-import)
+  SCENARIOS=(sign-in tds-form140 workflow-lifecycle gstr1-tables gstr1-fill-ins gstr1-findings gstr1-validate gstr1-export filed-returns-import)
 fi
 
 FAILED=0; RUN=0

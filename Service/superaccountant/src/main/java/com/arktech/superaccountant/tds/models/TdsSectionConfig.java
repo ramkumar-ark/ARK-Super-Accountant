@@ -3,8 +3,10 @@ package com.arktech.superaccountant.tds.models;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.beans.BeanUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -37,4 +39,46 @@ public class TdsSectionConfig {
 
     @Column(name = "higher_rate_if_no_pan", precision = 5, scale = 2, nullable = false)
     private BigDecimal higherRateIfNoPan = new BigDecimal("20.00");
+
+    /**
+     * Income-tax Act 2025 (s.393) values, applicable when the earlier of credit or payment
+     * falls on/after 1 April 2026. Null new-act rates mean the section has no new-act mapping
+     * yet and old values continue to apply.
+     */
+    @Column(name = "new_act_rate_company", precision = 5, scale = 2)
+    private BigDecimal newActRateCompany;
+
+    @Column(name = "new_act_rate_non_company", precision = 5, scale = 2)
+    private BigDecimal newActRateNonCompany;
+
+    @Column(name = "new_act_threshold_per_transaction", precision = 19, scale = 2)
+    private BigDecimal newActThresholdPerTransaction;
+
+    @Column(name = "new_act_threshold_annual", precision = 19, scale = 2)
+    private BigDecimal newActThresholdAnnual;
+
+    public static boolean newActApplies(LocalDate tdsDate) {
+        return !tdsDate.isBefore(NEW_ACT_EFFECTIVE_DATE);
+    }
+
+    public static final LocalDate NEW_ACT_EFFECTIVE_DATE = LocalDate.of(2026, 4, 1);
+
+    /**
+     * Returns the values in force for a TDS date (earlier of credit or payment): the new-Act
+     * values on/after 1 April 2026 when populated, otherwise the stored values. Never mutates
+     * this entity; detached copies are safe for engine use.
+     */
+    public TdsSectionConfig effectiveFor(LocalDate tdsDate) {
+        if (!newActApplies(tdsDate) || newActRateCompany == null) {
+            return this;
+        }
+        TdsSectionConfig copy = new TdsSectionConfig();
+        BeanUtils.copyProperties(this, copy);
+        copy.setId(getId());
+        copy.setRateCompany(getNewActRateCompany());
+        copy.setRateNonCompany(getNewActRateNonCompany());
+        copy.setThresholdPerTransaction(getNewActThresholdPerTransaction());
+        copy.setThresholdAnnual(getNewActThresholdAnnual());
+        return copy;
+    }
 }

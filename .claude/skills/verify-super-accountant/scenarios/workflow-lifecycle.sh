@@ -18,7 +18,7 @@ run_scenario() {
   req "advance-without-data" POST "/api/v1/workflows/$id/advance"
   expect_status 409
 
-  local id2; id2=$(fresh_workflow TDS_PAYMENT "2026-04")
+  local id2; id2=$(fresh_workflow TDS_PAYMENT "2027-01")
   tds_nil_challan "$id2"
   req "accountant-finalize" POST "/api/v1/workflows/$id2/finalize"
   expect_status 200

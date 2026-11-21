@@ -2,6 +2,8 @@ package com.arktech.superaccountant.tds.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.tds.models.TdsSectionConfig;
+import com.arktech.superaccountant.tds.rpu.Rpu140Generator;
 import com.arktech.superaccountant.tds.rpu.Rpu26qGenerator;
 import com.arktech.superaccountant.tds.rpu.RpuHeader;
 import com.arktech.superaccountant.tds.models.Tds26qDetail;
@@ -67,6 +69,7 @@ public class TdsWorkflowController {
     private final OrganizationRepository organizationRepository;
     private final WorkflowRepository workflowRepository;
     private final Rpu26qGenerator rpu26qGenerator;
+    private final Rpu140Generator rpu140Generator;
 
     public TdsWorkflowController(TdsChallanService challanService,
                                  TdsPaymentDetailRepository paymentDetailRepository,
@@ -76,7 +79,8 @@ public class TdsWorkflowController {
                                  Tds26qDetailRepository detail26qRepository,
                                  OrganizationRepository organizationRepository,
                                  WorkflowRepository workflowRepository,
-                                 Rpu26qGenerator rpu26qGenerator) {
+                                 Rpu26qGenerator rpu26qGenerator,
+                                 Rpu140Generator rpu140Generator) {
         this.challanService = challanService;
         this.paymentDetailRepository = paymentDetailRepository;
         this.entryRepository = entryRepository;
@@ -86,6 +90,7 @@ public class TdsWorkflowController {
         this.organizationRepository = organizationRepository;
         this.workflowRepository = workflowRepository;
         this.rpu26qGenerator = rpu26qGenerator;
+        this.rpu140Generator = rpu140Generator;
     }
 
     @GetMapping("/challans")
@@ -241,10 +246,20 @@ public class TdsWorkflowController {
                 detail.getResponsiblePersonName(), detail.getResponsiblePersonDesignation(),
                 detail.getOriginalReceiptNumber(), q.getFinancialYear(), quarter,
                 LocalDate.now(), q.getRevision() > 0);
-        String body = rpu26qGenerator.generate(header, quarterService.approvedChallans(q),
-                entryRepository.findByWorkflowIdAndSupersededAtIsNull(q.getId()));
-        String filename = "26Q_" + detail.getTan() + "_FY" + q.getFinancialYear()
-                + "_Q" + quarter + ".txt";
+        List<TdsDeducteeEntry> entries =
+                entryRepository.findByWorkflowIdAndSupersededAtIsNull(q.getId());
+        boolean newAct = TdsSectionConfig.newActApplies(q.getPeriodStart());
+        String body;
+        String filename;
+        if (newAct) {
+            body = rpu140Generator.generate(header, quarterService.approvedChallans(q), entries);
+            filename = "140_" + detail.getTan() + "_FY" + q.getFinancialYear()
+                    + "_Q" + quarter + ".txt";
+        } else {
+            body = rpu26qGenerator.generate(header, quarterService.approvedChallans(q), entries);
+            filename = "26Q_" + detail.getTan() + "_FY" + q.getFinancialYear()
+                    + "_Q" + quarter + ".txt";
+        }
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
                 .contentType(org.springframework.http.MediaType.TEXT_PLAIN)

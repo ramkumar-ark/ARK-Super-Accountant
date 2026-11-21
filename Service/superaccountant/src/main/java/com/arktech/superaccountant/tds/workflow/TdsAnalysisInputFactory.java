@@ -54,7 +54,7 @@ public class TdsAnalysisInputFactory {
         applyPanOverlay(ctx, snapshotsByName);
         Map<String, TdsSectionConfig> configsBySection = new LinkedHashMap<>();
         for (TdsSectionConfig c : configRepository.findAll()) {
-            configsBySection.putIfAbsent(c.getSectionCode(), c);
+            configsBySection.putIfAbsent(c.getSectionCode(), c.effectiveFor(ctx.periodStart()));
         }
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());

@@ -18,6 +18,7 @@ import {
   type TdsDeducteeEntry,
 } from '@/lib/tdsApi'
 import { PanOverridePanel } from './PanOverridePanel'
+import { tdsSectionDisplay } from '@/lib/tdsSections393'
 
 const buttonClass =
   'inline-flex h-9 w-fit items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-primary)] px-3 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50'
@@ -313,7 +314,7 @@ export function QuarterPreparePanel({ workflow, role }: Props) {
                       </span>
                     )}
                   </td>
-                  <td className="py-2 pr-2">{entry.section ?? '—'}</td>
+                  <td className="py-2 pr-2">{tdsSectionDisplay(entry.section, workflow.periodStart)}</td>
                   <td className="py-2 pr-2">{entry.dateOfPayment ?? '—'}</td>
                   <td className="py-2 pr-2">{money(entry.amountPaid)}</td>
                   <td className="py-2 pr-2">{money(entry.tdsDeducted)}</td>

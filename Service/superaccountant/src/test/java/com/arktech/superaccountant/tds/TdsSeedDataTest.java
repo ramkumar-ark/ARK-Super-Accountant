@@ -33,4 +33,25 @@ class TdsSeedDataTest {
         assertEquals(0, new BigDecimal("2.00").compareTo(c.getRateCompany()));
         assertEquals(0, new BigDecimal("1.00").compareTo(c.getRateNonCompany()));
     }
+
+    @Test
+    void s194iSeedsNewActMonthlyThreshold() {
+        TdsSectionConfig c = repo.findBySectionCode("194I").orElseThrow();
+        // Rs 50,000/month per landlord => Rs 6,00,000 annual per payee
+        assertEquals(0, new BigDecimal("600000.00").compareTo(c.getNewActThresholdAnnual()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(c.getNewActRateNonCompany()));
+    }
+
+    @Test
+    void s194jSeedsNewActThreshold50k() {
+        TdsSectionConfig jA = repo.findBySectionCode("194J_A").orElseThrow();
+        assertEquals(0, new BigDecimal("50000.00").compareTo(jA.getNewActThresholdAnnual()));
+        TdsSectionConfig jB = repo.findBySectionCode("194J_B").orElseThrow();
+        assertEquals(0, new BigDecimal("50000.00").compareTo(jB.getNewActThresholdAnnual()));
+    }
+
+    @Test
+    void s194mHasNoNewActValues() {
+        assertNull(repo.findBySectionCode("194M").orElseThrow().getNewActRateCompany());
+    }
 }

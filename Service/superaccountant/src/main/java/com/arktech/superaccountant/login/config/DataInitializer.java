@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
@@ -48,6 +49,7 @@ public class DataInitializer implements CommandLineRunner {
                 "Flags purchase ledgers with no GSTIN for GSTR-2B reconciliation.", 5);
         seedConstructionTemplate();
         seedTdsSectionConfigs();
+        backfillNewActSectionConfigs();
         if (preconfiguredMasterRepository.findByTemplateTrueAndTemplateSlug("standard").isEmpty()) {
             seedStandardTemplate();
         }
@@ -60,6 +62,20 @@ public class DataInitializer implements CommandLineRunner {
         int backfilled = dataMigrationService.backfillFindingSeverities();
         if (backfilled > 0) System.out.println("Backfilled " + backfilled + " finding severity values to HIGH/MEDIUM/LOW.");
     }
+
+    private record NewActValues(String rateCompany, String rateNonCompany, String perTxn, String annual) {}
+
+    // Income-tax Act 2025 s.393 values (effective 1 Apr 2026); see docs/tds-income-tax-act-2025-research.md.
+    // 194M is absent: it has no Form 140 code post-2026 (Form 141), so it keeps old-Act values.
+    // Display refs live in Client tdsSections393.ts; Form 140 codes in Rpu140FormatSpec.SECTION_CODES.
+    private static final Map<String, NewActValues> NEW_ACT_VALUES = Map.of(
+            "194A", new NewActValues("10.00", "10.00", null, "10000.00"),
+            "194C", new NewActValues("2.00", "1.00", "30000.00", "100000.00"),
+            "194H", new NewActValues("2.00", "2.00", null, "20000.00"),
+            "194I", new NewActValues("10.00", "10.00", null, "600000.00"),
+            "194J_A", new NewActValues("2.00", "2.00", null, "50000.00"),
+            "194J_B", new NewActValues("10.00", "10.00", null, "50000.00"),
+            "194Q", new NewActValues("0.10", "0.10", null, "5000000.00"));
 
     private void seedTdsSectionConfigs() {
         // Rates/thresholds per Income Tax Act as of FY 2026-27.
@@ -85,8 +101,30 @@ public class DataInitializer implements CommandLineRunner {
         c.setThresholdPerTransaction(perTxn != null ? new java.math.BigDecimal(perTxn) : null);
         c.setThresholdAnnual(new java.math.BigDecimal(annual));
         c.setHigherRateIfNoPan(new java.math.BigDecimal("20.00"));
+        applyNewAct(c);
         tdsSectionConfigRepository.save(c);
         System.out.println("TDS section config seeded: " + code);
+    }
+
+    /** Applies s.393 values to configs created before the new-act seeds existed. */
+    private void backfillNewActSectionConfigs() {
+        int updated = 0;
+        for (TdsSectionConfig c : tdsSectionConfigRepository.findAll()) {
+            if (c.getNewActRateCompany() != null || !applyNewAct(c)) continue;
+            tdsSectionConfigRepository.save(c);
+            updated++;
+        }
+        if (updated > 0) System.out.println("Backfilled " + updated + " TDS section configs with Income-tax Act 2025 (s.393) values.");
+    }
+
+    private boolean applyNewAct(TdsSectionConfig c) {
+        NewActValues v = NEW_ACT_VALUES.get(c.getSectionCode());
+        if (v == null) return false;
+        c.setNewActRateCompany(new java.math.BigDecimal(v.rateCompany()));
+        c.setNewActRateNonCompany(new java.math.BigDecimal(v.rateNonCompany()));
+        c.setNewActThresholdPerTransaction(v.perTxn() != null ? new java.math.BigDecimal(v.perTxn()) : null);
+        c.setNewActThresholdAnnual(new java.math.BigDecimal(v.annual()));
+        return true;
     }
 
     private void seedRoles() {
