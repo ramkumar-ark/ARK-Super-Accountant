@@ -50,6 +50,8 @@ class PreconfiguredMastersControllerIT {
     private com.arktech.superaccountant.login.repository.UserRepository userRepository;
     @Autowired
     private com.arktech.superaccountant.login.security.jwt.JwtUtils jwtUtils;
+    @Autowired
+    private com.arktech.superaccountant.masters.repository.PreconfiguredMasterRepository masterRepository;
 
     private UUID lastOrgId;
 
@@ -68,7 +70,8 @@ class PreconfiguredMastersControllerIT {
         java.util.Map<String, Object> body = objectMapper.readValue(
                 result.getResponse().getContentAsString(), java.util.Map.class);
         int count = ((Number) body.get("count")).intValue();
-        assertThat(count).isGreaterThanOrEqualTo(60);
+        assertThat(count).isGreaterThanOrEqualTo(50);
+        assertThat(gstLedgerNames(lastOrgId)).isEmpty();
     }
 
     @Test
@@ -86,7 +89,69 @@ class PreconfiguredMastersControllerIT {
         java.util.Map<String, Object> body = objectMapper.readValue(
                 result.getResponse().getContentAsString(), java.util.Map.class);
         int count = ((Number) body.get("count")).intValue();
-        assertThat(count).isGreaterThanOrEqualTo(30);
+        assertThat(count).isGreaterThanOrEqualTo(25);
+        assertThat(gstLedgerNames(lastOrgId)).isEmpty();
+    }
+
+    @Test
+    void onboard_gstinCompanyGetsExactlyTheStandardGstLedgerSet_forEverySlug() throws Exception {
+        for (String slug : java.util.List.of("standard", "simplified", "manufacturing")) {
+            String orgToken = setupOrgScopedToken("accountant", "27AAPFU0939F1ZV");
+
+            mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
+                            .header("Authorization", "Bearer " + orgToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"templateSlug\":\"" + slug + "\"}"))
+                    .andExpect(status().isOk());
+
+            java.util.List<String> gstNames = gstLedgerNames(lastOrgId);
+            assertThat(gstNames).containsExactlyInAnyOrderElementsOf(expectedStandardGstLedgerNames());
+            for (String plain : java.util.List.of("Input IGST", "Input CGST", "Input SGST",
+                    "Output IGST", "Output CGST", "Output SGST")) {
+                assertThat(gstNames).doesNotContain(plain);
+            }
+            // no duplicates
+            assertThat(java.util.Set.copyOf(gstNames)).hasSameSizeAs(gstNames);
+        }
+    }
+
+    @Test
+    void onboard_gstinCompanyViaLegacyUseTemplate_getsTheStandardGstLedgers() throws Exception {
+        String orgToken = setupOrgScopedToken("accountant", "27AAPFU0939F1ZV");
+
+        mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
+                        .header("Authorization", "Bearer " + orgToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"useTemplate\":true}"))
+                .andExpect(status().isOk());
+
+        assertThat(gstLedgerNames(lastOrgId)).containsExactlyInAnyOrderElementsOf(expectedStandardGstLedgerNames());
+    }
+
+    @Test
+    void onboard_nonGstinCompanyViaLegacyUseTemplate_getsNoGstLedgers() throws Exception {
+        String orgToken = setupOrgScopedToken("accountant", null);
+
+        mockMvc.perform(post("/api/v1/preconfigured-masters/onboard")
+                        .header("Authorization", "Bearer " + orgToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"useTemplate\":true}"))
+                .andExpect(status().isOk());
+
+        assertThat(gstLedgerNames(lastOrgId)).isEmpty();
+    }
+
+    private java.util.List<String> gstLedgerNames(java.util.UUID orgId) {
+        return masterRepository.findByOrganizationIdAndActiveTrue(orgId).stream()
+                .filter(m -> m.getCategory() == com.arktech.superaccountant.masters.models.LedgerCategory.GST)
+                .map(m -> m.getLedgerName())
+                .toList();
+    }
+
+    private java.util.List<String> expectedStandardGstLedgerNames() {
+        return com.arktech.superaccountant.masters.util.StandardGstLedgers.ledgers().stream()
+                .map(l -> l.ledgerName())
+                .toList();
     }
 
     @Test
@@ -183,6 +248,10 @@ class PreconfiguredMastersControllerIT {
     }
 
     private String setupOrgScopedToken(String role) throws Exception {
+        return setupOrgScopedToken(role, null);
+    }
+
+    private String setupOrgScopedToken(String role, String gstin) throws Exception {
         String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
         String username = "it_" + suffix;
 
@@ -204,10 +273,12 @@ class PreconfiguredMastersControllerIT {
         String token = (String) signinBody.get("token");
 
         // 3. Create org → get org ID
+        String orgPayload = "{\"name\":\"Test Org " + suffix + "\",\"financialYearStart\":4"
+                + (gstin == null ? "" : ",\"gstin\":\"" + gstin + "\"") + "}";
         MvcResult createOrgResult = mockMvc.perform(post("/api/organizations")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Test Org " + suffix + "\",\"financialYearStart\":4}"))
+                        .content(orgPayload))
                 .andExpect(status().isCreated())
                 .andReturn();
         @SuppressWarnings("unchecked")

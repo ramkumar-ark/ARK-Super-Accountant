@@ -10,7 +10,9 @@ import com.arktech.superaccountant.masters.payload.request.OnboardRequest;
 import com.arktech.superaccountant.masters.payload.request.UpdatePreconfiguredMasterRequest;
 import com.arktech.superaccountant.masters.payload.response.BulkImportResponse;
 import com.arktech.superaccountant.masters.payload.response.PreconfiguredMasterResponse;
+import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.PreconfiguredMasterRepository;
+import com.arktech.superaccountant.masters.util.StandardGstLedgers;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -33,6 +35,9 @@ public class PreconfiguredMastersController {
 
     @Autowired
     private PreconfiguredMasterRepository masterRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
 
     @PreAuthorize("isAuthenticated()")
     @GetMapping
@@ -229,21 +234,10 @@ public class PreconfiguredMastersController {
             List<PreconfiguredMaster> templates = masterRepository.findByTemplateTrueAndTemplateSlug(slug);
             List<PreconfiguredMaster> copies = new ArrayList<>();
             for (PreconfiguredMaster t : templates) {
-                PreconfiguredMaster copy = new PreconfiguredMaster();
-                copy.setOrganizationId(orgId);
-                copy.setLedgerName(t.getLedgerName());
-                copy.setCategory(t.getCategory());
-                copy.setExpectedParentGroup(t.getExpectedParentGroup());
-                copy.setExpectedGstApplicable(t.getExpectedGstApplicable());
-                copy.setExpectedTdsApplicable(t.getExpectedTdsApplicable());
-                copy.setTdsSection(t.getTdsSection());
-                copy.setGstApplicabilityType(t.getGstApplicabilityType());
-                copy.setHsnSacCode(t.getHsnSacCode());
-                copy.setGstin(t.getGstin());
-                copy.setTemplate(false);
-                copy.setActive(true);
-                copies.add(copy);
+                if (t.getCategory() == LedgerCategory.GST) continue;
+                copies.add(copyTemplateRow(orgId, t));
             }
+            addStandardGstLedgers(orgId, copies);
             masterRepository.saveAll(copies);
             return ResponseEntity.ok(Map.of(
                 "message", slug + " template applied. " + copies.size() + " masters configured.",
@@ -255,6 +249,7 @@ public class PreconfiguredMastersController {
             List<PreconfiguredMaster> templates = masterRepository.findByTemplateTrue();
             List<PreconfiguredMaster> copies = new ArrayList<>();
             for (PreconfiguredMaster t : templates) {
+                if (t.getCategory() == LedgerCategory.GST) continue;
                 PreconfiguredMaster copy = new PreconfiguredMaster();
                 copy.setOrganizationId(orgId);
                 copy.setLedgerName(t.getLedgerName());
@@ -265,6 +260,7 @@ public class PreconfiguredMastersController {
                 copy.setTemplate(false);
                 copies.add(copy);
             }
+            addStandardGstLedgers(orgId, copies);
             masterRepository.saveAll(copies);
             return ResponseEntity.ok(java.util.Map.of(
                     "message", "Construction/Works Contractor template applied. " + copies.size() + " masters configured.",
@@ -288,6 +284,61 @@ public class PreconfiguredMastersController {
 
     private UUID requireOrgId(UserDetailsImpl principal) {
         return principal.getOrganizationId();
+    }
+
+    private PreconfiguredMaster copyTemplateRow(UUID orgId, PreconfiguredMaster t) {
+        PreconfiguredMaster copy = new PreconfiguredMaster();
+        copy.setOrganizationId(orgId);
+        copy.setLedgerName(t.getLedgerName());
+        copy.setCategory(t.getCategory());
+        copy.setExpectedParentGroup(t.getExpectedParentGroup());
+        copy.setExpectedGstApplicable(t.getExpectedGstApplicable());
+        copy.setExpectedTdsApplicable(t.getExpectedTdsApplicable());
+        copy.setTdsSection(t.getTdsSection());
+        copy.setGstApplicabilityType(t.getGstApplicabilityType());
+        copy.setHsnSacCode(t.getHsnSacCode());
+        copy.setGstin(t.getGstin());
+        copy.setTemplate(false);
+        copy.setActive(true);
+        return copy;
+    }
+
+    /**
+     * Standard GST tax ledgers: applied only for GST-registered organizations, replacing the
+     * plain IGST/CGST/SGST rows the templates used to carry. Guarded by name so a template row
+     * is never added twice.
+     */
+    private void addStandardGstLedgers(UUID orgId, List<PreconfiguredMaster> copies) {
+        String orgGstin = organizationRepository.findById(orgId)
+                .map(o -> o.getGstin())
+                .orElse(null);
+        boolean gstApplicable = orgGstin != null && !orgGstin.isBlank();
+        if (!gstApplicable) {
+            return;
+        }
+        java.util.Set<String> existingNames = new java.util.HashSet<>();
+        for (PreconfiguredMaster c : copies) {
+            existingNames.add(c.getLedgerName().trim().toLowerCase());
+        }
+        for (StandardGstLedgers.StandardGstLedger ledger : StandardGstLedgers.ledgers()) {
+            if (!existingNames.add(ledger.ledgerName().trim().toLowerCase())) {
+                continue;
+            }
+            PreconfiguredMaster m = new PreconfiguredMaster();
+            m.setOrganizationId(orgId);
+            m.setLedgerName(ledger.ledgerName());
+            m.setCategory(LedgerCategory.GST);
+            m.setExpectedParentGroup(ledger.parentGroup());
+            m.setExpectedGstApplicable(true);
+            m.setExpectedTdsApplicable(false);
+            m.setTdsSection("NOT_SUBJECT");
+            m.setGstApplicabilityType(GstApplicabilityType.TAXABLE);
+            m.setHsnSacCode(null);
+            m.setGstin(null);
+            m.setTemplate(false);
+            m.setActive(true);
+            copies.add(m);
+        }
     }
 
     private PreconfiguredMasterResponse toResponse(PreconfiguredMaster m) {

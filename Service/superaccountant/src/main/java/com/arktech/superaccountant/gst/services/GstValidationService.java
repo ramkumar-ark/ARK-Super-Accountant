@@ -21,6 +21,10 @@ public class GstValidationService {
     private static final Pattern GST_LEDGER_PATTERN = Pattern.compile(
             "(?i).*(CGST|SGST|IGST).*");
 
+    // Balance, liability and TDS ledgers carry GST head names but are never invoice tax ledgers.
+    private static final Pattern NON_INVOICE_GST_LEDGER_PATTERN = Pattern.compile(
+            "(?i).*(PAYABLE|CASH BALANCE|CASH LEDGER|CREDIT BALANCE|TDS).*");
+
     private static final Pattern GSTIN_PATTERN = Pattern.compile(
             "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$");
 
@@ -358,6 +362,7 @@ public class GstValidationService {
 
     boolean isGstLedger(String ledgerName) {
         if (ledgerName == null) return false;
+        if (NON_INVOICE_GST_LEDGER_PATTERN.matcher(ledgerName).matches()) return false;
         return GST_LEDGER_PATTERN.matcher(ledgerName).matches();
     }
 

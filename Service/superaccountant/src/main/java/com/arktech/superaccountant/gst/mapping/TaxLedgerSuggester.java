@@ -49,7 +49,7 @@ public final class TaxLedgerSuggester {
         if (upper.contains("CASH")) {
             return TaxLedgerRole.CASH_BALANCE;
         }
-        if (upper.contains("LIABILITY")) {
+        if (upper.contains("LIABILITY") || upper.contains("PAYABLE")) {
             return TaxLedgerRole.LIABILITY_BALANCE;
         }
         if (upper.contains("BALANCE") && (upper.contains("CREDIT") || ITC_TOKEN.matcher(upper).find())) {
