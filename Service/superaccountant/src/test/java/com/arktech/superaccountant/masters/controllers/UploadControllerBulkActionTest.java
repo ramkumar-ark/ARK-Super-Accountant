@@ -8,6 +8,7 @@ import com.arktech.superaccountant.masters.repository.ValidationFindingRepositor
 import com.arktech.superaccountant.masters.services.BulkFindingActionException;
 import com.arktech.superaccountant.masters.services.FindingOverrideException;
 import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
+import com.arktech.superaccountant.masters.services.PanFormatOverrideService;
 import com.arktech.superaccountant.review.FindingReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Role and state rules of the bulk action endpoint; rollback itself is covered in FindingOverrideWorkflowIT. */
@@ -48,6 +50,8 @@ class UploadControllerBulkActionTest {
     ValidationFindingRepository findingRepository;
     @Mock
     FindingOverrideMasterService overrideService;
+    @Mock
+    PanFormatOverrideService panFormatOverrideService;
     @Spy
     FindingReviewService findingReviewService = new FindingReviewService();
 
@@ -339,5 +343,38 @@ class UploadControllerBulkActionTest {
                 .get("matched")).isEqualTo(2L);
         assertThat(controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR")).getStatusCode().value())
                 .isEqualTo(403);
+    }
+
+    @Test
+    void valueLessBulkAcknowledgeFailsPanFindingInsteadOfDroppingTheValue() {
+        ValidationFinding pan = finding("Pan", ResolveStatus.OPEN);
+        pan.setRuleCode("PAN_FORMAT");
+        when(findingRepository.findByIdsForUpdate(eq(jobId), any())).thenReturn(List.of(pan));
+        BulkFindingActionRequest r = new BulkFindingActionRequest();
+        r.setFindingIds(List.of(pan.getId()));
+
+        assertThatThrownBy(() -> controller.bulkFindingAction(jobId, r, user("op", "ROLE_OPERATOR")))
+                .isInstanceOfSatisfying(BulkFindingActionException.class, e -> {
+                    assertThat(e.getFailures()).hasSize(1);
+                    assertThat(e.getFailures().get(0).error()).contains("A PAN correction needs a typed value");
+                });
+        assertThat(pan.getResolveStatus()).isEqualTo(ResolveStatus.OPEN);
+        verifyNoInteractions(panFormatOverrideService);
+    }
+
+    @Test
+    void bulkApproveOfAcknowledgedPanDelegatesToPanService() {
+        ValidationFinding pan = finding("Pan", ResolveStatus.ACKNOWLEDGED);
+        pan.setRuleCode("PAN_FORMAT");
+        pan.setProposedValue("AAPPK2262D");
+        when(findingRepository.findByIdsForUpdate(eq(jobId), any())).thenReturn(List.of(pan));
+        BulkFindingActionRequest r = new BulkFindingActionRequest();
+        r.setAction("APPROVE");
+        r.setFindingIds(List.of(pan.getId()));
+
+        ResponseEntity<?> res = controller.bulkFindingAction(jobId, r, user("acct", "ROLE_ACCOUNTANT"));
+
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        verify(panFormatOverrideService).apply(eq(pan), eq(orgId), anyString());
     }
 }
