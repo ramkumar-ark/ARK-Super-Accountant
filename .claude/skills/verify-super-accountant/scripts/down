@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# verify-super-accountant down [--tag <slug>]
+# Stops only the process groups recorded in this run's instance marker and
+# drops only this run's verify database. Never touches other lanes' pids/ports
+# or the default `superaccountant` database.
+set -euo pipefail
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+EVIDENCE="$SKILL_DIR/evidence"
+SLUG=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tag) SLUG="$2"; shift 2;;
+    *) echo "usage: scripts/down [--tag <slug>]" >&2; exit 2;;
+  esac
+done
+[ -z "$SLUG" ] && SLUG=$(basename "$(pwd)" | tr -c 'a-zA-Z0-9_' '_' | cut -c1-30)
+MARKER="$EVIDENCE/instance-$SLUG.json"
+[ -f "$MARKER" ] || { echo "no instance marker for slug '$SLUG' — nothing to stop" >&2; exit 0; }
+
+API_PORT=$(jq -r .api_port "$MARKER")
+DB_NAME=$(jq -r .database "$MARKER")
+
+case "$DB_NAME" in
+  superaccountant_verify_?*) ;;
+  *) echo "refusing: marker database '$DB_NAME' is not a superaccountant_verify_ database" >&2; exit 1;;
+esac
+
+for pid in $(jq -r '.backend_pid_group, .frontend_pid_group' "$MARKER"); do
+  if [ -n "$pid" ] && [ "$pid" != "null" ] && kill -0 -- -"$pid" 2>/dev/null; then
+    kill -TERM -- -"$pid" 2>/dev/null || true
+  fi
+done
+deadline=$(( $(date +%s) + 20 ))
+for pid in $(jq -r '.backend_pid_group, .frontend_pid_group' "$MARKER"); do
+  while [ "$(date +%s)" -lt "$deadline" ] && kill -0 -- -"$pid" 2>/dev/null; do sleep 1; done
+  kill -KILL -- -"$pid" 2>/dev/null || true
+done
+
+ENV_FILE="${HOME}/.config/super-accountant/db.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a; . "$ENV_FILE"; set +a
+  if [ -n "${DB_PASSWORD:-}" ]; then
+    PGPASSWORD="$DB_PASSWORD" psql -h localhost -U "${DB_USERNAME:-postgres}" -d postgres \
+      -c "DROP DATABASE IF EXISTS \"$DB_NAME\" WITH (FORCE)" >/dev/null
+    echo "dropped database $DB_NAME"
+  fi
+fi
+
+rm -f "$MARKER"
+echo "down: stopped pids on api=$API_PORT and dropped $DB_NAME"

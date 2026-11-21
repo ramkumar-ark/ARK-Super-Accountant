@@ -109,7 +109,7 @@ cd Service/superaccountant    # ./mvnw lives here, not at the repo root
 ```bash
 cd Client
 npm install                   # Install dependencies
-npm run dev                   # Start Vite dev server (port 5173, proxies /api → localhost:8080)
+npm run dev                   # Start Vite dev server (port 5173, proxies /api → localhost:$SA_API_PORT, default 8080)
 npm run build                 # Type-check + production build → dist/
 npm run preview               # Preview production build
 npm run lint                  # ESLint
@@ -170,3 +170,6 @@ Keep this file for knowledge useful to almost every future agent session in this
 Do not repeat what the codebase already shows; point to the authoritative file or command instead.
 Prefer rewriting or pruning existing entries over appending new ones.
 When updating this file, preserve this bar for all agents and keep entries concise.
+
+## Verification
+Before handoff or live validation, run the verify-super-accountant skill per .claude/skills/verify-super-accountant/SKILL.md

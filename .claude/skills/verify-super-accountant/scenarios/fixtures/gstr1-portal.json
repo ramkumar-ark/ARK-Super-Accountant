@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "gstin": "29AAVCS5633D1ZL",
+  "fp": "042026",
+  "b2b": [
+    {
+      "ctin": "29AAACD1111F1Z5",
+      "inv": [
+        {
+          "inum": "INV-VERIFY-1",
+          "idt": "05-04-2026",
+          "val": 1180,
+          "pos": "29",
+          "inv_typ": "B2B",
+          "itms": [
+            {
+              "num": 1,
+              "itm_det": { "txval": 1000, "rt": 18, "igst": 180, "cgst": 0, "sgst": 0, "csamt": 0 }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "b2cs": [
+    { "sply_ty": "INTRA", "typ": "OE", "pos": "29", "txval": 500, "rt": 18, "camt": 45, "samt": 45 }
+  ],
+  "hsn_b2b": [
+    { "num": 1, "hsn_sc": "01011010", "uqc": "NOS", "qty": 10, "txval": 1000, "rt": 18, "iamt": 180 }
+  ]
+}
