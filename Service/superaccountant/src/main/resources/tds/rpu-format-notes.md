@@ -247,7 +247,8 @@ happens only in `RpuFormatSpec.sectionCode`.
 | `194A` | `94A` | interest other than securities |
 | `194C` | `94C` | contractor/sub-contractor |
 | `194H` | `94H` | commission/brokerage |
-| `194I` | `4IB` | rent — land/building (`4IA` is plant/machinery/equipment; seed is "Rent" @10%) |
+| `194I_A` | `4IA` | rent — plant/machinery/equipment @2% |
+| `194I_B` | `4IB` | rent — land/building/furniture/fittings @10% (legacy `194I` still maps here) |
 | `194J_A` | `4JA` | professional/technical fees |
 | `194J_B` | `4JB` | royalty / non-compete etc. |
 | `194M` | `94M` | **not in the v7.8 Annexure 2** — 194M is reported in Form 26QD, not 26Q. Mapped so the seeded internal code can never crash the generator; the export selection must exclude such entries. |

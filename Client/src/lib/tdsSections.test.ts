@@ -15,6 +15,12 @@ describe('TDS_SECTION_OPTIONS', () => {
     expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194J_A')?.label).toBe(
       '194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)] – Fees for technical services, royalty for films, call centre',
     )
+    expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194I_A')?.label).toBe(
+      '194I_A / 393(1) [Table: Sl. No. 2(ii).D(a)] – Rent of plant, machinery or equipment',
+    )
+    expect(TDS_SECTION_OPTIONS.find((o) => o.value === '194I_B')?.label).toBe(
+      '194I_B / 393(1) [Table: Sl. No. 2(ii).D(b)] – Rent of land, building, furniture or fittings',
+    )
   })
 
   it('keeps the stored value separate from the display label', () => {
@@ -40,5 +46,11 @@ describe('tdsSectionBothNames', () => {
   it('falls back to the code and renders an em dash when empty', () => {
     expect(tdsSectionBothNames('CUSTOM')).toBe('CUSTOM')
     expect(tdsSectionBothNames(null)).toBe('—')
+  })
+
+  it('shows legacy 194I mappings as the land/building half', () => {
+    expect(tdsSectionBothNames('194I')).toBe(
+      '194I_B / 393(1) [Table: Sl. No. 2(ii).D(b)] – Rent of land, building, furniture or fittings',
+    )
   })
 })

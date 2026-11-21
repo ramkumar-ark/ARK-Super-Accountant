@@ -158,6 +158,16 @@ class TdsAnalysisInputFactoryTest {
     }
 
     @Test
+    void configResolution_legacy194IResolvesToBuildingHalf() {
+        var c = TdsEngineFixtures.config("194I_B", "10.00", "10.00", null, "240000.00");
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(ctx);
+
+        assertSame(input.configsBySection().get("194I_B"), input.configsBySection().get("194I"));
+    }
+
+    @Test
     void configResolution_oldActPeriodKeepsStoredValues() {
         var c = TdsEngineFixtures.config("194J_A", "2.00", "2.00", "30000.00", "30000.00");
         c.setNewActRateCompany(new java.math.BigDecimal("2.00"));

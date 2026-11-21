@@ -106,12 +106,14 @@ class RpuFormatSpecTest {
 
     @Test
     void sectionCode_mapsAllEightInternalCodes() {
-        for (String c : List.of("194A", "194C", "194H", "194I", "194J_A", "194J_B", "194M", "194Q")) {
+        for (String c : List.of("194A", "194C", "194H", "194I", "194I_A", "194I_B", "194J_A", "194J_B", "194M", "194Q")) {
             assertFalse(RpuFormatSpec.sectionCode(c).isBlank(), c);
         }
         assertEquals("94A", RpuFormatSpec.sectionCode("194A"));
         assertEquals("94C", RpuFormatSpec.sectionCode("194C"));
         assertEquals("94H", RpuFormatSpec.sectionCode("194H"));
+        assertEquals("4IA", RpuFormatSpec.sectionCode("194I_A"));
+        assertEquals("4IB", RpuFormatSpec.sectionCode("194I_B"));
         assertEquals("4IB", RpuFormatSpec.sectionCode("194I"));
         assertEquals("4JA", RpuFormatSpec.sectionCode("194J_A"));
         assertEquals("4JB", RpuFormatSpec.sectionCode("194J_B"));
