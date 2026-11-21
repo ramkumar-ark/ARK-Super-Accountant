@@ -70,7 +70,7 @@ describe('MastersChangeList', () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          'TDS section: 194C / 393(1) [Table: Sl. No. 6(i)] – Payments to contractors and sub-contractors → 194J_B / 393(1) [Table: Sl. No. 6(iii).D(b)] – Fees for professional services, royalty, non-compete fees, director fees',
+          'TDS section: 194C / 393(1) [Table: Sl. No. 6(i)] – Payments to contractors and sub-contractors → 194J_B / 393(1) [Table: Sl. No. 6(iii).D(b)] – Fees for professional services, royalty, non-compete fees',
         ),
       ).toBeInTheDocument(),
     )

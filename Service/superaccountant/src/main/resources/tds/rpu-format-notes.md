@@ -1,20 +1,34 @@
 # RPU 26Q Regular Return — File Format Notes
 
-Research artifact for `RpuFormatSpec`. All column positions used by the generator come
-from this document, never from memory.
+Research artifact for `RpuFormatSpec` (26Q) and `Rpu140FormatSpec` (Form 140). All column
+positions and section codes used by the generators come from this document, never from
+memory.
 
 ## Source
 
+### Form 26Q Regular v7.8 (old Act, up to FY 2025-26)
+
 - **Form:** 26Q Regular (TDS on payments other than salary), Q1–Q4.
 - **Format version:** 7.8 (release 27-05-2025), valid for FY 2007-08 onward, and the
-  current regular 26Q format up to FY 2025-26. (FY 2026-27 onward moves to Form 140 /
-  RPU 1.2, which is out of scope for this worker; the plan fixes `FORM = "26Q"`.)
+  current regular 26Q format up to FY 2025-26.
 - **Source URL:**
   `https://tinpan.proteantech.in/downloads/e-tds/File_Format_26Q_Regular_Q1_to_Q4_Version_7.8_27052025_201011.xls`
 - **Retrieved:** 2026-11-14.
 - Downloaded copy: `/home/ram/firstmate/data/sa-wf-td/research/format-26q-v7.8.xls`
   (cleaned TSV: `format-26q-v7.8-clean.txt`). Not committed; this file is the committed
   record.
+
+### Form 140 (Income-tax Act 2025, FY 2026-27 onward)
+
+- **Form:** Form No. 140 (26Q), non-salary TDS file, Q1–Q4, Tax Year 2026-27 and onwards.
+- **Format version:** the Protean downloads page lists Version 1.2; the file's own title
+  row (A2) says Version 1.1, modified 2026-08-13. Both refer to the same 22-07-2026 file.
+- **Source URL:**
+  `https://tinpan.proteantech.in/downloads/e-tds/Form Number 140 - 26Q - Q1 to Q4_22072026.xlsx`
+  (page: `https://tinpan.proteantech.in/downloads/e-tds/eTDS-download-regular.html`).
+- **Retrieved:** 2026-11-22.
+- Section codes below are from **Annexure 2** of that file; DD field 15 is the section
+  code (CHAR 4, from Annexure 2).
 
 ## Encoding rules
 
@@ -251,21 +265,46 @@ happens only in `RpuFormatSpec.sectionCode`.
 | `194I_B` | `4IB` | rent — land/building/furniture/fittings @10% (legacy `194I` still maps here) |
 | `194J_A` | `4JA` | professional/technical fees |
 | `194J_B` | `4JB` | royalty / non-compete etc. |
+| `194J_C` | `4JB` | director remuneration/fees/commission (not salary). v7.8 Annexure 2 has **no dedicated director code**; `4JB` is the 10% professional/royalty code. |
 | `194M` | `94M` | **not in the v7.8 Annexure 2** — 194M is reported in Form 26QD, not 26Q. Mapped so the seeded internal code can never crash the generator; the export selection must exclude such entries. |
 | `194Q` | `94Q` | purchase of goods |
 
 Unknown internal code → `IllegalArgumentException`.
 
-## Form 140 payment codes (194I split)
+## Form 140 source
 
 Source: FORM NO. 140, Quarterly statement of deduction of tax under section 393(1) of the
 Income-tax Act, 2025 — Annexure 2, List of payment codes (official Protean/NSDL Form 140
 FVU v1.1/1.2 spec). Applied in `Rpu140FormatSpec`.
 
-| Internal | 26Q | Form 140 | s.393(1) reference |
+## Form 140 section-code table (Annexure 2)
+
+Translation happens only in `Rpu140FormatSpec.sectionCode`. 194C and 194A are not simple
+map lookups: 194C splits by deductee PAN type, 194A splits by the company's interest payer
+type and (later) the deductee's senior-citizen status.
+
+| Internal | Form 140 code | s.393(1) Table ref | Situation |
 |---|---|---|---|
-| `194I_A` | `4IA` | `1008` | 393(1) [Table: Sl. No. 2(ii).D(a)] — 2% |
-| `194I_B` | `4IB` | `1009` | 393(1) [Table: Sl. No. 2(ii).D(b)] — 10% |
+| `194A` | `1022` | 5(iii) | interest other than securities, payer is not a bank/co-op bank/post office |
+| `194A` | `1021` | 5(ii).D(b) | interest paid by a bank/co-op bank/post office, deductee not a senior citizen |
+| `194A` | `1020` | 5(ii).D(a) | interest paid by a bank/co-op bank/post office, deductee is a senior citizen (DOB seam, not captured yet) |
+| `194C` | `1023` | 6(i).D(a) | contractor/sub-contractor, payee individual/HUF (PAN 4th char P/H) |
+| `194C` | `1024` | 6(i).D(b) | contractor/sub-contractor, other payee |
+| `194H` | `1006` | 1(ii) | commission/brokerage |
+| `194I` | `1009` | 2(ii).D(b) | legacy stored rent value; resolves to the land/building half |
+| `194I_A` | `1008` | 2(ii).D(a) | rent — plant/machinery/equipment @2% |
+| `194I_B` | `1009` | 2(ii).D(b) | rent — land/building/furniture/fittings @10% |
+| `194J_A` | `1026` | 6(iii).D(a) | technical services, film royalty, call centre |
+| `194J_B` | `1027` | 6(iii).D(b) | professional services/royalty etc. |
+| `194J_C` | `1028` | 6(iii).D(b) | remuneration/fees/commission to a director, other than salary (no threshold) |
+| `194M` | — | — | no Form 140 code; from 1 Apr 2026 it belongs in Form 141 Schedule C |
+| `194Q` | `1031` | 8(ii) | purchase of goods |
+
+**194A threshold derivation:** the company's `interestPayerType` (`OTHER`, `BANK`,
+`CO_OPERATIVE_BANK`, `POST_OFFICE`) decides the annual threshold — Rs 50,000 for the three
+bank-like types, Rs 10,000 for `OTHER` — and the Form 140 code (1021 vs 1022). The
+Rs 1,00,000 senior-citizen threshold (code 1020) needs the deductee's date of birth; the
+rule helper already exposes that seam, but no DOB is stored yet.
 
 ## Literals and markers
 

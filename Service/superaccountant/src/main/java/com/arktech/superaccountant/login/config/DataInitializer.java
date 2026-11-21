@@ -83,6 +83,7 @@ public class DataInitializer implements CommandLineRunner {
             "194I_B", new NewActValues("10.00", "10.00", null, "600000.00"),
             "194J_A", new NewActValues("2.00", "2.00", null, "50000.00"),
             "194J_B", new NewActValues("10.00", "10.00", null, "50000.00"),
+            "194J_C", new NewActValues("10.00", "10.00", null, "0.00"),
             "194Q", new NewActValues("0.10", "0.10", null, "5000000.00"));
 
     private void seedTdsSectionConfigs() {
@@ -95,6 +96,7 @@ public class DataInitializer implements CommandLineRunner {
         seedSection("194I_B", "Rent of land, building, furniture or fittings", "10.00", "10.00", null, "240000.00");
         seedSection("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00");
         seedSection("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00");
+        seedSection("194J_C", "Remuneration, fees or commission to a director (not salary)", "10.00", "10.00", null, "0.00");
         seedSection("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00");
         seedSection("194Q", "Purchase of goods", "0.10", "0.10", null, "5000000.00");
     }

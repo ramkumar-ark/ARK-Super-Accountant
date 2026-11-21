@@ -429,7 +429,7 @@ class FindingOverrideMasterServiceTest {
 
     @Test
     void validate_tdsSection_acceptsOnlyTheListedCodes() {
-        for (String ok : List.of("NOT_SUBJECT", "194C", "194J_A", "194J_B", "194H", "194I_A",
+        for (String ok : List.of("NOT_SUBJECT", "194C", "194J_A", "194J_B", "194J_C", "194H", "194I_A",
                 "194I_B", "194Q", "194A", "194B", "194D", "194M", "OTHER")) {
             ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
             assertThatCode(() -> service.validate(f, ok, orgId)).as(ok).doesNotThrowAnyException();

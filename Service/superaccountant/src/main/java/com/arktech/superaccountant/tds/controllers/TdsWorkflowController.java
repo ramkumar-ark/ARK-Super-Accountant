@@ -237,9 +237,12 @@ public class TdsWorkflowController {
             }
         }
         Tds26qDetail detail = detail26qRepository.findByWorkflowId(q.getId()).orElseThrow();
-        int fyStartMonth = organizationRepository.findById(q.getOrganizationId())
-                .map(com.arktech.superaccountant.masters.models.Organization::getFinancialYearStart)
-                .orElse(4);
+        com.arktech.superaccountant.masters.models.Organization organization =
+                organizationRepository.findById(q.getOrganizationId()).orElse(null);
+        int fyStartMonth = organization != null ? organization.getFinancialYearStart() : 4;
+        com.arktech.superaccountant.masters.models.InterestPayerType interestPayerType =
+                com.arktech.superaccountant.masters.models.InterestPayerType.from(
+                        organization != null ? organization.getInterestPayerType() : null);
         int quarter = (q.getPeriodStart().getMonthValue() - fyStartMonth + 12) % 12 / 3 + 1;
         RpuHeader header = new RpuHeader(detail.getTan(), detail.getDeductorPan(),
                 detail.getDeductorName(), detail.getDeductorAddress(), detail.getDeductorType(),
@@ -252,7 +255,8 @@ public class TdsWorkflowController {
         String body;
         String filename;
         if (newAct) {
-            body = rpu140Generator.generate(header, quarterService.approvedChallans(q), entries);
+            body = rpu140Generator.generate(header, quarterService.approvedChallans(q), entries,
+                    interestPayerType);
             filename = "140_" + detail.getTan() + "_FY" + q.getFinancialYear()
                     + "_Q" + quarter + ".txt";
         } else {

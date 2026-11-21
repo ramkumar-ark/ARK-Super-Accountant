@@ -225,7 +225,7 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     ).toHaveValue('194J_A')
     expect(
       screen.getByRole('option', {
-        name: '194J_B / 393(1) [Table: Sl. No. 6(iii).D(b)] – Fees for professional services, royalty, non-compete fees, director fees',
+        name: '194J_B / 393(1) [Table: Sl. No. 6(iii).D(b)] – Fees for professional services, royalty, non-compete fees',
       }),
     ).toHaveValue('194J_B')
 

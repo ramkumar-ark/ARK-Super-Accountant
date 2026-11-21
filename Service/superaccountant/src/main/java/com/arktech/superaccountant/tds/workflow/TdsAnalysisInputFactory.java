@@ -2,18 +2,22 @@ package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
+import com.arktech.superaccountant.masters.models.InterestPayerType;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.tds.engine.TdsAnalysisInput;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
+import com.arktech.superaccountant.tds.models.Tds194aRules;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
 import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.analysis.AnalysisContext;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,8 +65,32 @@ public class TdsAnalysisInputFactory {
         if (!configsBySection.containsKey("194I") && configsBySection.containsKey("194I_B")) {
             configsBySection.put("194I", configsBySection.get("194I_B"));
         }
+        applyInterestPayerThreshold(org, configsBySection);
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
+    }
+
+    /**
+     * Section 194A has one stored threshold but two company-level thresholds: a bank, co-operative
+     * bank or post office gets Rs 50,000, every other payer Rs 10,000. Apply the company's choice
+     * to a detached copy so the stored config (and the managed entity) is never mutated.
+     */
+    private void applyInterestPayerThreshold(Organization org,
+                                             Map<String, TdsSectionConfig> configsBySection) {
+        TdsSectionConfig config = configsBySection.get("194A");
+        if (config == null) {
+            return;
+        }
+        BigDecimal threshold = Tds194aRules.thresholdAnnual(
+                InterestPayerType.from(org.getInterestPayerType()));
+        if (config.getThresholdAnnual() != null
+                && config.getThresholdAnnual().compareTo(threshold) == 0) {
+            return;
+        }
+        TdsSectionConfig copy = new TdsSectionConfig();
+        BeanUtils.copyProperties(config, copy);
+        copy.setThresholdAnnual(threshold);
+        configsBySection.put("194A", copy);
     }
 
     /**

@@ -15,6 +15,7 @@ export const TDS_393_DISPLAY: Readonly<Record<string, string>> = {
   '194I_B': '393(1) [Table: Sl. No. 2(ii).D(b)]',
   '194J_A': '393(1) [Table: Sl. No. 6(iii).D(a)]',
   '194J_B': '393(1) [Table: Sl. No. 6(iii).D(b)]',
+  '194J_C': '393(1) [Table: Sl. No. 6(iii).D(b)]',
   '194Q': '393(1) [Table: Sl. No. 8(ii)]',
 }
 

@@ -1,5 +1,8 @@
 package com.arktech.superaccountant.tds.rpu;
 
+import com.arktech.superaccountant.masters.models.InterestPayerType;
+import com.arktech.superaccountant.tds.models.Tds194aRules;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -11,7 +14,7 @@ import java.util.Map;
  * (TDS statements under the Income-tax Act 2025, s.397(3)(b) read with Rule 219).
  *
  * <p>Every field position comes from the official Protean file-format specification
- * (Form 140 v1.2, 22072026) — see {@code resources/tds/rpu-format-notes-140.md}.
+ * (Form 140 v1.2, 22072026) — see {@code resources/tds/rpu-format-notes.md}.
  * Builders return the fields in spec order; joining with {@link #DELIMITER} and
  * terminating lines is the caller's job.
  */
@@ -33,6 +36,7 @@ public final class Rpu140FormatSpec {
             "194I_B", "1009",
             "194J_A", "1026",
             "194J_B", "1027",
+            "194J_C", "1028",
             "194Q", "1031");
 
     private Rpu140FormatSpec() {
@@ -146,6 +150,16 @@ public final class Rpu140FormatSpec {
     // ---------------------------------------------------------------- DD
 
     public static List<String> deducteeDetail(RpuFormatSpec.DdData d) {
+        return deducteeDetail(d, InterestPayerType.OTHER, null);
+    }
+
+    /**
+     * @param payerType      company-level 194A payer type, used only for the 194A code
+     * @param seniorCitizen  senior-citizen seam for 194A; null/false until deductee DOB exists
+     */
+    public static List<String> deducteeDetail(RpuFormatSpec.DdData d,
+                                               InterestPayerType payerType,
+                                               Boolean seniorCitizen) {
         List<String> f = new ArrayList<>(45);
         f.add(String.valueOf(d.lineNumber()));               // 1
         f.add("DD");                                         // 2
@@ -157,7 +171,7 @@ public final class Rpu140FormatSpec {
         f.add(RpuFormatSpec.pan(d.pan(), d.panValid()));     // 8
         f.add(RpuFormatSpec.sanitiseName(d.name()));         // 9
         addBlanks(f, 5);                                     // 10-14
-        f.add(sectionCode(d.section(), d.pan()));             // 15
+        f.add(sectionCode(d.section(), d.pan(), payerType, seniorCitizen)); // 15
         addBlanks(f, 2);                                     // 16-17
         f.add(hasAmount(d.tdsDeposited()) ? "Y" : "N");      // 18
         f.add(RpuFormatSpec.date(d.paymentDate()));          // 19
@@ -193,6 +207,15 @@ public final class Rpu140FormatSpec {
      * defaulting — a valid PAN is enforced separately by the PANS_VALID finalize gate.
      */
     public static String sectionCode(String internal, String deducteePan) {
+        return sectionCode(internal, deducteePan, InterestPayerType.OTHER, null);
+    }
+
+    /**
+     * Form 140 tax code for a deductee. 194A depends on the company-level payer type (bank-like
+     * non-senior 1021, other payer 1022, senior-citizen seam 1020); 194C splits by payee type.
+     */
+    public static String sectionCode(String internal, String deducteePan,
+                                     InterestPayerType payerType, Boolean seniorCitizen) {
         String code = internal == null ? null : SECTION_CODES.get(internal);
         if (code == null) {
             if ("194M".equals(internal)) {
@@ -201,6 +224,9 @@ public final class Rpu140FormatSpec {
                                 + "Form 141 Schedule C, which this export does not support yet");
             }
             throw new IllegalArgumentException("Unknown TDS section for Form 140: " + internal);
+        }
+        if ("194A".equals(internal)) {
+            return Tds194aRules.form140Code(payerType, seniorCitizen);
         }
         if ("194C".equals(internal)) {
             if (deducteePan == null || deducteePan.length() != 10) {

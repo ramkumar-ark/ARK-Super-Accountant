@@ -8,7 +8,11 @@ const SECTION_DEFS: ReadonlyArray<{ value: string; nature: string; bare?: boolea
   { value: 'NOT_SUBJECT', nature: 'Not subject to TDS', bare: true },
   { value: '194C', nature: 'Payments to contractors and sub-contractors' },
   { value: '194J_A', nature: 'Fees for technical services, royalty for films, call centre' },
-  { value: '194J_B', nature: 'Fees for professional services, royalty, non-compete fees, director fees' },
+  { value: '194J_B', nature: 'Fees for professional services, royalty, non-compete fees' },
+  {
+    value: '194J_C',
+    nature: 'Remuneration, fees or commission to a director (not salary)',
+  },
   { value: '194H', nature: 'Commission or brokerage' },
   { value: '194I_A', nature: 'Rent of plant, machinery or equipment' },
   { value: '194I_B', nature: 'Rent of land, building, furniture or fittings' },
