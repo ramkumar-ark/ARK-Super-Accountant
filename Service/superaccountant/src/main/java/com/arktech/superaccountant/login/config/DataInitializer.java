@@ -48,6 +48,7 @@ public class DataInitializer implements CommandLineRunner {
                 "Flags purchase ledgers with no GSTIN for GSTR-2B reconciliation.", 5);
         seedConstructionTemplate();
         seedTdsSectionConfigs();
+        backfillNewActSectionConfigs();
         if (preconfiguredMasterRepository.findByTemplateTrueAndTemplateSlug("standard").isEmpty()) {
             seedStandardTemplate();
         }
@@ -64,18 +65,38 @@ public class DataInitializer implements CommandLineRunner {
     private void seedTdsSectionConfigs() {
         // Rates/thresholds per Income Tax Act as of FY 2026-27.
         // VERIFY against the current Finance Act before release — these change yearly.
-        seedSection("194A", "Interest other than securities", "10.00", "10.00", null, "10000.00");
-        seedSection("194C", "Payments to contractors", "2.00", "1.00", "30000.00", "100000.00");
-        seedSection("194H", "Commission or brokerage", "2.00", "2.00", null, "20000.00");
-        seedSection("194I", "Rent", "10.00", "10.00", null, "240000.00");
-        seedSection("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00");
-        seedSection("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00");
-        seedSection("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00");
-        seedSection("194Q", "Purchase of goods", "0.10", "0.10", null, "5000000.00");
+        // New-act values per Income-tax Act 2025 s.393 (effective 1 Apr 2026) — see
+        // docs/tds-income-tax-act-2025-research.md for sources.
+        seedSection("194A", "Interest other than securities", "10.00", "10.00", null, "10000.00",
+                "10.00", "10.00", null, "10000.00", "393(1) [Table: Sl. No. 5(iii)]", "1022");
+        seedSection("194C", "Payments to contractors", "2.00", "1.00", "30000.00", "100000.00",
+                "2.00", "1.00", "30000.00", "100000.00", "393(1) [Table: Sl. No. 6(i).D(b)]", "1024");
+        seedSection("194H", "Commission or brokerage", "2.00", "2.00", null, "20000.00",
+                "2.00", "2.00", null, "20000.00", "393(1) [Table: Sl. No. 1(ii)]", "1006");
+        seedSection("194I", "Rent", "10.00", "10.00", null, "240000.00",
+                "10.00", "10.00", null, "600000.00", "393(1) [Table: Sl. No. 2(ii).D(b)]", "1009");
+        seedSection("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00",
+                "2.00", "2.00", null, "50000.00", "393(1) [Table: Sl. No. 6(iii).D(a)]", "1026");
+        seedSection("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00",
+                "10.00", "10.00", null, "50000.00", "393(1) [Table: Sl. No. 6(iii).D(b)]", "1027");
+        // 194M has no Form 140 code post-2026 (moves to Form 141 Schedule C) — new-act values
+        // intentionally left null so the 140 generator can reject it explicitly.
+        seedSection("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00",
+                null, null, null, null, null, null);
+        seedSection("194Q", "Purchase of goods", "0.10", "0.10", null, "5000000.00",
+                "0.10", "0.10", null, "5000000.00", "393(1) [Table: Sl. No. 8(ii)]", "1031");
     }
 
     private void seedSection(String code, String desc, String rateCompany, String rateNonCompany,
                              String perTxn, String annual) {
+        seedSection(code, desc, rateCompany, rateNonCompany, perTxn, annual,
+                null, null, null, null, null, null);
+    }
+
+    private void seedSection(String code, String desc, String rateCompany, String rateNonCompany,
+                             String perTxn, String annual,
+                             String newRateCompany, String newRateNonCompany, String newPerTxn,
+                             String newAnnual, String newDisplayRef, String newRpuCode) {
         if (tdsSectionConfigRepository.existsBySectionCode(code)) return;
         TdsSectionConfig c = new TdsSectionConfig();
         c.setSectionCode(code);
@@ -85,8 +106,54 @@ public class DataInitializer implements CommandLineRunner {
         c.setThresholdPerTransaction(perTxn != null ? new java.math.BigDecimal(perTxn) : null);
         c.setThresholdAnnual(new java.math.BigDecimal(annual));
         c.setHigherRateIfNoPan(new java.math.BigDecimal("20.00"));
+        if (newRateCompany != null) {
+            c.setNewActRateCompany(new java.math.BigDecimal(newRateCompany));
+            c.setNewActRateNonCompany(new java.math.BigDecimal(newRateNonCompany));
+            c.setNewActThresholdPerTransaction(newPerTxn != null ? new java.math.BigDecimal(newPerTxn) : null);
+            c.setNewActThresholdAnnual(newAnnual != null ? new java.math.BigDecimal(newAnnual) : null);
+            c.setNewActDisplayRef(newDisplayRef);
+            c.setNewActRpuCode(newRpuCode);
+        }
         tdsSectionConfigRepository.save(c);
         System.out.println("TDS section config seeded: " + code);
+    }
+
+    /** Applies s.393 values to configs created before the new-act seeds existed. */
+    private void backfillNewActSectionConfigs() {
+        int updated = 0;
+        for (TdsSectionConfig c : tdsSectionConfigRepository.findAll()) {
+            if (c.getNewActRateCompany() != null) continue;
+            switch (c.getSectionCode()) {
+                case "194A" -> setNewAct(c, "10.00", "10.00", null, "10000.00",
+                        "393(1) [Table: Sl. No. 5(iii)]", "1022");
+                case "194C" -> setNewAct(c, "2.00", "1.00", "30000.00", "100000.00",
+                        "393(1) [Table: Sl. No. 6(i).D(b)]", "1024");
+                case "194H" -> setNewAct(c, "2.00", "2.00", null, "20000.00",
+                        "393(1) [Table: Sl. No. 1(ii)]", "1006");
+                case "194I" -> setNewAct(c, "10.00", "10.00", null, "600000.00",
+                        "393(1) [Table: Sl. No. 2(ii).D(b)]", "1009");
+                case "194J_A" -> setNewAct(c, "2.00", "2.00", null, "50000.00",
+                        "393(1) [Table: Sl. No. 6(iii).D(a)]", "1026");
+                case "194J_B" -> setNewAct(c, "10.00", "10.00", null, "50000.00",
+                        "393(1) [Table: Sl. No. 6(iii).D(b)]", "1027");
+                case "194Q" -> setNewAct(c, "0.10", "0.10", null, "5000000.00",
+                        "393(1) [Table: Sl. No. 8(ii)]", "1031");
+                default -> { continue; }
+            }
+            tdsSectionConfigRepository.save(c);
+            updated++;
+        }
+        if (updated > 0) System.out.println("Backfilled " + updated + " TDS section configs with Income-tax Act 2025 (s.393) values.");
+    }
+
+    private void setNewAct(TdsSectionConfig c, String rateCompany, String rateNonCompany,
+                           String perTxn, String annual, String displayRef, String rpuCode) {
+        c.setNewActRateCompany(new java.math.BigDecimal(rateCompany));
+        c.setNewActRateNonCompany(new java.math.BigDecimal(rateNonCompany));
+        c.setNewActThresholdPerTransaction(perTxn != null ? new java.math.BigDecimal(perTxn) : null);
+        c.setNewActThresholdAnnual(new java.math.BigDecimal(annual));
+        c.setNewActDisplayRef(displayRef);
+        c.setNewActRpuCode(rpuCode);
     }
 
     private void seedRoles() {

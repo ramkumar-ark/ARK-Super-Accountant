@@ -204,14 +204,19 @@ class Tds26qPrepareIT {
 
     private Workflow seedPaymentWorkflow(String month, String periodKey, boolean approved,
                                          int serial) {
+        return seedPaymentWorkflow(2025, month, periodKey, approved, serial);
+    }
+
+    private Workflow seedPaymentWorkflow(int fy, String month, String periodKey, boolean approved,
+                                         int serial) {
+        int monthNumber = Integer.parseInt(month.substring(month.length() - 2));
         Workflow w = new Workflow();
         w.setOrganizationId(orgId);
         w.setType(WorkflowType.TDS_PAYMENT);
-        w.setPeriodStart(LocalDate.of(2025, month.equals("2025-04") ? 4
-                : month.equals("2025-05") ? 5 : month.equals("2025-06") ? 6 : 7, 1));
+        w.setPeriodStart(LocalDate.of(fy, monthNumber, 1));
         w.setPeriodEnd(w.getPeriodStart().plusMonths(1).minusDays(1));
         w.setPeriodKey(periodKey);
-        w.setFinancialYear(2025);
+        w.setFinancialYear(fy);
         w.setStage(WorkflowStage.FINALIZED);
         w.setFinalizedAt(java.time.Instant.now());
         w.setFinalizedBy("it");
@@ -231,13 +236,17 @@ class Tds26qPrepareIT {
     }
 
     private Workflow seedQuarter() {
+        return seedQuarter(2025, "2025-Q1", LocalDate.of(2025, 4, 1));
+    }
+
+    private Workflow seedQuarter(int fy, String periodKey, LocalDate periodStart) {
         Workflow w = new Workflow();
         w.setOrganizationId(orgId);
         w.setType(WorkflowType.TDS_26Q);
-        w.setPeriodStart(LocalDate.of(2025, 4, 1));
-        w.setPeriodEnd(LocalDate.of(2025, 6, 30));
-        w.setPeriodKey("2025-Q1");
-        w.setFinancialYear(2025);
+        w.setPeriodStart(periodStart);
+        w.setPeriodEnd(periodStart.plusMonths(3).minusDays(1));
+        w.setPeriodKey(periodKey);
+        w.setFinancialYear(fy);
         w.setStage(WorkflowStage.PREPARE);
         w.setCreatedBy("it");
         Workflow saved = workflowRepository.save(w);
@@ -254,17 +263,21 @@ class Tds26qPrepareIT {
     }
 
     private TdsDeducteeEntry seedEntry(Workflow quarter) {
+        return seedEntry(quarter, "194C", LocalDate.of(2025, 5, 10));
+    }
+
+    private TdsDeducteeEntry seedEntry(Workflow quarter, String section, LocalDate paymentDate) {
         TdsDeducteeEntry e = new TdsDeducteeEntry();
         e.setWorkflowId(quarter.getId());
         e.setDeducteeName("ABC Contractors");
         e.setDeducteePan("ABCDE1234F");
         e.setPanValid(true);
-        e.setSection("194C");
+        e.setSection(section);
         e.setAmountPaid(new BigDecimal("500000.00"));
         e.setTdsDeducted(new BigDecimal("5000.00"));
         e.setTdsDeposited(new BigDecimal("5000.00"));
-        e.setDateOfPayment(LocalDate.of(2025, 5, 10));
-        e.setDateOfDeduction(LocalDate.of(2025, 5, 10));
+        e.setDateOfPayment(paymentDate);
+        e.setDateOfDeduction(paymentDate);
         e.setRateApplied(new BigDecimal("1.00"));
         e.setSourceVoucherIds("[\"v\"]");
         return entryRepository.save(e);
@@ -449,6 +462,43 @@ class Tds26qPrepareIT {
         assertTrue(body.startsWith("1^FH^"), body);
         assertTrue(result.getResponse().getHeader("Content-Disposition")
                 .contains("26Q_CHEA12345B_FY2025_Q1.txt"));
+    }
+
+    @Test
+    void export_newActQuarter_generatesForm140() throws Exception {
+        Workflow quarter = seedQuarter(2026, "2026-Q1", LocalDate.of(2026, 4, 1));
+        seedPaymentWorkflow(2026, "2026-04", "2026-04", true, 111);
+        seedPaymentWorkflow(2026, "2026-05", "2026-05", true, 222);
+        seedPaymentWorkflow(2026, "2026-06", "2026-06", true, 333);
+        TdsDeducteeEntry e1 = seedEntry(quarter, "194J_B", LocalDate.of(2026, 5, 10));
+        TdsDeducteeEntry e2 = seedEntry(quarter, "194C", LocalDate.of(2026, 6, 15));
+
+        post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
+                "{\"challanId\":\"" + challanIdsByPeriod.get("2026-04")
+                        + "\",\"entryIds\":[\"" + e1.getId() + "\"]}");
+        post("/api/v1/workflows/" + quarter.getId() + "/tds/entries/map",
+                "{\"challanId\":\"" + challanIdsByPeriod.get("2026-05")
+                        + "\",\"entryIds\":[\"" + e2.getId() + "\"]}");
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/v1/workflows/" + quarter.getId() + "/finalize")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{}").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isOk());
+
+        var result = mockMvc.perform(org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get("/api/v1/workflows/" + quarter.getId()
+                                + "/tds/export").with(as(principal)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .status().isOk())
+                .andReturn();
+        String body = result.getResponse().getContentAsString();
+        assertTrue(body.contains("^BH^1^1^140^"), body);
+        assertTrue(body.contains("^202627^") || body.contains("202627"), body);
+        assertTrue(body.contains("1027"), body);
+        assertTrue(result.getResponse().getHeader("Content-Disposition")
+                .contains("140_CHEA12345B_FY2026_Q1.txt"));
     }
 
     @Test
