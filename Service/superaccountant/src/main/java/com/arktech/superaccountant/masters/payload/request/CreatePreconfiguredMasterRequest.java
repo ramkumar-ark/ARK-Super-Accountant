@@ -15,7 +15,7 @@ public class CreatePreconfiguredMasterRequest {
     private String expectedParentGroup;
     private Boolean expectedGstApplicable;
     private Boolean expectedTdsApplicable;
-    @Pattern(regexp = "NOT_SUBJECT|194C|194J_A|194J_B|194H|194I|194Q|194A|194B|194D|194M|OTHER",
+    @Pattern(regexp = "NOT_SUBJECT|194C|194J_A|194J_B|194H|194I_A|194I_B|194Q|194A|194B|194D|194M|OTHER",
              message = "Invalid TDS section code")
     private String tdsSection;
     @Pattern(regexp = "TAXABLE|EXEMPT|ZERO_RATED|NON_GST|RCM|NOT_APPLICABLE",

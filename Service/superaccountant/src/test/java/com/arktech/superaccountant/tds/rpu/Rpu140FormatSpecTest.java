@@ -143,6 +143,8 @@ class Rpu140FormatSpecTest {
     void form140SectionCode_mapsInternalsToFourDigitCodes() {
         assertEquals("1022", Rpu140FormatSpec.sectionCode("194A"));
         assertEquals("1006", Rpu140FormatSpec.sectionCode("194H"));
+        assertEquals("1008", Rpu140FormatSpec.sectionCode("194I_A"));
+        assertEquals("1009", Rpu140FormatSpec.sectionCode("194I_B"));
         assertEquals("1009", Rpu140FormatSpec.sectionCode("194I"));
         assertEquals("1026", Rpu140FormatSpec.sectionCode("194J_A"));
         assertEquals("1027", Rpu140FormatSpec.sectionCode("194J_B"));

@@ -247,13 +247,25 @@ happens only in `RpuFormatSpec.sectionCode`.
 | `194A` | `94A` | interest other than securities |
 | `194C` | `94C` | contractor/sub-contractor |
 | `194H` | `94H` | commission/brokerage |
-| `194I` | `4IB` | rent — land/building (`4IA` is plant/machinery/equipment; seed is "Rent" @10%) |
+| `194I_A` | `4IA` | rent — plant/machinery/equipment @2% |
+| `194I_B` | `4IB` | rent — land/building/furniture/fittings @10% (legacy `194I` still maps here) |
 | `194J_A` | `4JA` | professional/technical fees |
 | `194J_B` | `4JB` | royalty / non-compete etc. |
 | `194M` | `94M` | **not in the v7.8 Annexure 2** — 194M is reported in Form 26QD, not 26Q. Mapped so the seeded internal code can never crash the generator; the export selection must exclude such entries. |
 | `194Q` | `94Q` | purchase of goods |
 
 Unknown internal code → `IllegalArgumentException`.
+
+## Form 140 payment codes (194I split)
+
+Source: FORM NO. 140, Quarterly statement of deduction of tax under section 393(1) of the
+Income-tax Act, 2025 — Annexure 2, List of payment codes (official Protean/NSDL Form 140
+FVU v1.1/1.2 spec). Applied in `Rpu140FormatSpec`.
+
+| Internal | 26Q | Form 140 | s.393(1) reference |
+|---|---|---|---|
+| `194I_A` | `4IA` | `1008` | 393(1) [Table: Sl. No. 2(ii).D(a)] — 2% |
+| `194I_B` | `4IB` | `1009` | 393(1) [Table: Sl. No. 2(ii).D(b)] — 10% |
 
 ## Literals and markers
 

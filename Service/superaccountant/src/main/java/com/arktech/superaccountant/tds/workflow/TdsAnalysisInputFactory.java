@@ -56,6 +56,11 @@ public class TdsAnalysisInputFactory {
         for (TdsSectionConfig c : configRepository.findAll()) {
             configsBySection.putIfAbsent(c.getSectionCode(), c.effectiveFor(ctx.periodStart()));
         }
+        // Legacy stored 194I (pre-split rent) is the land/building half; keep rows that still
+        // carry it resolvable even before/without the stored-value migration.
+        if (!configsBySection.containsKey("194I") && configsBySection.containsKey("194I_B")) {
+            configsBySection.put("194I", configsBySection.get("194I_B"));
+        }
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
     }

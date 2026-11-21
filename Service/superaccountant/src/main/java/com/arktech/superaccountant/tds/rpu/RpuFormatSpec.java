@@ -36,8 +36,11 @@ public final class RpuFormatSpec {
             "194A", "94A",
             "194C", "94C",
             "194H", "94H",
-            // Internal 194I = rent on land/building/furniture (4IB); plant-and-machinery rent (4IA) is not modelled yet.
+            // 194I is split as 194I_A (plant/machinery/equipment, 4IA) and 194I_B
+            // (land/building/furniture, 4IB); legacy 194I stays the land/building half.
             "194I", "4IB",
+            "194I_A", "4IA",
+            "194I_B", "4IB",
             "194J_A", "4JA",
             "194J_B", "4JB",
             "194M", "94M",

@@ -187,7 +187,7 @@ class BulkTypedOverrideIT {
 
     @Test
     void operatorBulkTdsThenAccountantBulkApprove_appliesProposedValues() throws Exception {
-        bulk(operatorJwt, "{\"findingIds\":" + ids("TDS_SECTION_MAPPING", "Rent A", "Rent B") + ",\"value\":\"194I\"}")
+        bulk(operatorJwt, "{\"findingIds\":" + ids("TDS_SECTION_MAPPING", "Rent A", "Rent B") + ",\"value\":\"194I_B\"}")
                 .andExpect(status().isOk());
         assertThat(statusOf("TDS_SECTION_MAPPING", "Rent A")).isEqualTo(ResolveStatus.ACKNOWLEDGED);
 
@@ -195,7 +195,7 @@ class BulkTypedOverrideIT {
         bulk(accountantJwt, "{\"action\":\"APPROVE\",\"ruleCode\":\"TDS_SECTION_MAPPING\"}")
                 .andExpect(status().isOk()).andExpect(jsonPath("$.processed").value(2));
 
-        assertThat(master("Rent B").getTdsSection()).isEqualTo("194I");
+        assertThat(master("Rent B").getTdsSection()).isEqualTo("194I_B");
         assertThat(statusOf("TDS_SECTION_MAPPING", "Rent B")).isEqualTo(ResolveStatus.APPROVED);
         assertThat(statusOf("TDS_SECTION_MAPPING", "Freight X")).isEqualTo(ResolveStatus.OPEN);
     }

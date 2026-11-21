@@ -50,6 +50,8 @@ public class DataInitializer implements CommandLineRunner {
         seedValidationRuleIfAbsent("PAN_FORMAT", "PAN Format",
                 "Flags ledgers whose PAN is not ten characters in the format AAAAA9999A.", 6);
         seedConstructionTemplate();
+        int split194I = dataMigrationService.split194ISection();
+        if (split194I > 0) System.out.println("Migrated " + split194I + " stored 194I values to 194I_B.");
         seedTdsSectionConfigs();
         backfillNewActSectionConfigs();
         if (preconfiguredMasterRepository.findByTemplateTrueAndTemplateSlug("standard").isEmpty()) {
@@ -77,7 +79,8 @@ public class DataInitializer implements CommandLineRunner {
             "194A", new NewActValues("10.00", "10.00", null, "10000.00"),
             "194C", new NewActValues("2.00", "1.00", "30000.00", "100000.00"),
             "194H", new NewActValues("2.00", "2.00", null, "20000.00"),
-            "194I", new NewActValues("10.00", "10.00", null, "600000.00"),
+            "194I_A", new NewActValues("2.00", "2.00", null, "600000.00"),
+            "194I_B", new NewActValues("10.00", "10.00", null, "600000.00"),
             "194J_A", new NewActValues("2.00", "2.00", null, "50000.00"),
             "194J_B", new NewActValues("10.00", "10.00", null, "50000.00"),
             "194Q", new NewActValues("0.10", "0.10", null, "5000000.00"));
@@ -88,7 +91,8 @@ public class DataInitializer implements CommandLineRunner {
         seedSection("194A", "Interest other than securities", "10.00", "10.00", null, "10000.00");
         seedSection("194C", "Payments to contractors", "2.00", "1.00", "30000.00", "100000.00");
         seedSection("194H", "Commission or brokerage", "2.00", "2.00", null, "20000.00");
-        seedSection("194I", "Rent", "10.00", "10.00", null, "240000.00");
+        seedSection("194I_A", "Rent of plant, machinery or equipment", "2.00", "2.00", null, "240000.00");
+        seedSection("194I_B", "Rent of land, building, furniture or fittings", "10.00", "10.00", null, "240000.00");
         seedSection("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00");
         seedSection("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00");
         seedSection("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00");
@@ -251,7 +255,7 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Purchase Returns", LedgerCategory.PURCHASE, "Purchase Accounts", true, false, "standard", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Freight & Cartage", LedgerCategory.EXPENSE, "Direct Expenses", true, true, "standard", "194C", GstApplicabilityType.TAXABLE, "996812", null));
         // Indirect Expenses
-        rows.add(template("Rent", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "standard", "194I", GstApplicabilityType.TAXABLE, "997212", null));
+        rows.add(template("Rent", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "standard", "194I_B", GstApplicabilityType.TAXABLE, "997212", null));
         rows.add(template("Professional Fees", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "standard", "194J_B", GstApplicabilityType.TAXABLE, "998311", null));
         rows.add(template("Technical Services", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "standard", "194J_A", GstApplicabilityType.TAXABLE, "998312", null));
         rows.add(template("Commission Paid", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "standard", "194H", GstApplicabilityType.TAXABLE, "997113", null));
@@ -305,7 +309,7 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Purchase (Domestic)", LedgerCategory.PURCHASE, "Purchase Accounts", true, true, "simplified", "194Q", GstApplicabilityType.TAXABLE, null, null));
         rows.add(template("Freight & Cartage", LedgerCategory.EXPENSE, "Direct Expenses", true, true, "simplified", "194C", GstApplicabilityType.TAXABLE, "996812", null));
         // Expenses
-        rows.add(template("Rent", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "simplified", "194I", GstApplicabilityType.TAXABLE, "997212", null));
+        rows.add(template("Rent", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "simplified", "194I_B", GstApplicabilityType.TAXABLE, "997212", null));
         rows.add(template("Professional Fees", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "simplified", "194J_B", GstApplicabilityType.TAXABLE, "998311", null));
         rows.add(template("Repairs & Maintenance", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "simplified", "194C", GstApplicabilityType.TAXABLE, "998719", null));
         rows.add(template("Advertisement", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "simplified", "194C", GstApplicabilityType.TAXABLE, "998361", null));
@@ -372,7 +376,7 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Freight & Cartage", LedgerCategory.EXPENSE, "Direct Expenses", true, true, "manufacturing", "194C", GstApplicabilityType.TAXABLE, "996812", null));
         // Manufacturing Expenses
         rows.add(template("Factory Power & Fuel", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "270119", null));
-        rows.add(template("Factory Rent", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, true, "manufacturing", "194I", GstApplicabilityType.TAXABLE, "997212", null));
+        rows.add(template("Factory Rent", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, true, "manufacturing", "194I_B", GstApplicabilityType.TAXABLE, "997212", null));
         rows.add(template("Machine Repairs", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, true, "manufacturing", "194C", GstApplicabilityType.TAXABLE, "998719", null));
         rows.add(template("Quality Testing", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, true, "manufacturing", "194J_A", GstApplicabilityType.TAXABLE, "998314", null));
         rows.add(template("Tooling & Dies", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, false, "manufacturing", "NOT_SUBJECT", GstApplicabilityType.TAXABLE, "998719", null));
@@ -381,7 +385,7 @@ public class DataInitializer implements CommandLineRunner {
         rows.add(template("Effluent Treatment", LedgerCategory.EXPENSE, "Manufacturing Expenses", true, true, "manufacturing", "194C", GstApplicabilityType.TAXABLE, "999000", null));
         rows.add(template("Plant Maintenance", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "manufacturing", "194C", GstApplicabilityType.TAXABLE, "998719", null));
         // Indirect Expenses
-        rows.add(template("Rent", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "manufacturing", "194I", GstApplicabilityType.TAXABLE, "997212", null));
+        rows.add(template("Rent", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "manufacturing", "194I_B", GstApplicabilityType.TAXABLE, "997212", null));
         rows.add(template("Professional Fees", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "manufacturing", "194J_B", GstApplicabilityType.TAXABLE, "998311", null));
         rows.add(template("Technical Services", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "manufacturing", "194J_A", GstApplicabilityType.TAXABLE, "998312", null));
         rows.add(template("Commission Paid", LedgerCategory.EXPENSE, "Indirect Expenses", true, true, "manufacturing", "194H", GstApplicabilityType.TAXABLE, "997113", null));

@@ -19,6 +19,8 @@ class TdsSectionRefsTest {
         assertEquals("393(1) [Table: Sl. No. 6(iii).D(b)]", TdsSectionRefs.newActRef("194J_B"));
         assertEquals("393(1) [Table: Sl. No. 1(ii)]", TdsSectionRefs.newActRef("194H"));
         assertEquals("393(1) [Table: Sl. No. 8(ii)]", TdsSectionRefs.newActRef("194Q"));
+        assertEquals("393(1) [Table: Sl. No. 2(ii).D(a)]", TdsSectionRefs.newActRef("194I_A"));
+        assertEquals("393(1) [Table: Sl. No. 2(ii).D(b)]", TdsSectionRefs.newActRef("194I_B"));
         assertNull(TdsSectionRefs.newActRef("194M"));
         assertNull(TdsSectionRefs.newActRef(null));
     }

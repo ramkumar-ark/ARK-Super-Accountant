@@ -19,8 +19,8 @@ class TdsSeedDataTest {
     private TdsSectionConfigRepository repo;
 
     @Test
-    void seedsAllEightSections() {
-        for (String code : new String[]{"194A", "194C", "194H", "194I", "194J_A", "194J_B", "194M", "194Q"}) {
+    void seedsAllNineSections() {
+        for (String code : new String[]{"194A", "194C", "194H", "194I_A", "194I_B", "194J_A", "194J_B", "194M", "194Q"}) {
             assertTrue(repo.existsBySectionCode(code), "missing seed: " + code);
         }
     }
@@ -35,11 +35,19 @@ class TdsSeedDataTest {
     }
 
     @Test
-    void s194iSeedsNewActMonthlyThreshold() {
-        TdsSectionConfig c = repo.findBySectionCode("194I").orElseThrow();
-        // Rs 50,000/month per landlord => Rs 6,00,000 annual per payee
-        assertEquals(0, new BigDecimal("600000.00").compareTo(c.getNewActThresholdAnnual()));
-        assertEquals(0, new BigDecimal("10.00").compareTo(c.getNewActRateNonCompany()));
+    void s194iSplitsIntoPlantAndBuildingHalves() {
+        TdsSectionConfig plant = repo.findBySectionCode("194I_A").orElseThrow();
+        // Rs 50,000/month per payee => Rs 6,00,000 annual per payee
+        assertEquals(0, new BigDecimal("2.00").compareTo(plant.getRateCompany()));
+        assertEquals(0, new BigDecimal("2.00").compareTo(plant.getRateNonCompany()));
+        assertEquals(0, new BigDecimal("2.00").compareTo(plant.getNewActRateNonCompany()));
+        assertEquals(0, new BigDecimal("600000.00").compareTo(plant.getNewActThresholdAnnual()));
+
+        TdsSectionConfig building = repo.findBySectionCode("194I_B").orElseThrow();
+        assertEquals(0, new BigDecimal("10.00").compareTo(building.getRateCompany()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(building.getRateNonCompany()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(building.getNewActRateNonCompany()));
+        assertEquals(0, new BigDecimal("600000.00").compareTo(building.getNewActThresholdAnnual()));
     }
 
     @Test

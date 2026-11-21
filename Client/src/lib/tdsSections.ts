@@ -10,7 +10,8 @@ const SECTION_DEFS: ReadonlyArray<{ value: string; nature: string; bare?: boolea
   { value: '194J_A', nature: 'Fees for technical services, royalty for films, call centre' },
   { value: '194J_B', nature: 'Fees for professional services, royalty, non-compete fees, director fees' },
   { value: '194H', nature: 'Commission or brokerage' },
-  { value: '194I', nature: 'Rent' },
+  { value: '194I_A', nature: 'Rent of plant, machinery or equipment' },
+  { value: '194I_B', nature: 'Rent of land, building, furniture or fittings' },
   { value: '194Q', nature: 'Purchase of goods above the threshold' },
   { value: '194A', nature: 'Interest other than interest on securities' },
   { value: '194B', nature: 'Winnings from lottery, crossword puzzles, card games' },
@@ -37,5 +38,7 @@ export function tdsSectionBothNames(section: string | null | undefined): string 
   if (!section) {
     return '—'
   }
-  return TDS_SECTION_OPTIONS.find((o) => o.value === section)?.label ?? section
+  // Legacy stored 194I (pre-split rent) is the land/building half.
+  const key = section === '194I' ? '194I_B' : section
+  return TDS_SECTION_OPTIONS.find((o) => o.value === key)?.label ?? section
 }
