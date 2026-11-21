@@ -59,5 +59,23 @@ A company-level corrected PAN for one ledger, stored once in `tds_pan_overrides`
 by the organization and the normalized ledger name. It is written when an accountant
 approves a `PAN_MISSING`/`PAN_INVALID` TDS finding or a `PAN_FORMAT` masters finding.
 TDS analysis overlays it on the ledger; the masters rule suppresses the finding while an
-override exists; the planned Tally write-back will read this same row. It is not a
+override exists; the Tally write-back records a change item from this same row. It is not a
 `preconfigured_masters` field and does not create a `MasterEditLog` row.
+
+## Tally write-back
+
+**Change item**:
+One intended Tally ledger-field change: (organization, ledger, field PAN) from a baseline value to a new value, with source, approver and status. Rows are never deleted.
+_Avoid_: change journal entry, diff
+
+**Baseline**:
+The PAN the latest completed masters upload held for that ledger when the correction was approved (raw, trimmed; blank is null). It may be an invalid over-length value; the column is 255 chars like `upload_ledger_snapshots.pan`.
+_Avoid_: old value, snapshot
+
+**Export batch**:
+One generated file: who, when, which masters upload it was checked against, hash, stale confirmation, and the items with the name sent and the existence outcome of each.
+_Avoid_: export, push, sync
+
+**Existence outcome**:
+FOUND (same name), RENAMED (GUID found under another name; the current name is sent), NOT_FOUND (blocked).
+_Avoid_: match status, lookup result
