@@ -47,6 +47,8 @@ public class DataInitializer implements CommandLineRunner {
                 "Flags taxable income/GST ledgers with no HSN or SAC code.", 4);
         seedValidationRuleIfAbsent("GSTIN_PRESENCE", "GSTIN Presence",
                 "Flags purchase ledgers with no GSTIN for GSTR-2B reconciliation.", 5);
+        seedValidationRuleIfAbsent("PAN_FORMAT", "PAN Format",
+                "Flags ledgers whose PAN is not ten characters in the format AAAAA9999A.", 6);
         seedConstructionTemplate();
         seedTdsSectionConfigs();
         backfillNewActSectionConfigs();
