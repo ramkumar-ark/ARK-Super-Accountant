@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -36,6 +37,7 @@ public class TallyExportService {
 
     private static final List<TallyChangeStatus> EXPORTABLE =
             List.of(TallyChangeStatus.PENDING, TallyChangeStatus.EXPORTED);
+    private static final Duration STALE_AFTER = Duration.ofHours(24);
 
     private final TallyChangeItemRepository itemRepository;
     private final TallyExportBatchRepository batchRepository;
@@ -84,12 +86,14 @@ public class TallyExportService {
             return ExportResult.error("NO_MASTERS_UPLOAD");
         }
         MastersUpload upload = latest.get();
+        Instant now = clock.instant();
+        boolean stale = upload.uploadedAt() != null
+                && upload.uploadedAt().isBefore(now.minus(STALE_AFTER));
         boolean confirmed = Boolean.TRUE.equals(confirmStale);
-        if (upload.stale() && !confirmed) {
+        if (stale && !confirmed) {
             return ExportResult.error("STALE_CONFIRMATION_REQUIRED");
         }
 
-        Instant now = clock.instant();
         List<ExportLine> lines = new ArrayList<>();
         List<TallyChangeItem> included = new ArrayList<>();
         int skipped = 0;
@@ -122,7 +126,7 @@ public class TallyExportService {
         batch.setGeneratedAt(now);
         batch.setMastersJobId(upload.jobId());
         batch.setMastersUploadedAt(upload.uploadedAt());
-        batch.setStaleConfirmed(confirmed && upload.stale());
+        batch.setStaleConfirmed(confirmed && stale);
         batch.setItemCount(included.size());
         batch.setFileSha256(sha256(body));
         TallyExportBatch savedBatch = batchRepository.save(batch);
@@ -147,19 +151,14 @@ public class TallyExportService {
 
     private List<TallyChangeItem> select(UUID organizationId, List<UUID> itemIds) {
         if (itemIds == null || itemIds.isEmpty()) {
-            return itemRepository.findByOrganizationIdAndStatusInOrderByCreatedAtDesc(
-                    organizationId, EXPORTABLE);
+            return itemRepository.findForExport(organizationId, EXPORTABLE);
         }
-        List<TallyChangeItem> selected = new ArrayList<>();
-        for (UUID id : new LinkedHashSet<>(itemIds)) {
-            if (id == null) {
-                continue;
-            }
-            itemRepository.findByIdAndOrganizationId(id, organizationId)
-                    .filter(item -> EXPORTABLE.contains(item.getStatus()))
-                    .ifPresent(selected::add);
+        LinkedHashSet<UUID> unique = new LinkedHashSet<>(itemIds);
+        unique.remove(null);
+        if (unique.isEmpty()) {
+            return List.of();
         }
-        return selected;
+        return itemRepository.findForExportByIds(organizationId, unique, EXPORTABLE);
     }
 
     private String nameToSend(LedgerLookup lookup, TallyChangeItem item) {
