@@ -11,6 +11,12 @@ run_scenario() {
   local snap; snap=$(echo "$RESP" | jq -r .id)
   expect_json '.id != null'
 
+  req "baseline-missing-message" POST /api/v1/filed-returns/gstr3b \
+    '{"filingPeriod":"2030-01","rows":[{"rowCode":"3.1a","taxable":100000,"igst":18000,"cgst":0,"sgst":0,"cess":0}]}'
+  expect_status 409
+  expect_json '.message | contains("Baseline periods")'
+  expect_json '.message | contains("Create a baseline period")'
+
   local id; id=$(state_get "wf_TDS_PAYMENT_2026-04")
   if [ -z "$id" ]; then id=$(fresh_workflow TDS_PAYMENT "2026-04"); fi
   req "snapshots-list" GET "/api/v1/filed-returns/snapshots?workflowId=$id"

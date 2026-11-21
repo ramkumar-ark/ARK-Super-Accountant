@@ -19,10 +19,12 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -128,7 +130,10 @@ public class FiledReturnImportService {
                 .filter(w -> !w.getPeriodStart().isAfter(first) && !w.getPeriodEnd().isBefore(first))
                 .findFirst()
                 .orElseThrow(() -> new FiledReturnConflictException(
-                        "No baseline period covers " + period));
+                        "No baseline period covers " + period + ". Create a baseline period for "
+                                + period.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH)
+                                + " " + period.getYear()
+                                + " in Settings > Baseline periods, then import this return again."));
     }
 
     private String contentHash(List<FiledReturnLine> lines) {
