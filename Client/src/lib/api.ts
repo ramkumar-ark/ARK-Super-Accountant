@@ -1,6 +1,13 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** Set by session validation: let the caller (router guard) handle the redirect instead of the global interceptor. */
+    skipAuthRedirect?: boolean
+  }
+}
+
 export const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
@@ -17,7 +24,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
       useAuthStore.getState().logout()
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
