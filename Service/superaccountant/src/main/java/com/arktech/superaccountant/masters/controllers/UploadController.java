@@ -29,6 +29,7 @@ import com.arktech.superaccountant.masters.services.ValidationOrchestrator;
 import com.arktech.superaccountant.tally.services.TallyParserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -583,6 +584,19 @@ public class UploadController {
     @ExceptionHandler(FindingOverrideException.class)
     public ResponseEntity<?> handleFindingOverride(FindingOverrideException e) {
         return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
+    }
+
+    /**
+     * Last-resort net for any persistence error that escapes the upload path (the transaction has
+     * already rolled back by the time this runs): a clear message instead of a stack trace. The
+     * known length traps are handled up front — the pan column is widened to 255 — so this catches
+     * whatever else the file can throw at the schema (e.g. an absurdly long ledger name).
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        return ResponseEntity.badRequest().body(Map.of("error",
+                "The upload could not be saved: the file contains a value the database rejected "
+                        + "(for example a value that is too long). Correct the file and re-upload."));
     }
 
     /**

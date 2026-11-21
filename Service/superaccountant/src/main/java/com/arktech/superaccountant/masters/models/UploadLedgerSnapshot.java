@@ -56,7 +56,9 @@ public class UploadLedgerSnapshot {
     @Column(name = "gst_registration_type")
     private String gstRegistrationType;
 
-    @Column(name = "pan", length = 10)
+    // Raw value from Tally, kept as-is (never truncated): a real PAN is 10 chars, but the
+    // column matches its 255-char siblings so an over-length value cannot fail the batch insert.
+    @Column(name = "pan", length = 255)
     private String pan;
 
     // Sign convention matches voucher entries: negative = credit balance, positive = debit balance
