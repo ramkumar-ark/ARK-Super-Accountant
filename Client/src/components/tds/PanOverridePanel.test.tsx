@@ -48,6 +48,15 @@ describe('PanOverridePanel', () => {
     expect(screen.getByText('2025-05-01')).toBeInTheDocument()
   })
 
+  it('shows No PAN for an override with a blank PAN', async () => {
+    mockGet.mockResolvedValue({ data: [{ ...OVERRIDE, pan: '' }] })
+
+    renderPanel()
+
+    expect(await screen.findByText('ABC Contractors')).toBeInTheDocument()
+    expect(screen.getByText('No PAN')).toBeInTheDocument()
+  })
+
   it('shows an empty state when there are no overrides', async () => {
     mockGet.mockResolvedValue({ data: [] })
 
