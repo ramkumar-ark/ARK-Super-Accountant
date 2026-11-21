@@ -261,6 +261,57 @@ class TallyChangeReconcilerTest {
     }
 
     @Test
+    void fallsBackToNameWhenGuidIsGoneAndTallyHoldsNewValue() {
+        TallyChangeItem item = item(ORG, "guid-old", "Sales", "AAAAA1111A", "BBBBB2222B",
+                TallyChangeStatus.PENDING);
+        stubJobAndItems(ORG, item);
+        when(snapshotRepository.findByUploadJobIdAndTallyGuid(JOB, "guid-old"))
+                .thenReturn(Optional.empty());
+        when(snapshotRepository.findByUploadJobIdAndNormalizedName(JOB, "sales"))
+                .thenReturn(List.of(snapshot("Sales", "guid-new", "BBBBB2222B")));
+
+        reconciler.reconcile(JOB);
+
+        assertThat(item.getStatus()).isEqualTo(TallyChangeStatus.APPLIED);
+        assertThat(item.getAppliedUploadJobId()).isEqualTo(JOB);
+        verify(snapshotRepository).findByUploadJobIdAndNormalizedName(JOB, "sales");
+    }
+
+    @Test
+    void fallsBackToNameWhenGuidIsGoneAndReportsTallyValueChanged() {
+        TallyChangeItem item = item(ORG, "guid-old", "Sales", "AAAAA1111A", "BBBBB2222B",
+                TallyChangeStatus.PENDING);
+        stubJobAndItems(ORG, item);
+        when(snapshotRepository.findByUploadJobIdAndTallyGuid(JOB, "guid-old"))
+                .thenReturn(Optional.empty());
+        when(snapshotRepository.findByUploadJobIdAndNormalizedName(JOB, "sales"))
+                .thenReturn(List.of(snapshot("Sales", "guid-new", "CCCCC3333C")));
+
+        reconciler.reconcile(JOB);
+
+        assertThat(item.getStatus()).isEqualTo(TallyChangeStatus.FAILED);
+        assertThat(item.getFailureReason()).isEqualTo(TallyFailureReason.TALLY_VALUE_CHANGED);
+        assertThat(item.getObservedValue()).isEqualTo("CCCCC3333C");
+    }
+
+    @Test
+    void ledgerMissingWhenGuidIsGoneAndNoNameMatch() {
+        TallyChangeItem item = item(ORG, "guid-old", "Sales", "AAAAA1111A", "BBBBB2222B",
+                TallyChangeStatus.PENDING);
+        stubJobAndItems(ORG, item);
+        when(snapshotRepository.findByUploadJobIdAndTallyGuid(JOB, "guid-old"))
+                .thenReturn(Optional.empty());
+        when(snapshotRepository.findByUploadJobIdAndNormalizedName(JOB, "sales"))
+                .thenReturn(List.of());
+
+        reconciler.reconcile(JOB);
+
+        assertThat(item.getStatus()).isEqualTo(TallyChangeStatus.FAILED);
+        assertThat(item.getFailureReason()).isEqualTo(TallyFailureReason.LEDGER_MISSING);
+        assertThat(item.getObservedValue()).isNull();
+    }
+
+    @Test
     void appliedAndSupersededItemsAreIgnored() {
         TallyChangeItem applied = item(ORG, "guid-1", "Sales", "AAAAA1111A", "BBBBB2222B",
                 TallyChangeStatus.APPLIED);

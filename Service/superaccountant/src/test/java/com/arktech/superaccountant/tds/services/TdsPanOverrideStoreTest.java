@@ -1,24 +1,38 @@
 package com.arktech.superaccountant.tds.services;
 
+import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.pan.PanChangeRecorder;
+import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.tds.models.TdsPanOverride;
 import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class TdsPanOverrideStoreTest {
 
     private static final UUID ORG = UUID.randomUUID();
     private final TdsPanOverrideRepository repository = mock(TdsPanOverrideRepository.class);
+    private final OrganizationRepository organizationRepository = mock(OrganizationRepository.class);
     private final PanChangeRecorder recorder = mock(PanChangeRecorder.class);
-    private final TdsPanOverrideStore store = new TdsPanOverrideStore(repository, recorder);
+    private final TdsPanOverrideStore store =
+            new TdsPanOverrideStore(repository, organizationRepository, recorder);
+
+    @BeforeEach
+    void lockOrganization() {
+        Organization org = new Organization();
+        org.setId(ORG);
+        when(organizationRepository.findByIdForUpdate(ORG)).thenReturn(Optional.of(org));
+    }
 
     @Test
     void findPanLooksUpNormalizedPartyKey() {
@@ -100,6 +114,30 @@ class TdsPanOverrideStoreTest {
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getPan()).isEmpty();
         verify(recorder).onPanSaved(ORG, "ANANDHA TIMBER DEPOT", "", overrideId, findingId, "acct", at);
+    }
+
+    @Test
+    void savePanLocksOrganizationBeforeLookupAndSave() {
+        when(repository.findByOrganizationIdAndPartyKey(ORG, "anandha timber depot"))
+                .thenReturn(Optional.empty());
+
+        store.savePan(ORG, "ANANDHA TIMBER DEPOT", "AAPPK2262D", UUID.randomUUID(), "acct", Instant.now());
+
+        InOrder inOrder = inOrder(organizationRepository, repository);
+        inOrder.verify(organizationRepository).findByIdForUpdate(ORG);
+        inOrder.verify(repository).findByOrganizationIdAndPartyKey(ORG, "anandha timber depot");
+        inOrder.verify(repository).save(any(TdsPanOverride.class));
+    }
+
+    @Test
+    void savePanThrowsWhenOrganizationIsMissing() {
+        when(organizationRepository.findByIdForUpdate(ORG)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> store.savePan(ORG, "ANANDHA TIMBER DEPOT", "AAPPK2262D",
+                UUID.randomUUID(), "acct", Instant.now()))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(repository, recorder);
     }
 
     @Test
