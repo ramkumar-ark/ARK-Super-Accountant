@@ -34,6 +34,13 @@ class TallyImportRendererTest {
         }
     }
 
+    private static String clearingFixture() throws IOException {
+        try (InputStream stream = TallyImportRendererTest.class
+                .getResourceAsStream("/fixtures/tally-pan-changes-clearing-sample.json")) {
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
     private static List<ExportLine> sampleLines() {
         return List.of(
                 new ExportLine(TallyChangeType.ALTER_FIELD, TallyField.PAN,
@@ -63,6 +70,20 @@ class TallyImportRendererTest {
             assertEquals(Set.of("metadata", "name", "incometaxnumber"), fieldNameSet(message));
             assertEquals(Set.of("type", "action", "name"), fieldNameSet(message.get("metadata")));
         }
+    }
+
+    @Test
+    void clearingValueRendersGoldenFileWithEmptyFieldAndKeepsKey() throws IOException {
+        List<ExportLine> lines = List.of(new ExportLine(TallyChangeType.ALTER_FIELD, TallyField.PAN,
+                "SAMPLE SUPPLIER STEELS", ""));
+
+        String actual = normalize(renderer.render(lines));
+        assertEquals(normalize(clearingFixture()), actual);
+
+        JsonNode message = MAPPER.readTree(actual).get("tallymessage").get(0);
+        assertEquals("", message.get("incometaxnumber").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                fieldNameSet(message).contains("incometaxnumber"));
     }
 
     @Test

@@ -112,6 +112,16 @@ class TdsEnginePass1Test {
     }
 
     @Test
+    void blankPan_panMissingNeverPanInvalid() {
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000"},
+                {"TDS Payable 194C", "-1000"}});
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("   ")));
+        assertTrue(result.findings().stream().anyMatch(f -> f.getFindingType() == TdsFindingType.PAN_MISSING));
+        assertTrue(result.findings().stream().noneMatch(f -> f.getFindingType() == TdsFindingType.PAN_INVALID));
+    }
+
+    @Test
     void invalidPan_panInvalidAndEntryHigherRate() {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-80000"},

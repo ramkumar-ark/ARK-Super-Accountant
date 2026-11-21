@@ -183,8 +183,9 @@ public class TdsEngine {
                 }
                 UploadLedgerSnapshot partySnapshot = input.snapshotsByName().get(partyKey);
                 String pan = partySnapshot == null ? null : partySnapshot.getPan();
-                boolean panValid = pan != null && pan.trim().matches(PAN_PATTERN);
                 String trimmedPan = pan == null ? null : pan.trim();
+                boolean panMissing = trimmedPan == null || trimmedPan.isEmpty();
+                boolean panValid = !panMissing && trimmedPan.matches(PAN_PATTERN);
                 BigDecimal rate = rateFor(partyKey, cfg, input);
                 BigDecimal expected = base.multiply(rate)
                         .divide(HUNDRED, 2, RoundingMode.HALF_UP);
@@ -192,7 +193,7 @@ public class TdsEngine {
                         .setScale(2, RoundingMode.HALF_UP);
                 facts.add(new VoucherFact(v, partyName, partyKey, section, base, deducted, rate));
                 if (isInPeriod(v.getVoucherDate(), input)) {
-                    if (pan == null) {
+                    if (panMissing) {
                         String dedupKey = partyKey + "|" + section + "|" + TdsFindingType.PAN_MISSING;
                         if (panFindingKeys.add(dedupKey)) {
                             findings.add(finding(input, v, TdsFindingType.PAN_MISSING, FindingSeverity.HIGH,

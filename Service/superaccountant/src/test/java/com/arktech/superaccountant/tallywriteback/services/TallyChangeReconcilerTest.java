@@ -163,6 +163,23 @@ class TallyChangeReconcilerTest {
     }
 
     @Test
+    void blankTallyPanMatchesEmptyNewValueAndBecomesApplied() {
+        TallyChangeItem item = item(ORG, "guid-1", "Sales", "AAAAA1111A", "",
+                TallyChangeStatus.PENDING);
+        stubJobAndItems(ORG, item);
+        when(snapshotRepository.findByUploadJobIdAndTallyGuid(JOB, "guid-1"))
+                .thenReturn(Optional.of(snapshot("Sales", "guid-1", "   ")));
+
+        reconciler.reconcile(JOB);
+
+        assertThat(item.getStatus()).isEqualTo(TallyChangeStatus.APPLIED);
+        assertThat(item.getAppliedUploadJobId()).isEqualTo(JOB);
+        assertThat(item.getResolvedAt()).isEqualTo(NOW);
+        assertThat(item.getFailureReason()).isNull();
+        assertThat(item.getObservedValue()).isNull();
+    }
+
+    @Test
     void tallyValueChangedFailsWithObservedValue() {
         TallyChangeItem item = item(ORG, "guid-1", "Sales", "AAAAA1111A", "BBBBB2222B",
                 TallyChangeStatus.PENDING);

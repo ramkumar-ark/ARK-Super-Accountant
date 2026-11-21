@@ -19,7 +19,9 @@ public class PanFormatOverrideService {
     }
 
     public void validate(String value) {
-        if (!PanFormat.isValid(PanFormat.normalize(value))) {
+        String normalized = PanFormat.normalize(value);
+        // Blank is the deliberate "No PAN / not available" correction; the controller guards it.
+        if (normalized != null && !normalized.isBlank() && !PanFormat.isValid(normalized)) {
             throw new FindingReviewException(400, PanFormat.ERROR_MESSAGE);
         }
     }
