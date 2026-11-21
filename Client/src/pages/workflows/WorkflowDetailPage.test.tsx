@@ -240,6 +240,13 @@ describe('WorkflowDetailPage', () => {
     expect(screen.getByLabelText('Coverage to')).toHaveValue('2025-04-30')
   })
 
+  it('states the coverage rule next to the coverage inputs', async () => {
+    routeApi({ detailResponse: detail({ stage: 'STARTED' }) })
+    renderPage()
+
+    expect(await screen.findByText(/coverage must start at the financial-year start/)).toBeInTheDocument()
+  })
+
   it('uploads a multipart file and shows the intake warnings', async () => {
     routeApi({ detailResponse: detail({ stage: 'STARTED' }) })
     mockPost.mockResolvedValue({

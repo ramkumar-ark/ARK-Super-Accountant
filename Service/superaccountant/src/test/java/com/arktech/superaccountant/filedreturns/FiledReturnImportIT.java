@@ -230,7 +230,9 @@ class FiledReturnImportIT {
                     ]}
                     """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("No baseline period covers 2025-01"));
+                .andExpect(jsonPath("$.message").value(
+                        "No baseline period covers 2025-01. Create a baseline period for "
+                                + "January 2025 in Settings > Baseline periods, then import this return again."));
     }
 
     @Test

@@ -127,6 +127,10 @@ export function WorkflowUploadStep({
             className={inputClass}
           />
         </label>
+        <p className="text-xs text-[var(--color-text-muted)] sm:col-span-2">
+          The upload must cover the whole required range shown. For monthly TDS workflows, coverage
+          must start at the financial-year start (1 April), not the month start.
+        </p>
       </div>
 
       <label className="flex flex-col gap-1 text-sm text-[var(--color-text-secondary)]">
