@@ -8,6 +8,7 @@ import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
 import com.arktech.superaccountant.tds.models.TdsPanOverride;
 import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
+import com.arktech.superaccountant.tds.services.TdsPanOverrideStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,7 +32,7 @@ class TdsFindingApplierTest {
     @BeforeEach
     void setUp() {
         repository = mock(TdsPanOverrideRepository.class);
-        applier = new TdsFindingApplier(repository, TdsEngineFixtures.ORG);
+        applier = new TdsFindingApplier(new TdsPanOverrideStore(repository), TdsEngineFixtures.ORG);
     }
 
     private TdsFinding finding(TdsFindingType type, String party) {

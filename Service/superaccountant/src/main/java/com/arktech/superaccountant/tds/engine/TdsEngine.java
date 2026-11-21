@@ -6,6 +6,7 @@ import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.masters.pan.PanFormat;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import com.arktech.superaccountant.tds.models.TdsFinding;
@@ -30,7 +31,7 @@ import java.util.UUID;
 @Component
 public class TdsEngine {
 
-    public static final String PAN_PATTERN = "[A-Z]{5}[0-9]{4}[A-Z]";
+    public static final String PAN_PATTERN = PanFormat.PATTERN;
     public static final BigDecimal TOLERANCE = new BigDecimal("1.00");
     private static final String NOT_SUBJECT = "NOT_SUBJECT";
     private static final BigDecimal HUNDRED = new BigDecimal("100");
