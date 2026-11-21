@@ -7,8 +7,8 @@ export function isNewActPeriod(periodStart: string | null | undefined): boolean 
 }
 
 export const TDS_393_DISPLAY: Readonly<Record<string, string>> = {
-  '194A': '393(1) [Table: Sl. No. 5(iii)]',
-  '194C': '393(1) [Table: Sl. No. 6(i).D(b)]',
+  '194A': '393(1) [Table: Sl. No. 5(ii) and 5(iii)]',
+  '194C': '393(1) [Table: Sl. No. 6(i)]',
   '194H': '393(1) [Table: Sl. No. 1(ii)]',
   '194I': '393(1) [Table: Sl. No. 2(ii).D(b)]',
   '194J_A': '393(1) [Table: Sl. No. 6(iii).D(a)]',

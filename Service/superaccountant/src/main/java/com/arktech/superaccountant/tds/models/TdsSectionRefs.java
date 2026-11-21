@@ -11,8 +11,8 @@ import java.util.Map;
 public final class TdsSectionRefs {
 
     private static final Map<String, String> NEW_ACT_REFS = Map.of(
-            "194A", "393(1) [Table: Sl. No. 5(iii)]",
-            "194C", "393(1) [Table: Sl. No. 6(i).D(b)]",
+            "194A", "393(1) [Table: Sl. No. 5(ii) and 5(iii)]",
+            "194C", "393(1) [Table: Sl. No. 6(i)]",
             "194H", "393(1) [Table: Sl. No. 1(ii)]",
             "194I", "393(1) [Table: Sl. No. 2(ii).D(b)]",
             "194J_A", "393(1) [Table: Sl. No. 6(iii).D(a)]",
