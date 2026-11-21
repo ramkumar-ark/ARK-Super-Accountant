@@ -21,6 +21,9 @@ public final class Rpu140FormatSpec {
     public static final String LINE_ENDING = RpuFormatSpec.LINE_ENDING;
     public static final String FORM = "140";
 
+    // Form 140 payment codes from FORM NO. 140 Annexure 2 (List of payment codes), official
+    // Protean/NSDL FVU spec: 194I_A=1008 (s.393(1) Table Sl. No. 2(ii).D(a)), 194I_B=1009
+    // (2(ii).D(b)); see src/main/resources/tds/rpu-format-notes.md.
     private static final Map<String, String> SECTION_CODES = Map.of(
             "194A", "1022",
             "194C", "1024",

@@ -256,6 +256,17 @@ happens only in `RpuFormatSpec.sectionCode`.
 
 Unknown internal code → `IllegalArgumentException`.
 
+## Form 140 payment codes (194I split)
+
+Source: FORM NO. 140, Quarterly statement of deduction of tax under section 393(1) of the
+Income-tax Act, 2025 — Annexure 2, List of payment codes (official Protean/NSDL Form 140
+FVU v1.1/1.2 spec). Applied in `Rpu140FormatSpec`.
+
+| Internal | 26Q | Form 140 | s.393(1) reference |
+|---|---|---|---|
+| `194I_A` | `4IA` | `1008` | 393(1) [Table: Sl. No. 2(ii).D(a)] — 2% |
+| `194I_B` | `4IB` | `1009` | 393(1) [Table: Sl. No. 2(ii).D(b)] — 10% |
+
 ## Literals and markers
 
 - **PAN not available:** `PANNOTAVBL` (other defaults allowed by the format: `PANAPPLIED`, `PANINVALID`).
