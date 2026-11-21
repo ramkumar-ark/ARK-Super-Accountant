@@ -14,6 +14,7 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.support.TestDatabase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +27,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
 
@@ -49,19 +47,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
 @Transactional
 @TestPropertySource(properties = "JWT_SECRET=test-jwt-secret-must-be-at-least-32-characters-long")
 class UploadControllerIT {
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
     @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+    static void db(DynamicPropertyRegistry registry) {
+        TestDatabase.register(registry);
     }
 
     @Autowired
@@ -294,6 +286,27 @@ class UploadControllerIT {
                 .findByUploadJobId(job.getId());
         assertThat(snapshots).hasSize(1);
         assertThat(snapshots.get(0).getPan()).isEqualTo("AAPPK2262D1");
+        assertThat(snapshots.get(0).getTallyGuid()).isEqualTo("g-pan-001");
+    }
+
+    // Snapshots uploaded before the tally_guid column existed keep a null GUID; lookups by GUID
+    // must not match them.
+    @Test
+    void snapshotWithNullTallyGuid_persistsAndIsNotFoundByGuid() {
+        Organization org = organizationRepository.save(
+                new Organization("Null Guid Org " + UUID.randomUUID()));
+        UUID jobId = UUID.randomUUID();
+
+        UploadLedgerSnapshot snap = new UploadLedgerSnapshot();
+        snap.setUploadJobId(jobId);
+        snap.setOrganizationId(org.getId());
+        snap.setLedgerName("Legacy Ledger");
+
+        UploadLedgerSnapshot saved = snapshotRepository.saveAndFlush(snap);
+
+        assertThat(saved.getTallyGuid()).isNull();
+        assertThat(snapshotRepository.findByUploadJobIdAndTallyGuid(jobId, "g-null-001"))
+                .isEmpty();
     }
 
     // Databases created with the old varchar(10) pan must end up widened: the guarded startup
