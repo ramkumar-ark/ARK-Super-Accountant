@@ -2,6 +2,7 @@ package com.arktech.superaccountant.masters.rules;
 
 import com.arktech.superaccountant.masters.classifier.ParsedLedger;
 import com.arktech.superaccountant.masters.models.*;
+import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -42,7 +43,9 @@ public class TdsSectionMappingRule implements ValidationRule {
                 f.setSeverity(severity);
                 f.setResolveStatus(ResolveStatus.OPEN);
                 f.setMessage("Ledger '" + master.getLedgerName() + "' has no TDS section assigned.");
-                f.setSuggestedFix("Assign a TDS section (e.g., 194C, 194J_A) or mark as 'NOT_SUBJECT' if not applicable to TDS.");
+                f.setSuggestedFix("Assign a TDS section (e.g., " + TdsSectionRefs.both("194C") + ", "
+                        + TdsSectionRefs.both("194J_A")
+                        + ") or mark as 'NOT_SUBJECT' if not applicable to TDS.");
                 findings.add(f);
             }
         }

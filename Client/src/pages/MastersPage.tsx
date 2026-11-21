@@ -1,4 +1,5 @@
 import { TdsSectionSelect } from '@/components/TdsSectionSelect'
+import { tdsSectionBothNames } from '@/lib/tdsSections'
 import { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
 import { Database, Upload, SearchX, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
@@ -437,14 +438,16 @@ export function MastersPage() {
                         <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)] w-[160px]">
                           {master.expectedParentGroup ?? '—'}
                         </td>
-                        <td className="px-4 py-2 w-[160px]">
-                          {master.tdsSection === 'NOT_SUBJECT' ? (
-                            <span className="text-sm font-mono text-[var(--color-text-muted)]">
-                              Not Subject to TDS
-                            </span>
-                          ) : master.tdsSection ? (
-                            <span className="text-sm font-mono text-[var(--color-text-primary)]">
-                              {master.tdsSection}
+                        <td className="px-4 py-2 min-w-[220px] max-w-[320px]">
+                          {master.tdsSection ? (
+                            <span
+                              className={`text-sm ${
+                                master.tdsSection === 'NOT_SUBJECT'
+                                  ? 'text-[var(--color-text-muted)]'
+                                  : 'text-[var(--color-text-primary)]'
+                              }`}
+                            >
+                              {tdsSectionBothNames(master.tdsSection)}
                             </span>
                           ) : (
                             <span className="text-sm text-[var(--color-text-muted)]">—</span>

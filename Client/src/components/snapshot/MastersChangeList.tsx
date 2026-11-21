@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
+import { tdsSectionBothNames } from '@/lib/tdsSections'
 
 interface MasterChange {
   id: string
@@ -75,6 +76,12 @@ export function MastersChangeList({ uploadId }: { uploadId: string }) {
           <tbody>
             {changes.map((c) => {
               const attributeLabel = ATTRIBUTE_LABELS[c.attributeName ?? ''] ?? c.attributeName
+              const displayValue = (value: string | null) => {
+                if (!value) {
+                  return '—'
+                }
+                return c.attributeName === 'tdsSection' ? tdsSectionBothNames(value) : value
+              }
               return (
                 <tr key={c.id} className="border-t border-[var(--color-border)]">
                   <td className="px-3 py-2">
@@ -93,7 +100,7 @@ export function MastersChangeList({ uploadId }: { uploadId: string }) {
                   </td>
                   <td className="px-3 py-2 text-[var(--color-text-primary)]">{c.ledgerName}</td>
                   <td className="px-3 py-2 font-mono text-[var(--color-text-primary)]">
-                    {attributeLabel}: {c.oldValue ?? '—'} → {c.newValue ?? '—'}
+                    {attributeLabel}: {displayValue(c.oldValue)} → {displayValue(c.newValue)}
                   </td>
                   <td className="px-3 py-2 text-xs text-[var(--color-text-muted)]">
                     {c.touchedScopes.join(', ')}

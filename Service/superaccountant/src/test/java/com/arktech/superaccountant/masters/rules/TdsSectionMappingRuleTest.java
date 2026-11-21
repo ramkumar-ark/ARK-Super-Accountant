@@ -152,4 +152,12 @@ class TdsSectionMappingRuleTest {
     void getRuleCode_returnsTdsSectionMapping() {
         assertEquals("TDS_SECTION_MAPPING", rule.getRuleCode());
     }
+
+    @Test
+    void suggestedFixShowsOldAndNewActNamesWithoutBeingPeriodSpecific() {
+        PreconfiguredMaster m = configured("Labour Charges", LedgerCategory.EXPENSE, null);
+        String fix = rule.execute(ctx(List.of(m)), List.of()).get(0).getSuggestedFix();
+        assertTrue(fix.contains("194C / 393(1) [Table: Sl. No. 6(i).D(b)]"), fix);
+        assertTrue(fix.contains("194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)]"), fix);
+    }
 }

@@ -1,24 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
+import { TDS_SECTION_OPTIONS } from '@/lib/tdsSections'
 import { X, CheckCircle } from 'lucide-react'
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 const HSN_SAC_REGEX = /^\d{4,8}$/
-
-const TDS_SECTIONS = [
-  { value: 'NOT_SUBJECT', label: 'Not Subject to TDS' },
-  { value: '194C', label: '194C — Contractors & Sub-contractors' },
-  { value: '194J_A', label: '194J(a) — Technical Services' },
-  { value: '194J_B', label: '194J(b) — Professional Services' },
-  { value: '194H', label: '194H — Commission & Brokerage' },
-  { value: '194I', label: '194I — Rent' },
-  { value: '194Q', label: '194Q — Purchase of Goods' },
-  { value: '194A', label: '194A — Interest' },
-  { value: '194B', label: '194B — Winnings' },
-  { value: '194D', label: '194D — Insurance Commission' },
-  { value: '194M', label: '194M — Payments by Individuals/HUF' },
-  { value: 'OTHER', label: 'Other Section' },
-]
 
 const GST_OPTIONS = [
   { value: 'TAXABLE', label: 'Taxable' },
@@ -190,7 +176,7 @@ export function LedgerMappingPanel({
               <option value="" disabled>
                 Select TDS section…
               </option>
-              {TDS_SECTIONS.map((s) => (
+              {TDS_SECTION_OPTIONS.map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
