@@ -2,6 +2,7 @@ package com.arktech.superaccountant.tallywriteback.repository;
 
 import com.arktech.superaccountant.tallywriteback.models.TallyChangeItem;
 import com.arktech.superaccountant.tallywriteback.models.TallyChangeStatus;
+import com.arktech.superaccountant.tallywriteback.models.TallyChangeType;
 import com.arktech.superaccountant.tallywriteback.models.TallyField;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -58,4 +59,13 @@ public interface TallyChangeItemRepository extends JpaRepository<TallyChangeItem
     Optional<TallyChangeItem> findByOrganizationIdAndLedgerKeyAndFieldAndStatusIn(
             UUID organizationId, String ledgerKey, TallyField field,
             Collection<TallyChangeStatus> statuses);
+
+    @Query("SELECT i FROM TallyChangeItem i WHERE i.appliedUploadJobId = :appliedUploadJobId " +
+           "AND i.status = :status AND i.field = :field AND i.changeType = :changeType " +
+           "ORDER BY i.createdAt DESC")
+    List<TallyChangeItem> findByAppliedUploadJobIdAndStatusAndFieldAndChangeType(
+            @Param("appliedUploadJobId") UUID appliedUploadJobId,
+            @Param("status") TallyChangeStatus status,
+            @Param("field") TallyField field,
+            @Param("changeType") TallyChangeType changeType);
 }
