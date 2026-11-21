@@ -23,6 +23,8 @@ public interface UploadLedgerSnapshotRepository extends JpaRepository<UploadLedg
 
     Optional<UploadLedgerSnapshot> findByUploadJobIdAndId(UUID uploadJobId, UUID snapshotId);
 
+    Optional<UploadLedgerSnapshot> findByUploadJobIdAndTallyGuid(UUID uploadJobId, String tallyGuid);
+
     @Query("SELECT s FROM UploadLedgerSnapshot s WHERE s.uploadJobId = :jobId AND LOWER(TRIM(s.ledgerName)) = :normalizedName")
     List<UploadLedgerSnapshot> findByUploadJobIdAndNormalizedName(@Param("jobId") UUID jobId,
                                                                   @Param("normalizedName") String normalizedName);

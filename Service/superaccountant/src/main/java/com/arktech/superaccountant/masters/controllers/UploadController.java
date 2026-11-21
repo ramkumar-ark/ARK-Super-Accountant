@@ -172,6 +172,7 @@ public class UploadController {
             snap.setUploadJobId(jobId);
             snap.setOrganizationId(orgId);
             snap.setLedgerName(pl.getName());
+            snap.setTallyGuid(pl.getGuid());
             snap.setParentGroup(pl.getParentGroup());
             snap.setCategory(pl.getCategory());
             snap.setGstApplicable(pl.getGstApplicable());

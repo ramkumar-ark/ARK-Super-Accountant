@@ -26,6 +26,10 @@ public class UploadLedgerSnapshot {
     @Column(name = "ledger_name", nullable = false)
     private String ledgerName;
 
+    /** Tally's stable GUID for the ledger; null on snapshots uploaded before this column existed. */
+    @Column(name = "tally_guid")
+    private String tallyGuid;
+
     @Column(name = "parent_group")
     private String parentGroup;
 
