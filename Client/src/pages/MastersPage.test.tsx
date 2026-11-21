@@ -1054,3 +1054,30 @@ describe('MastersPage — reason visibility and Tally group filter', () => {
     })
   })
 })
+
+describe('MastersPage — tally changes tab', () => {
+  it('is reachable from the tab bar and mounts the Tally changes panel', async () => {
+    setRole('ROLE_ACCOUNTANT')
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) {
+        return Promise.resolve({ data: { totalElements: 0 } })
+      }
+      if (url === '/v1/tally-changes') {
+        return Promise.resolve({ data: { mastersUpload: null, items: [] } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MastersPage />
+      </QueryClientProvider>,
+    )
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Tally changes' }))
+    expect(await screen.findByText(/Back up the company/)).toBeInTheDocument()
+    expect(mockGet).toHaveBeenCalledWith('/v1/tally-changes', { params: undefined })
+  })
+})
