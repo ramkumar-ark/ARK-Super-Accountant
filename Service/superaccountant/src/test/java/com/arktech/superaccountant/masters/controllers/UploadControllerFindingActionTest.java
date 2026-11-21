@@ -8,6 +8,7 @@ import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import com.arktech.superaccountant.masters.services.FindingOverrideException;
 import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
+import com.arktech.superaccountant.masters.services.PanFormatOverrideService;
 import com.arktech.superaccountant.review.FindingReviewService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,8 @@ class UploadControllerFindingActionTest {
     ValidationFindingRepository findingRepository;
     @Mock
     FindingOverrideMasterService overrideService;
+    @Mock
+    PanFormatOverrideService panFormatOverrideService;
     @Spy
     FindingReviewService findingReviewService = new FindingReviewService();
 

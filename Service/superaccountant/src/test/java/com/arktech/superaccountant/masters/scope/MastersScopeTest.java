@@ -137,6 +137,13 @@ class MastersScopeTest {
     }
 
     @Test
+    void panFormatFindingsHaveNoWorkflowScopeButStillGateMasters() {
+        ValidationFinding f = finding("PAN_FORMAT", LedgerCategory.INCOME, "ANANDHA TIMBER DEPOT");
+
+        assertEquals(Set.of(), MastersScope.typesFor(f, Map.of(), Map.of()));
+    }
+
+    @Test
     void typesFor_tdsApplicableTrue_expense_gstr3bAndTds() {
         UploadLedgerSnapshot l = snap("Professional Fees", LedgerCategory.EXPENSE, null, null);
         l.setTdsApplicable(true);

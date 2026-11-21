@@ -51,7 +51,7 @@ interface ValidationFinding {
 // Rule codes whose corrected value is typed in by the user; everything else is derived server-side.
 // Sentinel the backend reads as "mark this ledger GST not applicable" instead of a GSTIN.
 const GST_NOT_APPLICABLE = 'NOT_APPLICABLE'
-const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY']
+const TYPED_INPUT_RULES = ['GSTIN_PRESENCE', 'HSN_SAC_CODE', 'TDS_SECTION_MAPPING', 'GST_APPLICABILITY', 'PAN_FORMAT']
 const APPLICABILITY_MISMATCH_TYPES = ['GST_APPLICABILITY_MISMATCH', 'TDS_APPLICABILITY_MISMATCH']
 const DERIVABLE_MISMATCH_TYPES = [
   'MISSING_IN_CONFIGURATION',
@@ -91,6 +91,7 @@ const VALUE_LABELS: Record<string, string> = {
   HSN_SAC_CODE: 'HSN/SAC code',
   TDS_SECTION_MAPPING: 'TDS section',
   GST_APPLICABILITY: 'GST applicability',
+  PAN_FORMAT: 'PAN',
 }
 
 export function MastersPage() {
@@ -781,10 +782,17 @@ function FindingsTab({
               value={overrideValue}
               disabled={overrideValue === GST_NOT_APPLICABLE}
               onChange={(e) => setOverrideValue(e.target.value)}
+              placeholder={finding.ruleCode === 'PAN_FORMAT' ? 'AAAAA9999A' : undefined}
+              maxLength={finding.ruleCode === 'PAN_FORMAT' ? 10 : undefined}
               className="mt-1 w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
             />
           )}
         </label>
+        {finding.ruleCode === 'PAN_FORMAT' && (
+          <p className="mt-1 text-xs text-[var(--color-text-secondary)]">
+            10 characters: 5 letters, 4 digits, 1 letter (e.g. AAPPK2262D).
+          </p>
+        )}
         {finding.ruleCode === 'GSTIN_PRESENCE' && (
           <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
             <input
@@ -982,6 +990,7 @@ function FindingsTab({
     GST_APPLICABILITY: 'GST Applicability',
     HSN_SAC_CODE: 'HSN/SAC Code',
     TDS_SECTION_MAPPING: 'TDS Section Mapping',
+    PAN_FORMAT: 'PAN Format',
   }
 
 

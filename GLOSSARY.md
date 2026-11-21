@@ -45,3 +45,19 @@ _Avoid_: gateway (the spec's `PortalGateway` also fetched IMS and 2B; that stays
 **IFF (Invoice Furnishing Facility)**:
 An optional monthly return for months 1 and 2 of a QRMP quarter that reports only B2B and CDNR (and their amendments). Its documents are left out of the quarter's GSTR-1. It is its own workflow type (N7a).
 _Avoid_: monthly GSTR-1 for QRMP filers
+
+## PAN
+
+Permanent Account Number issued by the Income Tax Department: ten characters in the
+format `AAAAA9999A` (five letters, four digits, one letter). Tally exports it on a ledger
+as `incometaxnumber`. Lowercase or longer values found in Tally are invalid and are what
+the `PAN_FORMAT` masters rule flags.
+
+## PAN override
+
+A company-level corrected PAN for one ledger, stored once in `tds_pan_overrides` and keyed
+by the organization and the normalized ledger name. It is written when an accountant
+approves a `PAN_MISSING`/`PAN_INVALID` TDS finding or a `PAN_FORMAT` masters finding.
+TDS analysis overlays it on the ledger; the masters rule suppresses the finding while an
+override exists; the planned Tally write-back will read this same row. It is not a
+`preconfigured_masters` field and does not create a `MasterEditLog` row.

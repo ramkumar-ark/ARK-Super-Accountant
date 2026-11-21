@@ -1,9 +1,9 @@
 package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.masters.models.ResolveStatus;
+import com.arktech.superaccountant.masters.pan.PanOverrideGateway;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.repository.TdsFindingRepository;
-import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
 import com.arktech.superaccountant.workflow.findings.WorkflowFindingSource;
 import com.arktech.superaccountant.workflow.findings.WorkflowFindingView;
 import com.arktech.superaccountant.workflow.models.Workflow;
@@ -27,12 +27,12 @@ public class TdsFindingSource implements WorkflowFindingSource {
             EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.RESOLVED, ResolveStatus.DISCARDED);
 
     private final TdsFindingRepository findingRepository;
-    private final TdsPanOverrideRepository panOverrideRepository;
+    private final PanOverrideGateway panOverrides;
 
     public TdsFindingSource(TdsFindingRepository findingRepository,
-                            TdsPanOverrideRepository panOverrideRepository) {
+                            PanOverrideGateway panOverrides) {
         this.findingRepository = findingRepository;
-        this.panOverrideRepository = panOverrideRepository;
+        this.panOverrides = panOverrides;
     }
 
     @Override
@@ -69,7 +69,7 @@ public class TdsFindingSource implements WorkflowFindingSource {
 
     @Override
     public FindingApplier<ReviewableFinding> applier(Workflow w) {
-        return new TdsFindingApplier(panOverrideRepository, w.getOrganizationId());
+        return new TdsFindingApplier(panOverrides, w.getOrganizationId());
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.arktech.superaccountant.masters.models.ValidationFinding;
 import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import com.arktech.superaccountant.masters.scope.MastersScopeService;
 import com.arktech.superaccountant.masters.services.FindingOverrideMasterService;
+import com.arktech.superaccountant.masters.services.PanFormatOverrideService;
 import com.arktech.superaccountant.masters.services.MastersFindingApplier;
 import com.arktech.superaccountant.review.FindingApplier;
 import com.arktech.superaccountant.review.ReviewableFinding;
@@ -39,6 +40,9 @@ public class ScopedMastersFindingSource implements WorkflowFindingSource {
 
     @Autowired
     FindingOverrideMasterService overrideService;
+
+    @Autowired
+    PanFormatOverrideService panFormatOverrideService;
 
     @Override
     public String sourceCode() {
@@ -85,7 +89,7 @@ public class ScopedMastersFindingSource implements WorkflowFindingSource {
     @Override
     public FindingApplier<ReviewableFinding> applier(Workflow w) {
         MastersFindingApplier delegate = new MastersFindingApplier(
-                overrideService, w.getOrganizationId(), null, null);
+                overrideService, panFormatOverrideService, w.getOrganizationId(), null, null);
         return new FindingApplier<>() {
             @Override
             public void validate(ReviewableFinding finding, String proposedValue, String note) {

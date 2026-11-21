@@ -41,6 +41,7 @@ public final class MastersScope {
             case "GSTIN_PRESENCE" -> gstinPresence(base, f, l, p);
             case "GST_APPLICABILITY", "HSN_SAC_CODE" -> intersect(base, GSTR1_3B);
             case "TDS_SECTION_MAPPING" -> EnumSet.copyOf(TDS);
+            case "PAN_FORMAT" -> EnumSet.noneOf(WorkflowType.class);
             default -> base; // MISMATCH_DETECTION and unknown codes: rule 6
         };
     }
