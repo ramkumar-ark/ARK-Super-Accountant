@@ -547,7 +547,9 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
   })
 })
 
-describe('MastersPage — findings paging and select-all-matching', () => {
+// These cases render 257 findings per page and pass standalone, but exceed the 5s
+// default under full-suite parallelism; give only this suite more headroom.
+describe('MastersPage — findings paging and select-all-matching', { timeout: 15000 }, () => {
   const BULK_URL = '/v1/uploads/job-1/findings/bulk-action'
   const TOTAL = 250
   const mk = (i: number, over: Record<string, unknown> = {}) => ({
