@@ -5,6 +5,10 @@ import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
 import { getOrganization, updateDeductor, type DeductorDetails } from '@/lib/tdsApi'
 
+// Non-government deductor categories per e-TDS file format Annexure 4 (Form 26Q v5.8).
+// P was previously mislabelled "Individual / HUF" — that is Q; P is AOP.
+const DEDUCTOR_TYPE_CODES = ['', 'K', 'M', 'P', 'T', 'J', 'B', 'Q', 'F'] as const
+
 const deductorSchema = z.object({
   tan: z
     .string()
@@ -12,7 +16,7 @@ const deductorSchema = z.object({
       /^[A-Z]{4}[0-9]{5}[A-Z]$/,
       'Invalid TAN format. Expected [A-Z]{4}[0-9]{5}[A-Z].',
     ),
-  deductorType: z.string(),
+  deductorType: z.enum(DEDUCTOR_TYPE_CODES),
   responsiblePersonName: z.string(),
   responsiblePersonDesignation: z.string(),
   interestPayerType: z.string(),
@@ -124,7 +128,13 @@ function DeductorForm({
           >
             <option value="">Select</option>
             <option value="K">Company</option>
-            <option value="P">Individual / HUF</option>
+            <option value="M">Branch / Division of Company</option>
+            <option value="P">Association of Person (AOP)</option>
+            <option value="T">Association of Person (Trust)</option>
+            <option value="J">Artificial Juridical Person</option>
+            <option value="B">Body of Individuals</option>
+            <option value="Q">Individual/HUF</option>
+            <option value="F">Firm</option>
           </select>
         </label>
         <label className="text-sm flex flex-col gap-1">

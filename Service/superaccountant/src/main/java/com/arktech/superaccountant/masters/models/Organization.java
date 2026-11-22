@@ -44,7 +44,7 @@ public class Organization {
     @Column(name = "tan", length = 10)
     private String tan;
 
-    // NSDL deductor/collector category code, e.g. "K" = Company, "P" = Individual/HUF
+    // TDS deductor category code per e-TDS file format Annexure 4, e.g. "K" = Company, "Q" = Individual/HUF, "P" = AOP
     @Column(name = "deductor_type", length = 2)
     private String deductorType;
 
