@@ -51,6 +51,7 @@ class Tds194aRulesTest {
         assertEquals("40000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.BANK, LocalDate.of(2024, 6, 1)).toPlainString());
         assertEquals("50000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.BANK, LocalDate.of(2025, 6, 1)).toPlainString());
         assertEquals("40000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.CO_OPERATIVE_BANK, LocalDate.of(2024, 6, 1)).toPlainString());
-        assertEquals("10000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.OTHER, LocalDate.of(2024, 6, 1)).toPlainString());
+        assertEquals("5000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.OTHER, LocalDate.of(2024, 6, 1)).toPlainString());
+        assertEquals("10000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.OTHER, LocalDate.of(2025, 6, 1)).toPlainString());
     }
 }

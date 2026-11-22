@@ -184,6 +184,22 @@ class TdsAnalysisInputFactoryTest {
     }
 
     @Test
+    void configResolution_194aOtherPayerUsesFiveThousandBeforeFinanceAct2025() {
+        organization("OTHER");
+        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(new AnalysisContext(
+                UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
+                LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 30),
+                UUID.randomUUID(), MASTERS_JOB, UUID.randomUUID()));
+
+        assertEquals("5000.00",
+                input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+    }
+
+    @Test
     void configResolution_194aOtherPayerKeepsTenThousandThreshold() {
         organization("OTHER");
         var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");

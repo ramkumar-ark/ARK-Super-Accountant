@@ -71,9 +71,11 @@ public class TdsAnalysisInputFactory {
     }
 
     /**
-     * Section 194A has one stored threshold but two company-level thresholds: a bank, co-operative
-     * bank or post office gets Rs 50,000 (Rs 40,000 before 1 April 2025), every other payer Rs 10,000. Apply the company's choice
-     * to a detached copy so the stored config (and the managed entity) is never mutated.
+     * Section 194A has one stored threshold but company-level thresholds: a bank, co-operative
+     * bank or post office gets Rs 40,000 before 1 April 2025 and Rs 50,000 from then (Finance Act
+     * 2025); every other payer gets Rs 5,000 before 1 April 2025 and Rs 10,000 from then. Apply
+     * the company's choice to a detached copy so the stored config (and the managed entity) is
+     * never mutated.
      */
     private void applyInterestPayerThreshold(Organization org,
                                              Map<String, TdsSectionConfig> configsBySection,

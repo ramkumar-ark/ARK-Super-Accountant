@@ -30,6 +30,19 @@ memory.
 - Section codes below are from **Annexure 2** of that file; DD field 15 is the section
   code (CHAR 4, from Annexure 2).
 
+### Finance Act 2025 — old-Act 194A thresholds
+
+- **Change:** s.58 of the Finance Act 2025 amended s.194A(3)(i) of the 1961 Act with
+  effect from 1 April 2025. Bank, co-operative bank and post-office interest moved from
+  Rs 40,000 to Rs 50,000 (senior citizens to Rs 1,00,000); other payers moved from
+  Rs 5,000 to Rs 10,000.
+- **Source:** Income Tax Department, "Key Highlights of Finance Act, 2025", TDS/TCS
+  threshold table:
+  `https://www.incometaxindia.gov.in/documents/20117/14614782/%E2%80%8BKey-Highlights-of-Finance-Act-2025.pdf/139e2679-ed0a-9470-7277-23d5d6244b9f`
+- **Retrieved:** 2026-11-22.
+- **Used by:** `Tds194aRules.thresholdAnnualForPeriod` and the 194A derivation note
+  below.
+
 ## Encoding rules
 
 | Rule | Value |
@@ -261,6 +274,7 @@ happens only in `RpuFormatSpec.sectionCode`.
 | `194A` | `94A` | interest other than securities |
 | `194C` | `94C` | contractor/sub-contractor |
 | `194H` | `94H` | commission/brokerage |
+| `194I` | `4IB` | legacy stored rent value, read-side only; maps to the land/building half |
 | `194I_A` | `4IA` | rent — plant/machinery/equipment @2% |
 | `194I_B` | `4IB` | rent — land/building/furniture/fittings @10% (legacy `194I` still maps here) |
 | `194J_A` | `4JA` | professional/technical fees |
@@ -301,11 +315,16 @@ type and (later) the deductee's senior-citizen status.
 | `194Q` | `1031` | 8(ii) | purchase of goods |
 
 **194A threshold derivation:** the company's `interestPayerType` (`OTHER`, `BANK`,
-`CO_OPERATIVE_BANK`, `POST_OFFICE`) decides the annual threshold — for the three bank-like
-types Rs 40,000 before 1 April 2025 (1961 Act), Rs 50,000 from 1 April 2025 (Finance Act 2025)
-and under Act 2025 s.393 from 1 April 2026; Rs 10,000 for `OTHER` in every period — and the Form 140 code (1021 vs 1022). The
-Rs 1,00,000 senior-citizen threshold (code 1020) needs the deductee's date of birth; the
-rule helper already exposes that seam, but no DOB is stored yet.
+`CO_OPERATIVE_BANK`, `POST_OFFICE`) decides the annual threshold:
+
+- bank-like payers: Rs 40,000 before 1 April 2025; Rs 50,000 from 1 April 2025
+  (Finance Act 2025); Act 2025 s.393 values from 1 April 2026.
+- every other payer: Rs 5,000 before 1 April 2025; Rs 10,000 from 1 April 2025
+  (Finance Act 2025); Act 2025 s.393 values from 1 April 2026.
+
+The same choice selects the Form 140 code (1021 vs 1022). The Rs 1,00,000 senior-citizen
+threshold (code 1020) needs the deductee's date of birth; the rule helper already exposes
+that seam, but no DOB is stored yet.
 
 ## Literals and markers
 

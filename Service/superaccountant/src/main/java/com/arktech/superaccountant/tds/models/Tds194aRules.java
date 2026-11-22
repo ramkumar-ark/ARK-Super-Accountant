@@ -9,7 +9,8 @@ import java.time.LocalDate;
  * Section 194A interest rules that depend on the payer and the deductee.
  *
  * <p>1961 Act s.194A: bank/co-op/post office Rs 40,000 before 1 April 2025 and Rs 50,000 from
- * 1 April 2025 (Finance Act 2025); every other payer Rs 10,000.
+ * 1 April 2025 (Finance Act 2025 s.58); every other payer Rs 5,000 before 1 April 2025 and
+ * Rs 10,000 from that date.
  *
  * <p>The Act 2025 s.393(1) Table 5(ii) gives banks, co-operative banks and post offices a
  * Rs 50,000 annual threshold (Rs 1,00,000 for senior citizens); Table 5(iii) gives every
@@ -21,6 +22,7 @@ public final class Tds194aRules {
 
     public static final BigDecimal BANK_THRESHOLD_ANNUAL = new BigDecimal("50000.00");
     public static final BigDecimal OLD_ACT_BANK_THRESHOLD_ANNUAL = new BigDecimal("40000.00");
+    public static final BigDecimal OLD_ACT_OTHER_THRESHOLD_ANNUAL = new BigDecimal("5000.00");
     public static final LocalDate FINANCE_ACT_2025_EFFECTIVE = LocalDate.of(2025, 4, 1);
     public static final BigDecimal OTHER_THRESHOLD_ANNUAL = new BigDecimal("10000.00");
     public static final BigDecimal SENIOR_CITIZEN_THRESHOLD_ANNUAL = new BigDecimal("100000.00");
@@ -33,9 +35,10 @@ public final class Tds194aRules {
     }
 
     public static BigDecimal thresholdAnnualForPeriod(InterestPayerType payerType, LocalDate periodStart) {
-        if (isBankLike(payerType) && periodStart != null
-                && periodStart.isBefore(FINANCE_ACT_2025_EFFECTIVE)) {
-            return OLD_ACT_BANK_THRESHOLD_ANNUAL;
+        if (periodStart != null && periodStart.isBefore(FINANCE_ACT_2025_EFFECTIVE)) {
+            return isBankLike(payerType)
+                    ? OLD_ACT_BANK_THRESHOLD_ANNUAL
+                    : OLD_ACT_OTHER_THRESHOLD_ANNUAL;
         }
         return thresholdAnnual(payerType);
     }
