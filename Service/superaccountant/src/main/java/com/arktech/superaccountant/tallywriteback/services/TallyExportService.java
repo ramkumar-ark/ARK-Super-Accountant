@@ -3,6 +3,7 @@ package com.arktech.superaccountant.tallywriteback.services;
 import com.arktech.superaccountant.tallywriteback.models.ExistenceOutcome;
 import com.arktech.superaccountant.tallywriteback.models.TallyChangeItem;
 import com.arktech.superaccountant.tallywriteback.models.TallyChangeStatus;
+import com.arktech.superaccountant.tallywriteback.models.TallyFailureReason;
 import com.arktech.superaccountant.tallywriteback.models.TallyExportBatch;
 import com.arktech.superaccountant.tallywriteback.models.TallyExportBatchItem;
 import com.arktech.superaccountant.tallywriteback.payload.ExportLine;
@@ -162,7 +163,9 @@ public class TallyExportService {
         }
 
         item.setStatus(TallyChangeStatus.PENDING);
-        item.setBaselineValue(item.getObservedValue());
+        if (item.getFailureReason() == TallyFailureReason.TALLY_VALUE_CHANGED) {
+            item.setBaselineValue(item.getObservedValue());
+        }
         item.setFailureReason(null);
         item.setResolvedAt(null);
         itemRepository.save(item);
