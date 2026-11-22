@@ -353,7 +353,7 @@ class TallyChangeControllerIT {
     }
 
     @Test
-    void retry_failedLedgerMissingWithNullObserved_leavesBaselineNull() throws Exception {
+    void retry_failedLedgerMissingWithNullObserved_keepsOriginalBaseline() throws Exception {
         TallyChangeItem failed = item(orgId, "retry missing", "RETRY MISSING", "g-retry-missing",
                 TallyChangeStatus.FAILED, "BBBBB2222B");
         failed.setObservedValue(null);
@@ -365,12 +365,12 @@ class TallyChangeControllerIT {
         assertThat(response.getStatus()).isEqualTo(200);
         JsonNode body = objectMapper.readTree(response.getContentAsByteArray());
         assertThat(body.get("status").asText()).isEqualTo("PENDING");
-        assertThat(body.get("baselineValue").isNull()).isTrue();
+        assertThat(body.get("baselineValue").asText()).isEqualTo("OLDVALUE00X");
         assertThat(body.get("failureReason").isNull()).isTrue();
 
         TallyChangeItem loaded = itemRepository.findById(failed.getId()).orElseThrow();
         assertThat(loaded.getStatus()).isEqualTo(TallyChangeStatus.PENDING);
-        assertThat(loaded.getBaselineValue()).isNull();
+        assertThat(loaded.getBaselineValue()).isEqualTo("OLDVALUE00X");
         assertThat(loaded.getFailureReason()).isNull();
     }
 
