@@ -2,6 +2,7 @@ package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
+import com.arktech.superaccountant.masters.tan.DebtorTanGateway;
 import com.arktech.superaccountant.review.FindingReviewException;
 import com.arktech.superaccountant.tds.engine.TdsEngineFixtures;
 import com.arktech.superaccountant.tds.models.TdsFinding;
@@ -27,12 +28,15 @@ import static org.mockito.Mockito.when;
 class TdsFindingApplierTest {
 
     private TdsPanOverrideRepository repository;
+    private DebtorTanGateway debtorTans;
     private TdsFindingApplier applier;
 
     @BeforeEach
     void setUp() {
         repository = mock(TdsPanOverrideRepository.class);
-        applier = new TdsFindingApplier(new TdsPanOverrideStore(repository), TdsEngineFixtures.ORG);
+        debtorTans = mock(DebtorTanGateway.class);
+        applier = new TdsFindingApplier(new TdsPanOverrideStore(repository), debtorTans,
+                TdsEngineFixtures.ORG);
     }
 
     private TdsFinding finding(TdsFindingType type, String party) {
@@ -91,6 +95,42 @@ class TdsFindingApplierTest {
         verify(repository, org.mockito.Mockito.times(2)).save(captor2.capture());
         assertEquals(saved, captor2.getAllValues().get(1));
         assertEquals("acct2", captor2.getAllValues().get(1).getApprovedBy());
+    }
+
+    @Test
+    void validate_debtorTanFinding_rejectsMalformedTan() {
+        TdsFinding f = finding(TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN, "Acme Corp");
+
+        FindingReviewException e = assertThrows(FindingReviewException.class,
+                () -> applier.validate(f, "not-a-tan", "note"));
+
+        assertEquals(400, e.getStatus());
+        assertEquals("Enter a valid 10-character TAN (format AAAA99999A, e.g. BLRA12345C).",
+                e.getMessage());
+    }
+
+    @Test
+    void validate_debtorTanFinding_acceptsValidTanWithoutNote() {
+        TdsFinding f = finding(TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN, "Acme Corp");
+
+        applier.validate(f, " blra12345c ", null);
+    }
+
+    @Test
+    void apply_debtorTanFinding_savesNormalizedTanWithFindingProvenance() {
+        TdsFinding f = finding(TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN, "Acme Corp");
+        f.setProposedValue(" blra12345c ");
+
+        applier.apply(f, "acct");
+
+        verify(debtorTans).saveTan(org.mockito.ArgumentMatchers.eq(TdsEngineFixtures.ORG),
+                org.mockito.ArgumentMatchers.eq("Acme Corp"),
+                org.mockito.ArgumentMatchers.eq("BLRA12345C"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(f.getId()),
+                org.mockito.ArgumentMatchers.eq("acct"),
+                any());
+        verify(repository, never()).save(any());
     }
 
     @Test

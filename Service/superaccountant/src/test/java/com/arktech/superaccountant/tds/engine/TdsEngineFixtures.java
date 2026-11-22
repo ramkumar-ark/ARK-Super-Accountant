@@ -95,7 +95,7 @@ public final class TdsEngineFixtures {
 
     public static TdsAnalysisInput input(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps,
                                   LocalDate periodStart, LocalDate periodEnd) {
-        return new TdsAnalysisInput(ORG, WF, JOB, vouchers, snaps, CONFIGS,
+        return new TdsAnalysisInput(ORG, WF, JOB, vouchers, snaps, Map.of(), CONFIGS,
                 FY_START, periodStart, periodEnd);
     }
 

@@ -160,3 +160,38 @@ export interface PanOverride {
 export function listPanOverrides(): Promise<PanOverride[]> {
   return api.get('/v1/tds/pan-overrides').then((res) => res.data)
 }
+
+export interface DebtorTanItem {
+  ledgerName: string
+  ledgerKey: string
+  tallyGuid: string | null
+  tan: string | null
+  sourceFindingId: string | null
+  updatedBy: string | null
+  updatedAt: string | null
+  inLatestUpload: boolean
+}
+
+export interface DebtorTanRequest {
+  ledgerName: string
+  tan: string
+  tallyGuid?: string | null
+}
+
+export function listDebtorTans(): Promise<DebtorTanItem[]> {
+  return api.get('/v1/tds/debtor-tans').then((res) => res.data)
+}
+
+export function upsertDebtorTan(
+  request: DebtorTanRequest,
+): Promise<DebtorTanItem> {
+  return api
+    .put('/v1/tds/debtor-tans', request)
+    .then((res) => res.data)
+}
+
+export function deleteDebtorTan(ledgerName: string): Promise<void> {
+  return api
+    .delete('/v1/tds/debtor-tans', { params: { ledgerName } })
+    .then(() => undefined)
+}

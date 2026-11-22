@@ -65,6 +65,7 @@ public class TdsEngine {
     private void runPerVoucherPass(TdsAnalysisInput input, List<VoucherFact> facts,
                                    List<TdsFinding> findings, List<TdsDeducteeEntry> entries) {
         Set<String> panFindingKeys = new HashSet<>();
+        Set<String> debtorTanFindingKeys = new HashSet<>();
         for (ParsedVoucher v : input.vouchers()) {
             if (v == null || v.isCancelled() || v.getVoucherDate() == null
                     || v.getEntries() == null
@@ -74,6 +75,8 @@ public class TdsEngine {
             }
             Map<String, BigDecimal> baseBySection = new LinkedHashMap<>();
             List<ParsedVoucherEntry> tdsEntries = new ArrayList<>();
+            List<ParsedVoucherEntry> tdsReceivableEntries = new ArrayList<>();
+            List<ParsedVoucherEntry> debtorEntries = new ArrayList<>();
             for (ParsedVoucherEntry e : v.getEntries()) {
                 if (e == null || e.getLedgerName() == null || e.getAmount() == null) {
                     continue;
@@ -82,6 +85,12 @@ public class TdsEngine {
                 LedgerCategory category = snapshot != null && snapshot.getCategory() != null
                         ? snapshot.getCategory()
                         : LedgerCategory.OTHER;
+                if (e.getAmount().signum() > 0 && key(e.getLedgerName()).contains("tds receivable")) {
+                    tdsReceivableEntries.add(e);
+                }
+                if (e.getAmount().signum() < 0 && isDebtorSnapshot(snapshot)) {
+                    debtorEntries.add(e);
+                }
                 if (e.getAmount().signum() > 0
                         && (category == LedgerCategory.EXPENSE || category == LedgerCategory.PURCHASE)
                         && Boolean.TRUE.equals(snapshot != null ? snapshot.getTdsApplicable() : null)) {
@@ -92,6 +101,33 @@ public class TdsEngine {
                     }
                 } else if (category == LedgerCategory.TDS && e.getAmount().signum() != 0) {
                     tdsEntries.add(e);
+                }
+            }
+            if (isInPeriod(v.getVoucherDate(), input)) {
+                for (ParsedVoucherEntry receivable : tdsReceivableEntries) {
+                    for (ParsedVoucherEntry debtor : debtorEntries) {
+                        String debtorKey = key(debtor.getLedgerName());
+                        if (input.debtorTansByName().containsKey(debtorKey)) {
+                            continue;
+                        }
+                        String dedupKey = v.getId() + "|" + debtorKey;
+                        if (!debtorTanFindingKeys.add(dedupKey)) {
+                            continue;
+                        }
+                        BigDecimal deducted = receivable.getAmount().abs()
+                                .setScale(2, RoundingMode.HALF_UP);
+                        TdsFinding f = finding(input, v,
+                                TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN,
+                                FindingSeverity.LOW, null, null, deducted,
+                                "Customer '" + debtor.getLedgerName() + "' has TDS deduction of ₹"
+                                        + deducted + " debited to '" + receivable.getLedgerName()
+                                        + "' in voucher " + v.getVoucherNumber()
+                                        + ", but no TAN is stored.",
+                                "Enter the debtor's 10-character TAN (format AAAA99999A) on this "
+                                        + "finding or configure it in the Debtor TAN panel.");
+                        f.setPartyLedgerName(debtor.getLedgerName());
+                        findings.add(f);
+                    }
                 }
             }
             if (baseBySection.isEmpty()) {
@@ -543,6 +579,13 @@ public class TdsEngine {
 
     private boolean isInPeriod(LocalDate date, TdsAnalysisInput input) {
         return !date.isBefore(input.periodStart()) && !date.isAfter(input.periodEnd());
+    }
+
+    private static boolean isDebtorSnapshot(UploadLedgerSnapshot snapshot) {
+        if (snapshot == null || snapshot.getGroupChain() == null) {
+            return false;
+        }
+        return snapshot.getGroupChain().toLowerCase(Locale.ROOT).contains("sundry debtors");
     }
 
     private record VoucherFact(ParsedVoucher voucher, String partyName, String partyKey, String section,
