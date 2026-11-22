@@ -39,6 +39,7 @@ class TdsAnalysisInputFactoryTest {
     private TdsSectionConfigRepository configRepository;
     private OrganizationRepository organizationRepository;
     private TdsPanOverrideRepository panOverrideRepository;
+    private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
     private TdsAnalysisInputFactory factory;
 
     private final AnalysisContext ctx = new AnalysisContext(
@@ -53,12 +54,14 @@ class TdsAnalysisInputFactoryTest {
         configRepository = mock(TdsSectionConfigRepository.class);
         organizationRepository = mock(OrganizationRepository.class);
         panOverrideRepository = mock(TdsPanOverrideRepository.class);
+        debtorTanRepository = mock(com.arktech.superaccountant.tds.repository.DebtorTanRepository.class);
         factory = new TdsAnalysisInputFactory();
         inject("parsedVoucherRepository", parsedVoucherRepository);
         inject("snapshotRepository", snapshotRepository);
         inject("configRepository", configRepository);
         inject("organizationRepository", organizationRepository);
         inject("panOverrideRepository", panOverrideRepository);
+        inject("debtorTanRepository", debtorTanRepository);
 
         Organization org = new Organization();
         org.setName("Org");
@@ -70,6 +73,8 @@ class TdsAnalysisInputFactoryTest {
                 List.of(TdsEngineFixtures.config("194C", "2.00", "1.00", "30000.00", "100000.00")));
         when(snapshotRepository.findByUploadJobId(MASTERS_JOB)).thenReturn(List.of());
         when(panOverrideRepository.findByOrganizationIdOrderByPartyLedgerNameAsc(
+                TdsEngineFixtures.ORG)).thenReturn(List.of());
+        when(debtorTanRepository.findByOrganizationIdOrderByLedgerNameAsc(
                 TdsEngineFixtures.ORG)).thenReturn(List.of());
     }
 

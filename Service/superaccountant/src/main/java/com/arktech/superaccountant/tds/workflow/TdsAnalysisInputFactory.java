@@ -41,6 +41,9 @@ public class TdsAnalysisInputFactory {
     @org.springframework.beans.factory.annotation.Autowired
     private com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository panOverrideRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
+
     public TdsAnalysisInput build(AnalysisContext ctx) {
         if (ctx.mastersJobId() == null) {
             throw new IllegalStateException("No completed masters upload to analyse against");
@@ -56,6 +59,11 @@ public class TdsAnalysisInputFactory {
             snapshotsByName.putIfAbsent(TdsEngine.key(s.getLedgerName()), s);
         }
         applyPanOverlay(ctx, snapshotsByName);
+        Map<String, String> debtorTansByName = new LinkedHashMap<>();
+        for (com.arktech.superaccountant.tds.models.DebtorTan record
+                : debtorTanRepository.findByOrganizationIdOrderByLedgerNameAsc(ctx.organizationId())) {
+            debtorTansByName.put(record.getLedgerKey(), record.getTan());
+        }
         Map<String, TdsSectionConfig> configsBySection = new LinkedHashMap<>();
         for (TdsSectionConfig c : configRepository.findAll()) {
             configsBySection.putIfAbsent(c.getSectionCode(), c.effectiveFor(ctx.periodStart()));
@@ -67,7 +75,7 @@ public class TdsAnalysisInputFactory {
         }
         applyInterestPayerThreshold(org, configsBySection, ctx.periodStart());
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
-                vouchers, snapshotsByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
+                vouchers, snapshotsByName, debtorTansByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
     }
 
     /**

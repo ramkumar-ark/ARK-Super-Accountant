@@ -7,6 +7,7 @@ import { LedgerMappingPanel } from '@/components/LedgerMappingPanel'
 import { AppShell } from '@/components/AppShell'
 import { useAuthStore } from '@/store/authStore'
 import { ValidationSettingsPanel } from '@/components/ValidationSettingsPanel'
+import { DebtorTanPanel } from '@/components/tds/DebtorTanPanel'
 import { MastersChangeList } from '@/components/snapshot/MastersChangeList'
 import { apiErrorMessage } from '@/lib/apiError'
 import { FindingReviewPanel, type ReviewRole } from '@/components/review/FindingReviewPanel'
@@ -95,7 +96,7 @@ const VALUE_LABELS: Record<string, string> = {
 }
 
 export function MastersPage() {
-  const [activeTab, setActiveTab] = useState<'ledgers' | 'findings' | 'settings'>('ledgers')
+  const [activeTab, setActiveTab] = useState<'ledgers' | 'findings' | 'debtor-tans' | 'settings'>('ledgers')
   const [masters, setMasters] = useState<PreconfiguredMaster[]>([])
   const [findings, setFindings] = useState<ValidationFinding[]>([])
   const [openFindingsCount, setOpenFindingsCount] = useState(0)
@@ -336,6 +337,19 @@ export function MastersPage() {
           </button>
           <button
             role="tab"
+            aria-selected={activeTab === 'debtor-tans'}
+            aria-controls="debtor-tans-panel"
+            onClick={() => setActiveTab('debtor-tans')}
+            className={`h-11 px-4 text-sm font-normal border-b-2 transition-colors ${
+              activeTab === 'debtor-tans'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-text-secondary)]'
+            }`}
+          >
+            Debtor TANs
+          </button>
+          <button
+            role="tab"
             aria-selected={activeTab === 'settings'}
             aria-controls="settings-panel"
             onClick={() => setActiveTab('settings')}
@@ -540,6 +554,12 @@ export function MastersPage() {
         {activeTab === 'settings' && (
           <div id="settings-panel" role="tabpanel">
             <ValidationSettingsPanel />
+          </div>
+        )}
+
+        {activeTab === 'debtor-tans' && (
+          <div id="debtor-tans-panel" role="tabpanel">
+            <DebtorTanPanel />
           </div>
         )}
 

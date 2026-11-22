@@ -16,6 +16,7 @@ public record TdsAnalysisInput(
         UUID uploadJobId,
         List<ParsedVoucher> vouchers,
         Map<String, UploadLedgerSnapshot> snapshotsByName,
+        Map<String, String> debtorTansByName,
         Map<String, TdsSectionConfig> configsBySection,
         LocalDate fyStart,
         LocalDate periodStart,
@@ -27,6 +28,7 @@ public record TdsAnalysisInput(
         Objects.requireNonNull(uploadJobId, "uploadJobId");
         Objects.requireNonNull(vouchers, "vouchers");
         Objects.requireNonNull(snapshotsByName, "snapshotsByName");
+        Objects.requireNonNull(debtorTansByName, "debtorTansByName");
         Objects.requireNonNull(configsBySection, "configsBySection");
         Objects.requireNonNull(fyStart, "fyStart");
         Objects.requireNonNull(periodStart, "periodStart");

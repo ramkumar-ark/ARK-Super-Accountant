@@ -2,6 +2,7 @@ package com.arktech.superaccountant.tds.workflow;
 
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.pan.PanOverrideGateway;
+import com.arktech.superaccountant.masters.tan.DebtorTanGateway;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.repository.TdsFindingRepository;
 import com.arktech.superaccountant.workflow.findings.WorkflowFindingSource;
@@ -28,11 +29,14 @@ public class TdsFindingSource implements WorkflowFindingSource {
 
     private final TdsFindingRepository findingRepository;
     private final PanOverrideGateway panOverrides;
+    private final DebtorTanGateway debtorTans;
 
     public TdsFindingSource(TdsFindingRepository findingRepository,
-                            PanOverrideGateway panOverrides) {
+                            PanOverrideGateway panOverrides,
+                            DebtorTanGateway debtorTans) {
         this.findingRepository = findingRepository;
         this.panOverrides = panOverrides;
+        this.debtorTans = debtorTans;
     }
 
     @Override
@@ -69,7 +73,7 @@ public class TdsFindingSource implements WorkflowFindingSource {
 
     @Override
     public FindingApplier<ReviewableFinding> applier(Workflow w) {
-        return new TdsFindingApplier(panOverrides, w.getOrganizationId());
+        return new TdsFindingApplier(panOverrides, debtorTans, w.getOrganizationId());
     }
 
     @Override

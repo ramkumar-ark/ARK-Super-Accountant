@@ -42,6 +42,10 @@ public class UploadLedgerSnapshot {
     @Column(name = "gstin")
     private String gstin;
 
+    /** Tally GUID of the ledger, so records keyed to it survive a ledger rename. */
+    @Column(name = "tally_guid")
+    private String tallyGuid;
+
     @Column(name = "tds_section")
     private String tdsSection;
 

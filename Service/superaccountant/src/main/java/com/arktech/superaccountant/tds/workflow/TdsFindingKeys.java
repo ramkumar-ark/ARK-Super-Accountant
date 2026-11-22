@@ -4,6 +4,7 @@ import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.review.EvidenceHash;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
 import com.arktech.superaccountant.tds.models.TdsFinding;
+import com.arktech.superaccountant.tds.models.TdsFindingType;
 
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +25,9 @@ public final class TdsFindingKeys {
                 ? EvidenceHash.voucherIdentity(v.getVoucherGuid(), v.getVoucherTypeName(),
                         v.getVoucherNumber(), v.getVoucherDate())
                 : "party:" + TdsEngine.key(f.getPartyLedgerName());
+        if (f.getFindingType() == TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN) {
+            identity = identity + "|debtor:" + TdsEngine.key(f.getPartyLedgerName());
+        }
         f.setFindingKey(f.getFindingType().name() + "|" + identity + "|"
                 + (f.getSection() == null ? "" : f.getSection()));
         f.setEvidenceHash(EvidenceHash.of(f.getFindingType().name(), identity,

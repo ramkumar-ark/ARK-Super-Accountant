@@ -36,7 +36,13 @@ function findingTypeFilterLabel(type: string): string {
 }
 
 function needsTypedValue(f: WorkflowFinding): boolean {
-  if (f.source === 'TDS') return f.findingType === 'PAN_MISSING' || f.findingType === 'PAN_INVALID'
+  if (f.source === 'TDS') {
+    return (
+      f.findingType === 'PAN_MISSING' ||
+      f.findingType === 'PAN_INVALID' ||
+      f.findingType === 'DEBTOR_TDS_RECEIVABLE_MISSING_TAN'
+    )
+  }
   if (f.source === 'MASTERS') return TYPED_INPUT_RULES.includes(f.findingType)
   return false
 }

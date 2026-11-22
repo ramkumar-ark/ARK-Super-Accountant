@@ -26,6 +26,7 @@ import com.arktech.superaccountant.masters.repository.ValidationFindingRepositor
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.repository.ValidationRuleConfigRepository;
 import com.arktech.superaccountant.masters.rules.ValidationContext;
+import com.arktech.superaccountant.masters.tan.DebtorTanGateway;
 import com.arktech.superaccountant.masters.services.OrganizationSettingsService;
 import com.arktech.superaccountant.masters.services.ValidationOrchestrator;
 import com.arktech.superaccountant.masters.util.TallyGroups;
@@ -95,6 +96,9 @@ public class UploadController {
 
     @Autowired
     private FindingReviewService findingReviewService;
+
+    @Autowired
+    private DebtorTanGateway debtorTanGateway;
 
     @Autowired
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -177,6 +181,7 @@ public class UploadController {
             snap.setGstApplicable(pl.getGstApplicable());
             snap.setTdsApplicable(pl.getTdsApplicable());
             snap.setGstin(pl.getGstin());
+            snap.setTallyGuid(pl.getGuid());
             snap.setTdsSection(pl.getTdsSection());
             snap.setHsnSacCode(pl.getHsnSacCode());
             snap.setPan(pl.getPan());
@@ -186,6 +191,7 @@ public class UploadController {
             return snap;
         }).collect(Collectors.toList());
         uploadLedgerSnapshotRepository.saveAll(snapshots);
+        debtorTanGateway.syncLedgerRenames(orgId, parsedLedgers);
 
         if (!parsedLedgers.isEmpty()) {
             if (!masterRepository.existsByOrganizationId(orgId)) {

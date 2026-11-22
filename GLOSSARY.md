@@ -61,3 +61,20 @@ approves a `PAN_MISSING`/`PAN_INVALID` TDS finding or a `PAN_FORMAT` masters fin
 TDS analysis overlays it on the ledger; the masters rule suppresses the finding while an
 override exists; the planned Tally write-back will read this same row. It is not a
 `preconfigured_masters` field and does not create a `MasterEditLog` row.
+
+## TAN
+
+Tax Deduction and Collection Account Number issued by the Income Tax Department: ten
+characters in the format `AAAA99999A` (four letters, five digits, one letter). Super
+Accountant stores a debtor's TAN after trimming and uppercasing; a blank value means no
+TAN. It is distinct from the company's own TAN in `Organization`.
+
+## Debtor TAN
+
+The TAN of a customer (Tally ledger under Sundry Debtors) that deducts TDS on payments to
+the company, stored once in `debtor_tans` per organization and normalized ledger key. It
+also keeps the Tally ledger GUID so the TAN follows a ledger rename. Every role can view
+debtor TANs; only Owner and Accountant can edit them, while Operators propose a TAN by
+resolving a `DEBTOR_TDS_RECEIVABLE_MISSING_TAN` finding. The stored TAN is the foundation
+for later matching against 26AS.
+_Avoid_: customer TAN (say debtor TAN), deductee TAN (reserved for TDS deducted by the company)
