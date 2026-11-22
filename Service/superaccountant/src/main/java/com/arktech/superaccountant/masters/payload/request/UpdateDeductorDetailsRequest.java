@@ -8,4 +8,5 @@ public class UpdateDeductorDetailsRequest {
     private String deductorType;
     private String responsiblePersonName;
     private String responsiblePersonDesignation;
+    private String interestPayerType;
 }

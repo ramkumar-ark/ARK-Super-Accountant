@@ -105,8 +105,8 @@ class RpuFormatSpecTest {
     }
 
     @Test
-    void sectionCode_mapsAllEightInternalCodes() {
-        for (String c : List.of("194A", "194C", "194H", "194I", "194I_A", "194I_B", "194J_A", "194J_B", "194M", "194Q")) {
+    void sectionCode_mapsAllInternalCodes() {
+        for (String c : List.of("194A", "194C", "194H", "194I", "194I_A", "194I_B", "194J_A", "194J_B", "194J_C", "194M", "194Q")) {
             assertFalse(RpuFormatSpec.sectionCode(c).isBlank(), c);
         }
         assertEquals("94A", RpuFormatSpec.sectionCode("194A"));
@@ -117,6 +117,7 @@ class RpuFormatSpecTest {
         assertEquals("4IB", RpuFormatSpec.sectionCode("194I"));
         assertEquals("4JA", RpuFormatSpec.sectionCode("194J_A"));
         assertEquals("4JB", RpuFormatSpec.sectionCode("194J_B"));
+        assertEquals("4JB", RpuFormatSpec.sectionCode("194J_C"));
         assertEquals("94Q", RpuFormatSpec.sectionCode("194Q"));
         assertThrows(IllegalArgumentException.class, () -> RpuFormatSpec.sectionCode("194Z"));
     }

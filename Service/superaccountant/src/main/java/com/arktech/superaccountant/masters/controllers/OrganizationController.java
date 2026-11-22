@@ -6,6 +6,7 @@ import com.arktech.superaccountant.login.payload.response.MessageResponse;
 import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.models.InterestPayerType;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.OrganizationInvite;
 import com.arktech.superaccountant.masters.models.UserOrganization;
@@ -74,6 +75,7 @@ public class OrganizationController {
                 "pan", savedOrg.getPan() != null ? savedOrg.getPan() : "",
                 "registeredAddress", savedOrg.getRegisteredAddress() != null ? savedOrg.getRegisteredAddress() : "",
                 "financialYearStart", savedOrg.getFinancialYearStart(),
+                "interestPayerType", InterestPayerType.from(savedOrg.getInterestPayerType()).name(),
                 "createdAt", savedOrg.getCreatedAt()
         ));
     }
@@ -102,6 +104,7 @@ public class OrganizationController {
                         Map.entry("deductorType", org.getDeductorType() != null ? org.getDeductorType() : ""),
                         Map.entry("responsiblePersonName", org.getResponsiblePersonName() != null ? org.getResponsiblePersonName() : ""),
                         Map.entry("responsiblePersonDesignation", org.getResponsiblePersonDesignation() != null ? org.getResponsiblePersonDesignation() : ""),
+                        Map.entry("interestPayerType", InterestPayerType.from(org.getInterestPayerType()).name()),
                         Map.entry("createdAt", org.getCreatedAt())
                 )))
                 .orElse(ResponseEntity.notFound().build());
@@ -134,6 +137,14 @@ public class OrganizationController {
         if (request.getDeductorType() != null) org.setDeductorType(request.getDeductorType());
         if (request.getResponsiblePersonName() != null) org.setResponsiblePersonName(request.getResponsiblePersonName());
         if (request.getResponsiblePersonDesignation() != null) org.setResponsiblePersonDesignation(request.getResponsiblePersonDesignation());
+        if (request.getInterestPayerType() != null) {
+            InterestPayerType payerType = InterestPayerType.parse(request.getInterestPayerType());
+            if (payerType == null) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "Invalid interest payer type. Expected OTHER, BANK, CO_OPERATIVE_BANK or POST_OFFICE."));
+            }
+            org.setInterestPayerType(payerType.name());
+        }
 
         organizationRepository.save(org);
         return ResponseEntity.ok(org);

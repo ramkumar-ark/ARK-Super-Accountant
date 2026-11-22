@@ -137,6 +137,7 @@ export interface DeductorDetails {
   deductorType: string
   responsiblePersonName: string
   responsiblePersonDesignation: string
+  interestPayerType: string
 }
 
 export function getOrganization(orgId: string): Promise<DeductorDetails & Record<string, unknown>> {

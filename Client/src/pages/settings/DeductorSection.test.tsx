@@ -27,6 +27,7 @@ const CURRENT_ORG = {
   deductorType: 'K',
   responsiblePersonName: 'Ravi Kumar',
   responsiblePersonDesignation: 'Proprietor',
+  interestPayerType: 'OTHER',
   createdAt: '2025-04-01T00:00:00Z',
 }
 
@@ -64,6 +65,7 @@ describe('DeductorSection', () => {
 
     expect(await screen.findByLabelText('TAN')).toHaveValue('AAAA12345A')
     expect(screen.getByLabelText('Deductor type')).toHaveValue('K')
+    expect(screen.getByLabelText('Interest payer type')).toHaveValue('OTHER')
     expect(screen.getByLabelText('Responsible person name')).toHaveValue('Ravi Kumar')
   })
 
@@ -89,6 +91,7 @@ describe('DeductorSection', () => {
     await user.clear(tan)
     await user.type(tan, 'BBBB67890B')
     await user.selectOptions(screen.getByLabelText('Deductor type'), 'P')
+    await user.selectOptions(screen.getByLabelText('Interest payer type'), 'BANK')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
@@ -97,6 +100,7 @@ describe('DeductorSection', () => {
         deductorType: 'P',
         responsiblePersonName: 'Ravi Kumar',
         responsiblePersonDesignation: 'Proprietor',
+        interestPayerType: 'BANK',
       })
     })
   })
@@ -123,6 +127,7 @@ describe('DeductorSection', () => {
 
       expect(await screen.findByLabelText('TAN')).toBeDisabled()
       expect(screen.getByLabelText('Deductor type')).toBeDisabled()
+      expect(screen.getByLabelText('Interest payer type')).toBeDisabled()
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     },
   )

@@ -32,19 +32,21 @@ public final class RpuFormatSpec {
     private static final int ADDRESS_LINES = 5;
     private static final int ADDRESS_LINE_LENGTH = 25;
 
-    private static final Map<String, String> SECTION_CODES = Map.of(
-            "194A", "94A",
-            "194C", "94C",
-            "194H", "94H",
+    private static final Map<String, String> SECTION_CODES = Map.ofEntries(
+            Map.entry("194A", "94A"),
+            Map.entry("194C", "94C"),
+            Map.entry("194H", "94H"),
             // 194I is split as 194I_A (plant/machinery/equipment, 4IA) and 194I_B
             // (land/building/furniture, 4IB); legacy 194I stays the land/building half.
-            "194I", "4IB",
-            "194I_A", "4IA",
-            "194I_B", "4IB",
-            "194J_A", "4JA",
-            "194J_B", "4JB",
-            "194M", "94M",
-            "194Q", "94Q");
+            Map.entry("194I", "4IB"),
+            Map.entry("194I_A", "4IA"),
+            Map.entry("194I_B", "4IB"),
+            Map.entry("194J_A", "4JA"),
+            Map.entry("194J_B", "4JB"),
+            // Director remuneration has no dedicated 26Q v7.8 code; it shares 4JB (10%).
+            Map.entry("194J_C", "4JB"),
+            Map.entry("194M", "94M"),
+            Map.entry("194Q", "94Q"));
 
     private RpuFormatSpec() {
     }

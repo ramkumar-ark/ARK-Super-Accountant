@@ -142,6 +142,94 @@ class TdsAnalysisInputFactoryTest {
         assertEquals("ABC Contractors", synthetic.getLedgerName());
     }
 
+    private Organization organization(String interestPayerType) {
+        Organization org = new Organization();
+        org.setName("Org");
+        org.setFinancialYearStart(4);
+        org.setInterestPayerType(interestPayerType);
+        when(organizationRepository.findById(TdsEngineFixtures.ORG)).thenReturn(Optional.of(org));
+        return org;
+    }
+
+    @Test
+    void configResolution_194aBankPayerUsesFiftyThousandThreshold() {
+        organization("BANK");
+        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(new AnalysisContext(
+                UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
+                UUID.randomUUID(), MASTERS_JOB, UUID.randomUUID()));
+
+        assertEquals("50000.00",
+                input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+    }
+
+    @Test
+    void configResolution_194aBankPayerUsesFortyThousandBeforeFinanceAct2025() {
+        organization("BANK");
+        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(new AnalysisContext(
+                UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
+                LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 30),
+                UUID.randomUUID(), MASTERS_JOB, UUID.randomUUID()));
+
+        assertEquals("40000.00",
+                input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+    }
+
+    @Test
+    void configResolution_194aOtherPayerUsesFiveThousandBeforeFinanceAct2025() {
+        organization("OTHER");
+        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(new AnalysisContext(
+                UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
+                LocalDate.of(2024, 6, 15), LocalDate.of(2024, 6, 30),
+                UUID.randomUUID(), MASTERS_JOB, UUID.randomUUID()));
+
+        assertEquals("5000.00",
+                input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+    }
+
+    @Test
+    void configResolution_194aOtherPayerKeepsTenThousandThreshold() {
+        organization("OTHER");
+        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(new AnalysisContext(
+                UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
+                LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 31),
+                UUID.randomUUID(), MASTERS_JOB, UUID.randomUUID()));
+
+        assertEquals("10000.00",
+                input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
+    }
+
+    @Test
+    void configResolution_194aBankPayerUsesFiftyThousandInNewActPeriod() {
+        organization("POST_OFFICE");
+        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
+        c.setNewActRateCompany(new java.math.BigDecimal("10.00"));
+        c.setNewActRateNonCompany(new java.math.BigDecimal("10.00"));
+        c.setNewActThresholdAnnual(new java.math.BigDecimal("10000.00"));
+        when(configRepository.findAll()).thenReturn(List.of(c));
+
+        var input = factory.build(ctx);
+
+        assertEquals("50000.00",
+                input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", c.getNewActThresholdAnnual().toPlainString());
+    }
+
     @Test
     void configResolution_newActPeriodResolvesNewValues() {
         var c = TdsEngineFixtures.config("194J_A", "2.00", "2.00", "30000.00", "30000.00");

@@ -54,6 +54,10 @@ public class Organization {
     @Column(name = "responsible_person_designation")
     private String responsiblePersonDesignation;
 
+    // What kind of payer this company is for section 194A; blank/unknown behaves as OTHER.
+    @Column(name = "interest_payer_type", length = 24)
+    private String interestPayerType;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 

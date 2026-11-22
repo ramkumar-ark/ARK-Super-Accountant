@@ -72,6 +72,37 @@ class OrganizationDeductorPatchTest {
     }
 
     @Test
+    void patchDeductor_storesNormalisedInterestPayerType() {
+        Organization org = new Organization("Acme");
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+
+        UpdateDeductorDetailsRequest req = new UpdateDeductorDetailsRequest();
+        req.setInterestPayerType("bank");
+
+        ResponseEntity<?> res = patch(user("acct", "ROLE_ACCOUNTANT"), req);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        ArgumentCaptor<Organization> captor = ArgumentCaptor.forClass(Organization.class);
+        verify(organizationRepository).save(captor.capture());
+        assertThat(captor.getValue().getInterestPayerType()).isEqualTo("BANK");
+    }
+
+    @Test
+    void patchDeductor_unknownInterestPayerType_400() {
+        Organization org = new Organization("Acme");
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+
+        UpdateDeductorDetailsRequest req = new UpdateDeductorDetailsRequest();
+        req.setInterestPayerType("NBFC");
+
+        ResponseEntity<?> res = patch(user("acct", "ROLE_ACCOUNTANT"), req);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(400);
+        assertThat(((Map<?, ?>) res.getBody()).get("error")).isNotNull();
+        verify(organizationRepository, never()).save(any());
+    }
+
+    @Test
     void patchDeductor_malformedTan_400() {
         Organization org = new Organization("Acme");
         when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));

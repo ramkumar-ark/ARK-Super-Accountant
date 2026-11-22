@@ -15,7 +15,15 @@ const deductorSchema = z.object({
   deductorType: z.string(),
   responsiblePersonName: z.string(),
   responsiblePersonDesignation: z.string(),
+  interestPayerType: z.string(),
 })
+
+const INTEREST_PAYER_OPTIONS = [
+  { value: 'OTHER', label: 'Other payer (Rs 10,000 threshold)' },
+  { value: 'BANK', label: 'Bank (Rs 50,000 threshold)' },
+  { value: 'CO_OPERATIVE_BANK', label: 'Co-operative bank (Rs 50,000 threshold)' },
+  { value: 'POST_OFFICE', label: 'Post office (Rs 50,000 threshold)' },
+]
 
 export function DeductorSection() {
   const { user } = useAuthStore()
@@ -51,6 +59,7 @@ function DeductorForm({
   const [responsiblePersonDesignation, setResponsiblePersonDesignation] = useState(
     org.responsiblePersonDesignation ?? '',
   )
+  const [interestPayerType, setInterestPayerType] = useState(org.interestPayerType ?? 'OTHER')
   const [error, setError] = useState<string | null>(null)
 
   const mutation = useMutation({
@@ -69,6 +78,7 @@ function DeductorForm({
       deductorType,
       responsiblePersonName,
       responsiblePersonDesignation,
+      interestPayerType,
     })
     if (!parsed.success) {
       setError(parsed.error.issues[0].message)
@@ -116,6 +126,26 @@ function DeductorForm({
             <option value="K">Company</option>
             <option value="P">Individual / HUF</option>
           </select>
+        </label>
+        <label className="text-sm flex flex-col gap-1">
+          Interest payer type
+          <select
+            aria-label="Interest payer type"
+            value={interestPayerType}
+            onChange={(e) => setInterestPayerType(e.target.value)}
+            disabled={!canEdit}
+            className="border rounded px-2 py-1 text-sm"
+          >
+            {INTEREST_PAYER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-[var(--color-text-muted)]">
+            Sets the section 194A threshold and Form 140 code. The Rs 1,00,000 senior-citizen
+            threshold needs each customer&apos;s date of birth, which is not captured yet.
+          </span>
         </label>
         <label className="text-sm flex flex-col gap-1">
           Responsible person name

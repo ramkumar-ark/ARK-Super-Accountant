@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.rpu;
 
+import com.arktech.superaccountant.masters.models.InterestPayerType;
 import com.arktech.superaccountant.tds.models.TdsChallan;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,15 @@ import java.util.UUID;
 public class Rpu140Generator {
 
     public String generate(RpuHeader header, List<TdsChallan> challans, List<TdsDeducteeEntry> entries) {
+        return generate(header, challans, entries, InterestPayerType.OTHER);
+    }
+
+    /**
+     * @param interestPayerType company-level 194A payer type (bank-like vs other), used for the
+     *                          Form 140 section code; senior-citizen DOB is a later seam.
+     */
+    public String generate(RpuHeader header, List<TdsChallan> challans,
+                           List<TdsDeducteeEntry> entries, InterestPayerType interestPayerType) {
         List<TdsChallan> orderedChallans = new ArrayList<>(challans);
         orderedChallans.sort(Comparator
                 .comparing(TdsChallan::getDepositDate, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -105,7 +115,7 @@ public class Rpu140Generator {
                         entry.getDateOfPayment(),
                         entry.getDateOfDeduction(),
                         entry.getRateApplied(),
-                        entry.isHigherRateApplied()))));
+                        entry.isHigherRateApplied()), interestPayerType, null)));
             }
             challanSerialOnFile++;
         }

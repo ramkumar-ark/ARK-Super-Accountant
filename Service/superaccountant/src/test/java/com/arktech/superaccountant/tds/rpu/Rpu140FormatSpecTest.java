@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.rpu;
 
+import com.arktech.superaccountant.masters.models.InterestPayerType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -148,6 +149,7 @@ class Rpu140FormatSpecTest {
         assertEquals("1009", Rpu140FormatSpec.sectionCode("194I"));
         assertEquals("1026", Rpu140FormatSpec.sectionCode("194J_A"));
         assertEquals("1027", Rpu140FormatSpec.sectionCode("194J_B"));
+        assertEquals("1028", Rpu140FormatSpec.sectionCode("194J_C"));
         assertEquals("1031", Rpu140FormatSpec.sectionCode("194Q"));
 
         // 194C requires a deductee PAN: ind/HUF (4th char P/H) -> 1023, others -> 1024
@@ -162,6 +164,23 @@ class Rpu140FormatSpecTest {
         assertTrue(indeterminate.getMessage().contains("194C payee type"));
         assertThrows(IllegalArgumentException.class,
                 () -> Rpu140FormatSpec.sectionCode("194C", "BADPAN12"));
+    }
+
+    @Test
+    void form140SectionCode_194aDependsOnCompanyPayerTypeAndSeniorSeam() {
+        assertEquals("1022", Rpu140FormatSpec.sectionCode(
+                "194A", null, InterestPayerType.OTHER, null));
+        assertEquals("1022", Rpu140FormatSpec.sectionCode(
+                "194A", "ABCPE1234F", InterestPayerType.OTHER, true));
+        assertEquals("1021", Rpu140FormatSpec.sectionCode(
+                "194A", "ABCPE1234F", InterestPayerType.BANK, null));
+        assertEquals("1021", Rpu140FormatSpec.sectionCode(
+                "194A", "ABCPE1234F", InterestPayerType.CO_OPERATIVE_BANK, false));
+        assertEquals("1021", Rpu140FormatSpec.sectionCode(
+                "194A", "ABCPE1234F", InterestPayerType.POST_OFFICE, false));
+        assertEquals("1020", Rpu140FormatSpec.sectionCode(
+                "194A", "ABCPE1234F", InterestPayerType.BANK, true));
+        assertEquals("1022", Rpu140FormatSpec.sectionCode("194A"));
     }
 
     @Test

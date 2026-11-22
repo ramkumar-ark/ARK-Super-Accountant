@@ -19,8 +19,9 @@ class TdsSeedDataTest {
     private TdsSectionConfigRepository repo;
 
     @Test
-    void seedsAllNineSections() {
-        for (String code : new String[]{"194A", "194C", "194H", "194I_A", "194I_B", "194J_A", "194J_B", "194M", "194Q"}) {
+    void seedsAllTenSections() {
+        for (String code : new String[]{
+                "194A", "194C", "194H", "194I_A", "194I_B", "194J_A", "194J_B", "194J_C", "194M", "194Q"}) {
             assertTrue(repo.existsBySectionCode(code), "missing seed: " + code);
         }
     }
@@ -56,6 +57,15 @@ class TdsSeedDataTest {
         assertEquals(0, new BigDecimal("50000.00").compareTo(jA.getNewActThresholdAnnual()));
         TdsSectionConfig jB = repo.findBySectionCode("194J_B").orElseThrow();
         assertEquals(0, new BigDecimal("50000.00").compareTo(jB.getNewActThresholdAnnual()));
+    }
+
+    @Test
+    void s194jDirectorRemunerationHasNoThreshold() {
+        TdsSectionConfig c = repo.findBySectionCode("194J_C").orElseThrow();
+        assertEquals(0, BigDecimal.ZERO.compareTo(c.getThresholdAnnual()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(c.getNewActThresholdAnnual()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(c.getRateCompany()));
+        assertEquals(0, new BigDecimal("10.00").compareTo(c.getRateNonCompany()));
     }
 
     @Test

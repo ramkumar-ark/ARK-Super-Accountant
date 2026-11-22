@@ -23,6 +23,7 @@ describe('tdsSectionDisplay', () => {
     expect(tdsSectionDisplay('194I_A', '2026-06-15')).toBe('393(1) [Table: Sl. No. 2(ii).D(a)]')
     expect(tdsSectionDisplay('194I_B', '2026-06-15')).toBe('393(1) [Table: Sl. No. 2(ii).D(b)]')
     expect(tdsSectionDisplay('194I', '2026-06-15')).toBe('393(1) [Table: Sl. No. 2(ii).D(b)]')
+    expect(tdsSectionDisplay('194J_C', '2026-06-15')).toBe('393(1) [Table: Sl. No. 6(iii).D(b)]')
   })
 
   it('shows the plain internal code in old-Act periods', () => {

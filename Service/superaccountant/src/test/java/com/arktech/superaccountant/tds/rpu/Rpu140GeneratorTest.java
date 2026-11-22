@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.rpu;
 
+import com.arktech.superaccountant.masters.models.InterestPayerType;
 import com.arktech.superaccountant.tds.models.TdsChallan;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
@@ -84,6 +85,25 @@ class Rpu140GeneratorTest {
         assertEquals("1023", dd1[14]);   // entry PAN 4th char P => individual/HUF payee
         String[] dd2 = lines[4].split("\\^", -1);
         assertEquals("1027", dd2[14]);
+    }
+
+    @Test
+    void bankPayerGets1021For194aAndOtherPayerGets1022() {
+        String bankFile = gen.generate(header(), List.of(challan(CID)),
+                List.of(entry(CID, "194A")), InterestPayerType.BANK);
+        assertEquals("1021", bankFile.split("\r\n")[3].split("\\^", -1)[14]);
+
+        String otherFile = gen.generate(header(), List.of(challan(CID)),
+                List.of(entry(CID, "194A")), InterestPayerType.OTHER);
+        assertEquals("1022", otherFile.split("\r\n")[3].split("\\^", -1)[14]);
+    }
+
+    @Test
+    void directorRemunerationGetsForm140Code1028() {
+        String file = gen.generate(header(), List.of(challan(CID)),
+                List.of(entry(CID, "194J_C")));
+
+        assertEquals("1028", file.split("\r\n")[3].split("\\^", -1)[14]);
     }
 
     @Test
