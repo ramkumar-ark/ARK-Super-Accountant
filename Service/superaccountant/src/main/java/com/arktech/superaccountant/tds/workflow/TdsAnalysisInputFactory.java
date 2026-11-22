@@ -114,16 +114,17 @@ public class TdsAnalysisInputFactory {
                 : panOverrideRepository.findByOrganizationIdOrderByPartyLedgerNameAsc(
                         ctx.organizationId())) {
             UploadLedgerSnapshot s = snapshotsByName.get(o.getPartyKey());
+            String overridePan = o.getPan() == null || o.getPan().isBlank() ? null : o.getPan();
             if (s == null) {
                 UploadLedgerSnapshot synthetic = new UploadLedgerSnapshot();
                 synthetic.setLedgerName(o.getPartyLedgerName());
-                synthetic.setPan(o.getPan());
+                synthetic.setPan(overridePan);
                 snapshotsByName.put(o.getPartyKey(), synthetic);
             } else if (s.getPan() == null || s.getPan().isBlank()
                     || !s.getPan().matches(TdsEngine.PAN_PATTERN)) {
                 UploadLedgerSnapshot copy = new UploadLedgerSnapshot();
                 org.springframework.beans.BeanUtils.copyProperties(s, copy);
-                copy.setPan(o.getPan());
+                copy.setPan(overridePan);
                 snapshotsByName.put(o.getPartyKey(), copy);
             }
         }

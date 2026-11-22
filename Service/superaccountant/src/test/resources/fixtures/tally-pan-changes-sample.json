@@ -1,0 +1,28 @@
+{
+  "static_variables" : [
+    {
+      "name" : "svMstImportFormat",
+      "value" : "jsonex"
+    }
+  ],
+  "tallymessage" : [
+    {
+      "metadata" : {
+        "type" : "Ledger",
+        "action" : "Alter",
+        "name" : "ANANDHA & \"CO\" TRADERS"
+      },
+      "name" : "ANANDHA & \"CO\" TRADERS",
+      "incometaxnumber" : "ABCDE1234F"
+    },
+    {
+      "metadata" : {
+        "type" : "Ledger",
+        "action" : "Alter",
+        "name" : "SAMPLE SUPPLIER STEELS"
+      },
+      "name" : "SAMPLE SUPPLIER STEELS",
+      "incometaxnumber" : "PQRST5678U"
+    }
+  ]
+}

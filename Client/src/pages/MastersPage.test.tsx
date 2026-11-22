@@ -192,7 +192,7 @@ describe('MastersPage — findings resolution (two-stage)', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Override Value/ }))
 
-    const input = screen.getByLabelText(/PAN \(required\)/i)
+    const input = screen.getByLabelText(/^PAN$/)
     expect(input).toHaveAttribute('placeholder', 'AAAAA9999A')
     expect(screen.getByRole('button', { name: /Submit for Review/ })).toBeDisabled()
 
@@ -206,6 +206,54 @@ describe('MastersPage — findings resolution (two-stage)', () => {
         value: 'AAPPK2262D',
       })
     })
+  })
+
+  it('PAN_FORMAT can be resolved explicitly as No PAN / not available', async () => {
+    current = {
+      ...current,
+      ruleCode: 'PAN_FORMAT',
+      mismatchType: null,
+      actualValue: 'AAPPK2262D1',
+    }
+    await openFindingsTab()
+
+    await userEvent.click(await screen.findByRole('button', { name: /Override Value/ }))
+
+    const input = screen.getByLabelText(/^PAN$/)
+    const submit = screen.getByRole('button', { name: /Submit for Review/ })
+    expect(submit).toBeDisabled()
+
+    await userEvent.click(screen.getByLabelText('No PAN / not available'))
+    expect(input).toBeDisabled()
+    expect(submit).toBeEnabled()
+
+    await userEvent.click(submit)
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(ACTION_URL, {
+        action: 'ACKNOWLEDGE',
+        note: '',
+        noPan: true,
+      })
+    })
+    const panPosts = mockPost.mock.calls.filter((c) => c[0] === ACTION_URL)
+    expect(panPosts).toHaveLength(1)
+    expect(panPosts[0][1]).not.toHaveProperty('value')
+  })
+
+  it('shows No PAN / not available for a pending PAN_FORMAT finding with an empty proposal', async () => {
+    current = {
+      ...current,
+      ruleCode: 'PAN_FORMAT',
+      mismatchType: null,
+      resolveStatus: 'ACKNOWLEDGED',
+      proposedValue: '',
+      submittedBy: 'op1',
+    }
+    await openFindingsTab()
+
+    expect(screen.getByText('Pending accountant review')).toBeInTheDocument()
+    expect(screen.getByText('No PAN / not available')).toBeInTheDocument()
   })
 
   it('TDS section override is a dropdown with readable labels, posting the stored code', async () => {
@@ -499,7 +547,9 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
   })
 })
 
-describe('MastersPage — findings paging and select-all-matching', () => {
+// These cases render 257 findings per page and pass standalone, but exceed the 5s
+// default under full-suite parallelism; give only this suite more headroom.
+describe('MastersPage — findings paging and select-all-matching', { timeout: 15000 }, () => {
   const BULK_URL = '/v1/uploads/job-1/findings/bulk-action'
   const TOTAL = 250
   const mk = (i: number, over: Record<string, unknown> = {}) => ({
@@ -1004,5 +1054,32 @@ describe('MastersPage — reason visibility and Tally group filter', () => {
       expect(counted).toBeTruthy()
       expect(counted?.[0]).toBe(BULK_URL)
     })
+  })
+})
+
+describe('MastersPage — tally changes tab', () => {
+  it('is reachable from the tab bar and mounts the Tally changes panel', async () => {
+    setRole('ROLE_ACCOUNTANT')
+    mockGet.mockImplementation((url: string) => {
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [], totalElements: 0 } })
+      }
+      if (url.includes('size=1&showResolved=false')) {
+        return Promise.resolve({ data: { totalElements: 0 } })
+      }
+      if (url === '/v1/tally-changes') {
+        return Promise.resolve({ data: { mastersUpload: null, items: [] } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MastersPage />
+      </QueryClientProvider>,
+    )
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Tally changes' }))
+    expect(await screen.findByText(/Back up the company/)).toBeInTheDocument()
+    expect(mockGet).toHaveBeenCalledWith('/v1/tally-changes', { params: undefined })
   })
 })

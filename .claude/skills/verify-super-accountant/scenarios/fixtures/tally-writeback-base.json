@@ -1,0 +1,26 @@
+{
+  "tallymessage": [
+    {
+      "group": {
+        "name": "Sundry Creditors",
+        "parent": ""
+      }
+    },
+    {
+      "ledger": {
+        "name": "Verify Tally Vendor",
+        "guid": "verify-tally-guid-1",
+        "parent": "Sundry Creditors",
+        "incometaxnumber": "BADPAN1"
+      }
+    },
+    {
+      "ledger": {
+        "name": "Verify Tally NoPan",
+        "guid": "verify-tally-guid-2",
+        "parent": "Sundry Creditors",
+        "incometaxnumber": "BADPAN2"
+      }
+    }
+  ]
+}

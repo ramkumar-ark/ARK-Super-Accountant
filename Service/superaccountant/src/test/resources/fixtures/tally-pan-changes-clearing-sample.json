@@ -1,0 +1,19 @@
+{
+  "static_variables" : [
+    {
+      "name" : "svMstImportFormat",
+      "value" : "jsonex"
+    }
+  ],
+  "tallymessage" : [
+    {
+      "metadata" : {
+        "type" : "Ledger",
+        "action" : "Alter",
+        "name" : "SAMPLE SUPPLIER STEELS"
+      },
+      "name" : "SAMPLE SUPPLIER STEELS",
+      "incometaxnumber" : ""
+    }
+  ]
+}

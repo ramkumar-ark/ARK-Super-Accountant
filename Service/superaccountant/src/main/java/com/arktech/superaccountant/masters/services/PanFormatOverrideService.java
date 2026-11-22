@@ -19,13 +19,21 @@ public class PanFormatOverrideService {
     }
 
     public void validate(String value) {
-        if (!PanFormat.isValid(PanFormat.normalize(value))) {
+        String normalized = PanFormat.normalize(value);
+        if (normalized == null || normalized.isBlank() || !PanFormat.isValid(normalized)) {
+            throw new FindingReviewException(400, PanFormat.ERROR_MESSAGE);
+        }
+    }
+
+    public void validateAllowingNoPan(String value) {
+        String normalized = PanFormat.normalize(value);
+        if (normalized != null && !normalized.isBlank() && !PanFormat.isValid(normalized)) {
             throw new FindingReviewException(400, PanFormat.ERROR_MESSAGE);
         }
     }
 
     public void apply(ValidationFinding finding, UUID organizationId, String approver) {
-        validate(finding.getProposedValue());
+        validateAllowingNoPan(finding.getProposedValue());
         panOverrides.savePan(organizationId, finding.getLedgerName(),
                 PanFormat.normalize(finding.getProposedValue()), finding.getId(), approver, Instant.now());
     }

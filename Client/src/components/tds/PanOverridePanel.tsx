@@ -36,7 +36,7 @@ export function PanOverridePanel() {
             {overrides.map((o) => (
               <tr key={o.partyLedgerName} className="border-b border-[var(--color-border)]">
                 <td className="py-2 pr-2">{o.partyLedgerName}</td>
-                <td className="py-2 pr-2">{o.pan}</td>
+                <td className="py-2 pr-2">{o.pan?.trim() ? o.pan : 'No PAN'}</td>
                 <td className="py-2 pr-2">{o.approvedBy ?? '—'}</td>
                 <td className="py-2">{o.approvedAt ? o.approvedAt.slice(0, 10) : '—'}</td>
               </tr>

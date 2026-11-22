@@ -13,4 +13,6 @@ public class FindingActionRequest {
     private String note; // optional reason; required for REJECT
 
     private String value; // proposed master value; required for typed-input rule codes on ACKNOWLEDGE
+
+    private Boolean noPan; // deliberate "No PAN / not available"; PAN_FORMAT ACKNOWLEDGE only
 }

@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -54,6 +55,8 @@ public class MastersTamperComparisonService {
     private UploadLedgerSnapshotRepository uploadLedgerSnapshotRepository;
     @Autowired
     private WorkflowRepository workflowRepository;
+    @Autowired
+    private AppliedChangeLookup appliedChangeLookup;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void compare(UUID mastersJobId) {
@@ -66,6 +69,11 @@ public class MastersTamperComparisonService {
             return;
         }
         UUID orgId = job.getOrganizationId();
+
+        Map<String, AppliedPanChange> appliedPan = appliedChangeLookup
+                .appliedPanChanges(mastersJobId).stream()
+                .collect(Collectors.toMap(AppliedPanChange::ledgerKey, Function.identity(),
+                        (a, b) -> a));
 
         Map<String, UploadLedgerSnapshot> latest = uploadLedgerSnapshotRepository
                 .findByUploadJobId(mastersJobId).stream()
@@ -101,6 +109,11 @@ public class MastersTamperComparisonService {
             String ledgerKey = rows.get(0).getLedgerKey();
             String attribute = rows.get(0).getAttribute();
             UploadLedgerSnapshot snap = latest.get(ledgerKey);
+            if ("pan".equals(attribute)) {
+                // An APPLIED PAN change is expected: rewrite the frozen row so it
+                // no longer differs. Any other drift still follows the normal path.
+                suppressAppliedPanChanges(rows, snap, appliedPan);
+            }
             TamperChangeKind kind = snap == null ? TamperChangeKind.MASTER_REMOVED
                     : TamperChangeKind.MASTER_MODIFIED;
             List<FrozenMasterAttribute> differing = rows.stream()
@@ -171,6 +184,44 @@ public class MastersTamperComparisonService {
         }
 
         resolveRestored(orgId, changesByKey);
+    }
+
+    /**
+     * Suppresses the MASTER_MODIFIED noise a masters upload would otherwise raise
+     * for a PAN it just applied through a write-back item. Only a row whose current
+     * value still equals the item baseline and whose snapshot value equals the
+     * item's new value is rewritten; anything else is real tamper.
+     */
+    private void suppressAppliedPanChanges(List<FrozenMasterAttribute> rows,
+                                           UploadLedgerSnapshot snap,
+                                           Map<String, AppliedPanChange> appliedPan) {
+        if (snap == null) {
+            return;
+        }
+        for (FrozenMasterAttribute row : rows) {
+            AppliedPanChange change = appliedPan.get(row.getLedgerKey());
+            if (change == null) {
+                continue;
+            }
+            String snapshotValue = MasterAttributes.valuesFor(row.getWorkflowType(), snap).get("pan");
+            if (canonicalEquals(row.getValue(), change.baselineValue())
+                    && canonicalEquals(snapshotValue, change.newValue())) {
+                row.setValue(snapshotValue);
+                frozenMasterAttributeRepository.save(row);
+            }
+        }
+    }
+
+    /** Empty-PAN rule: trim, and blank (including "") is the same as null. */
+    private static boolean canonicalEquals(String a, String b) {
+        return Objects.equals(canonical(a), canonical(b));
+    }
+
+    private static String canonical(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private void upsertFinding(TamperChange change, String findingKey, String ledgerKey,

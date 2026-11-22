@@ -176,6 +176,7 @@ public class UploadController {
             snap.setUploadJobId(jobId);
             snap.setOrganizationId(orgId);
             snap.setLedgerName(pl.getName());
+            snap.setTallyGuid(pl.getGuid());
             snap.setParentGroup(pl.getParentGroup());
             snap.setCategory(pl.getCategory());
             snap.setGstApplicable(pl.getGstApplicable());
@@ -614,11 +615,31 @@ public class UploadController {
         }
         ValidationFinding finding = findingOpt.get();
 
-        // 3. Role + state machine enforcement lives in the shared review service
+        // 3. "No PAN / not available" is stored as an empty correction; only a PAN_FORMAT acknowledgement.
+        String action = request.getAction();
+        String value = request.getValue();
+        if (Boolean.TRUE.equals(request.getNoPan())) {
+            if (!PanFormat.RULE_CODE.equals(finding.getRuleCode()) || !"ACKNOWLEDGE".equals(action)) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "No PAN / not available can only be chosen when acknowledging a PAN format finding."));
+            }
+            if (value != null && !value.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "Choose either a PAN or No PAN / not available, not both."));
+            }
+            value = "";
+        } else if (PanFormat.RULE_CODE.equals(finding.getRuleCode()) && "ACKNOWLEDGE".equals(action)
+                && (value == null || value.isBlank())) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "Enter a valid PAN or choose No PAN / not available."));
+        }
+
+        // 4. Role + state machine enforcement lives in the shared review service
         try {
-            findingReviewService.act(finding, request.getAction(), request.getValue(), request.getNote(),
+            findingReviewService.act(finding, action, value, request.getNote(),
                     ReviewActor.of(principal), Instant.now(),
-                    new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, null, null));
+                    new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, null, null,
+                            Boolean.TRUE.equals(request.getNoPan())));
         } catch (FindingReviewException e) {
             return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
         }

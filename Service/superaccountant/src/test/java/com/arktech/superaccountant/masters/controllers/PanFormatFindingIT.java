@@ -8,6 +8,11 @@ import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
 import com.arktech.superaccountant.masters.models.*;
 import com.arktech.superaccountant.masters.repository.*;
+import com.arktech.superaccountant.support.TestDatabase;
+import com.arktech.superaccountant.tallywriteback.models.TallyChangeItem;
+import com.arktech.superaccountant.tallywriteback.models.TallyChangeStatus;
+import com.arktech.superaccountant.tallywriteback.models.TallyField;
+import com.arktech.superaccountant.tallywriteback.repository.TallyChangeItemRepository;
 import com.arktech.superaccountant.tds.models.TdsPanOverride;
 import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,9 +27,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -37,23 +39,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * PAN_FORMAT end to end: an over-length Tally PAN on a masters upload is flagged HIGH/OPEN and
- * persisted. Needs Docker.
+ * persisted. Uses Testcontainers unless {@code SA_TEST_DB_URL} points at a scratch database.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
 @Transactional
 @TestPropertySource(properties = "JWT_SECRET=test-jwt-secret-must-be-at-least-32-characters-long")
 class PanFormatFindingIT {
 
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
-
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        TestDatabase.register(registry);
     }
 
     private static final String MASTERS_JSON = """
@@ -72,6 +68,7 @@ class PanFormatFindingIT {
     @Autowired ValidationFindingRepository findingRepository;
     @Autowired ValidationRuleConfigRepository ruleConfigRepository;
     @Autowired TdsPanOverrideRepository panOverrideRepository;
+    @Autowired TallyChangeItemRepository changeItemRepository;
 
     private UUID orgId;
     private String accountantJwt;
@@ -156,6 +153,92 @@ class PanFormatFindingIT {
 
         UUID secondJob = upload(token, MASTERS_JSON, "masters-pan-2.json");
         assertThat(panFindingIds(token, secondJob)).isEmpty();
+    }
+
+    @Test
+    void noPanApprovalStoresEmptyOverrideAndPendingClearingChange() throws Exception {
+        String token = accountantJwt;
+        UUID jobId = upload(token, MASTERS_JSON, "masters-pan.json");
+        UUID findingId = panFindingId(token, jobId);
+
+        mockMvc.perform(post("/api/v1/uploads/{jobId}/findings/{findingId}/action", jobId, findingId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"action":"ACKNOWLEDGE","note":"","noPan":true}
+                                """))
+                .andExpect(status().isOk());
+
+        ValidationFinding approved = findingRepository.findById(findingId).orElseThrow();
+        assertThat(approved.getResolveStatus()).isEqualTo(ResolveStatus.APPROVED);
+
+        TdsPanOverride override = panOverrideRepository
+                .findByOrganizationIdAndPartyKey(orgId, "anandha timber depot").orElseThrow();
+        assertThat(override.getPan()).isEmpty();
+
+        List<TallyChangeItem> pending = changeItemRepository
+                .findByOrganizationIdOrderByCreatedAtDesc(orgId).stream()
+                .filter(i -> i.getField() == TallyField.PAN && i.getStatus() == TallyChangeStatus.PENDING)
+                .toList();
+        assertThat(pending).hasSize(1);
+        assertThat(pending.get(0).getNewValue()).isEmpty();
+        assertThat(pending.get(0).getBaselineValue()).isEqualTo("AAPPK2262D1");
+    }
+
+    @Test
+    void blankPanWithoutNoPanIsRejected() throws Exception {
+        String token = accountantJwt;
+        UUID jobId = upload(token, MASTERS_JSON, "masters-pan.json");
+        UUID findingId = panFindingId(token, jobId);
+
+        mockMvc.perform(post("/api/v1/uploads/{jobId}/findings/{findingId}/action", jobId, findingId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"action":"ACKNOWLEDGE","note":"","value":"   "}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        assertThat(findingRepository.findById(findingId).orElseThrow().getResolveStatus())
+                .isEqualTo(ResolveStatus.OPEN);
+        assertThat(panOverrideRepository
+                .findByOrganizationIdAndPartyKey(orgId, "anandha timber depot")).isEmpty();
+    }
+
+    @Test
+    void noPanWithValueIsRejected() throws Exception {
+        String token = accountantJwt;
+        UUID jobId = upload(token, MASTERS_JSON, "masters-pan.json");
+        UUID findingId = panFindingId(token, jobId);
+
+        mockMvc.perform(post("/api/v1/uploads/{jobId}/findings/{findingId}/action", jobId, findingId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"action":"ACKNOWLEDGE","noPan":true,"value":"AAPPK2262D"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        assertThat(findingRepository.findById(findingId).orElseThrow().getResolveStatus())
+                .isEqualTo(ResolveStatus.OPEN);
+    }
+
+    @Test
+    void invalidNonBlankPanIsStillRejected() throws Exception {
+        String token = accountantJwt;
+        UUID jobId = upload(token, MASTERS_JSON, "masters-pan.json");
+        UUID findingId = panFindingId(token, jobId);
+
+        mockMvc.perform(post("/api/v1/uploads/{jobId}/findings/{findingId}/action", jobId, findingId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"action":"ACKNOWLEDGE","value":"NOTAPAN"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        assertThat(findingRepository.findById(findingId).orElseThrow().getResolveStatus())
+                .isEqualTo(ResolveStatus.OPEN);
     }
 
     private UUID panFindingId(String token, UUID jobId) throws Exception {
