@@ -1,4 +1,4 @@
-# ADR 0006: Tally write-back records field-level change items and exports a JSON import file
+# ADR 0007: Tally write-back records field-level change items and exports a JSON import file
 
 Status: proposed
 
