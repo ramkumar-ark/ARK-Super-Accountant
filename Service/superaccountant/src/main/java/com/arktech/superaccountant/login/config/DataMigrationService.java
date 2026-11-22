@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.login.config;
 
+import com.arktech.superaccountant.login.models.DataMigrationMarker;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,9 @@ import java.util.List;
  */
 @Service
 public class DataMigrationService {
+
+    /** Marker name for the one-time legacy deductor type P (Individual/HUF) → Q correction. */
+    public static final String MARKER_DEDUCTOR_TYPE_P_TO_Q = "deductor_type_p_to_q";
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -93,6 +97,38 @@ public class DataMigrationService {
                             "DELETE FROM TdsSectionConfig c WHERE c.sectionCode = '194I'")
                     .executeUpdate();
         }
+        return updated;
+    }
+
+    /**
+     * Corrects the legacy deductor type mislabel: the old UI offered "Individual / HUF"
+     * under code P, but per e-TDS file format Annexure 4 P is Association of Person (AOP)
+     * and Individual/HUF is Q. Every stored P at the time of the fix came from that option,
+     * so both organizations and 26Q detail snapshots are rewritten P → Q once.
+     *
+     * <p>Guarded by a {@code DataMigrationMarker} row rather than a "no P left" check:
+     * after this fix P is a legitimately selectable AOP value, so an unconditional
+     * re-run on every boot would silently convert users' AOP selections back to Q.
+     *
+     * @return total number of rows updated (0 if already migrated or nothing to convert)
+     */
+    @Transactional
+    public int migrateIndividualHufDeductorTypePToQ() {
+        Long applied = (Long) entityManager.createQuery(
+                        "SELECT COUNT(m) FROM DataMigrationMarker m WHERE m.name = :name", Long.class)
+                .setParameter("name", MARKER_DEDUCTOR_TYPE_P_TO_Q)
+                .getSingleResult();
+        if (applied > 0) return 0;
+
+        int updated = entityManager.createQuery(
+                        "UPDATE Organization o SET o.deductorType = 'Q' WHERE o.deductorType = 'P'")
+                .executeUpdate();
+        updated += entityManager.createQuery(
+                        "UPDATE Tds26qDetail d SET d.deductorType = 'Q' WHERE d.deductorType = 'P'")
+                .executeUpdate();
+        // Persist even when 0 rows matched (fresh database): the marker must exist
+        // before any future P can be a genuine AOP selection.
+        entityManager.persist(new DataMigrationMarker(MARKER_DEDUCTOR_TYPE_P_TO_Q));
         return updated;
     }
 

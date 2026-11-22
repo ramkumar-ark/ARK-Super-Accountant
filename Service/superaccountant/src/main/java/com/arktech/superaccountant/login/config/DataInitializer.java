@@ -68,6 +68,10 @@ public class DataInitializer implements CommandLineRunner {
         if (dataMigrationService.widenUploadLedgerSnapshotPan()) {
             System.out.println("Widened upload_ledger_snapshots.pan to varchar(255).");
         }
+        int migratedDeductorType = dataMigrationService.migrateIndividualHufDeductorTypePToQ();
+        if (migratedDeductorType > 0) {
+            System.out.println("Migrated " + migratedDeductorType + " stored deductor type P (Individual/HUF) values to Q.");
+        }
     }
 
     private record NewActValues(String rateCompany, String rateNonCompany, String perTxn, String annual) {}

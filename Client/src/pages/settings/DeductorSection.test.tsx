@@ -69,6 +69,27 @@ describe('DeductorSection', () => {
     expect(screen.getByLabelText('Responsible person name')).toHaveValue('Ravi Kumar')
   })
 
+  it('offers every non-government Annexure 4 deductor type with official labels', async () => {
+    renderSection('ROLE_ACCOUNTANT')
+
+    const select = await screen.findByLabelText('Deductor type')
+    const options = Array.from(select.querySelectorAll('option')).map((o) => [
+      o.value,
+      o.textContent,
+    ])
+    expect(options).toEqual([
+      ['', 'Select'],
+      ['K', 'Company'],
+      ['M', 'Branch / Division of Company'],
+      ['P', 'Association of Person (AOP)'],
+      ['T', 'Association of Person (Trust)'],
+      ['J', 'Artificial Juridical Person'],
+      ['B', 'Body of Individuals'],
+      ['Q', 'Individual/HUF'],
+      ['F', 'Firm'],
+    ])
+  })
+
   it('rejects a malformed TAN client-side without calling the API', async () => {
     renderSection('ROLE_ACCOUNTANT')
     const user = userEvent.setup()
@@ -101,6 +122,26 @@ describe('DeductorSection', () => {
         responsiblePersonName: 'Ravi Kumar',
         responsiblePersonDesignation: 'Proprietor',
         interestPayerType: 'BANK',
+      })
+    })
+  })
+
+  it('saves Individual/HUF as code Q', async () => {
+    mockPatch.mockResolvedValue({ data: {} })
+    renderSection('ROLE_ACCOUNTANT')
+    const user = userEvent.setup()
+
+    await screen.findByLabelText('TAN')
+    await user.selectOptions(screen.getByLabelText('Deductor type'), 'Q')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith('/organizations/org-abc/deductor', {
+        tan: 'AAAA12345A',
+        deductorType: 'Q',
+        responsiblePersonName: 'Ravi Kumar',
+        responsiblePersonDesignation: 'Proprietor',
+        interestPayerType: 'OTHER',
       })
     })
   })

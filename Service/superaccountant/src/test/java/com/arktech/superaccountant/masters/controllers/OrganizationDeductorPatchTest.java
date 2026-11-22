@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.masters.controllers;
 
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.models.DeductorType;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.UserOrganization;
 import com.arktech.superaccountant.masters.payload.request.UpdateDeductorDetailsRequest;
@@ -9,6 +10,9 @@ import com.arktech.superaccountant.masters.repository.UserOrganizationRepository
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -115,5 +119,54 @@ class OrganizationDeductorPatchTest {
         assertThat(res.getStatusCode().value()).isEqualTo(400);
         assertThat(((Map<?, ?>) res.getBody()).get("error")).isNotNull();
         verify(organizationRepository, never()).save(any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(DeductorType.class)
+    void patchDeductor_acceptsEveryOfferedCode(DeductorType type) {
+        Organization org = new Organization("Acme");
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+
+        UpdateDeductorDetailsRequest req = new UpdateDeductorDetailsRequest();
+        req.setDeductorType(type.name());
+
+        ResponseEntity<?> res = patch(user("acct", "ROLE_ACCOUNTANT"), req);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        ArgumentCaptor<Organization> captor = ArgumentCaptor.forClass(Organization.class);
+        verify(organizationRepository).save(captor.capture());
+        assertThat(captor.getValue().getDeductorType()).isEqualTo(type.name());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"A", "S", "X", "PK", "individual/huf"})
+    void patchDeductor_rejectsUnknownOrGovernmentCode_400(String code) {
+        Organization org = new Organization("Acme");
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+
+        UpdateDeductorDetailsRequest req = new UpdateDeductorDetailsRequest();
+        req.setDeductorType(code);
+
+        ResponseEntity<?> res = patch(user("acct", "ROLE_ACCOUNTANT"), req);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(400);
+        assertThat(((Map<?, ?>) res.getBody()).get("error")).isNotNull();
+        verify(organizationRepository, never()).save(any());
+    }
+
+    @Test
+    void patchDeductor_emptyStringClearsSelection() {
+        Organization org = new Organization("Acme");
+        org.setDeductorType("K");
+        when(organizationRepository.findById(orgId)).thenReturn(Optional.of(org));
+
+        UpdateDeductorDetailsRequest req = new UpdateDeductorDetailsRequest();
+        req.setDeductorType("");
+
+        ResponseEntity<?> res = patch(user("acct", "ROLE_ACCOUNTANT"), req);
+
+        assertThat(res.getStatusCode().value()).isEqualTo(200);
+        verify(organizationRepository).save(org);
+        assertThat(org.getDeductorType()).isEmpty();
     }
 }

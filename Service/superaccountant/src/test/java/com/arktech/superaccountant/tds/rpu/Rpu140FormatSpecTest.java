@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.tds.rpu;
 
 import com.arktech.superaccountant.masters.models.InterestPayerType;
+import com.arktech.superaccountant.masters.models.DeductorType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -57,6 +58,22 @@ class Rpu140FormatSpecTest {
         assertEquals("1000.00", f.get(46));
         assertEquals("Y", f.get(51));
         assertEquals("91", f.get(28));       // dedutor country code
+    }
+
+    @Test
+    void batchHeader_emitsEveryOfferedDeductorTypeCodeAtField32() {
+        for (DeductorType type : DeductorType.values()) {
+            RpuHeader h = new RpuHeader(
+                    "MUMA12345A", "AAACA1234A", "Test Deductor Pvt Ltd",
+                    "12 MG Road Bangalore Karnataka", type.name(),
+                    "Ramesh Kumar", "Director", null,
+                    2026, 2, LocalDate.of(2026, 10, 5), true);
+            List<String> f = Rpu140FormatSpec.batchHeader(
+                    new RpuFormatSpec.BhData(2, 1, 1, h, new BigDecimal("1000.00")));
+
+            assertEquals(type.name(), f.get(31),
+                    "batch header field 32 must carry deductor type " + type.name());
+        }
     }
 
     @Test

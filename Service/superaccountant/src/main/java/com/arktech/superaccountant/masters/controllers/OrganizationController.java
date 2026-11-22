@@ -7,6 +7,7 @@ import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.masters.models.InterestPayerType;
+import com.arktech.superaccountant.masters.models.DeductorType;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.OrganizationInvite;
 import com.arktech.superaccountant.masters.models.UserOrganization;
@@ -134,7 +135,13 @@ public class OrganizationController {
             }
             org.setTan(tan);
         }
-        if (request.getDeductorType() != null) org.setDeductorType(request.getDeductorType());
+        if (request.getDeductorType() != null) {
+            String deductorType = request.getDeductorType();
+            if (!deductorType.isEmpty() && !DeductorType.isValid(deductorType)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid deductor type."));
+            }
+            org.setDeductorType(deductorType);
+        }
         if (request.getResponsiblePersonName() != null) org.setResponsiblePersonName(request.getResponsiblePersonName());
         if (request.getResponsiblePersonDesignation() != null) org.setResponsiblePersonDesignation(request.getResponsiblePersonDesignation());
         if (request.getInterestPayerType() != null) {

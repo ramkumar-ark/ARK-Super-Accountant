@@ -30,7 +30,7 @@ tds_setup() {
   ensure_masters
   as_owner
   req "deductor-details" PATCH "/api/organizations/$(state_get org_id)/deductor" \
-    "{\"tan\":\"$TDS_TAN\",\"deductorType\":\"1\",\"responsiblePersonName\":\"Verify Person\",\"responsiblePersonDesignation\":\"Director\"}"
+    "{\"tan\":\"$TDS_TAN\",\"deductorType\":\"Q\",\"responsiblePersonName\":\"Verify Person\",\"responsiblePersonDesignation\":\"Director\"}"
   expect_status 200 || vsa_fail "deductor details failed: $RESP"
   as_accountant
   req "masters-latest" GET "/api/v1/uploads?page=0&size=1"

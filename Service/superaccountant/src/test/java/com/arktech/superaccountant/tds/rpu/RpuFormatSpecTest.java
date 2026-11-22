@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.rpu;
 
+import com.arktech.superaccountant.masters.models.DeductorType;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +62,20 @@ class RpuFormatSpecTest {
         assertEquals("N", f.get(50));
         assertEquals("N", f.get(51));
         assertEquals("1000.00", f.get(46));
+    }
+
+    @Test
+    void batchHeader_emitsEveryOfferedDeductorTypeCodeAtField32() {
+        for (DeductorType type : DeductorType.values()) {
+            RpuHeader h = new RpuHeader(
+                    "CHEA12345B", "AAACA1234A", "Acme Traders", "12 MG Road, Mumbai", type.name(),
+                    "Ravi Kumar", "Director", null, 2026, 1, LocalDate.of(2026, 7, 20), false);
+            List<String> f = RpuFormatSpec.batchHeader(
+                    new RpuFormatSpec.BhData(2, 1, 1, h, bd("1000.00")));
+
+            assertEquals(type.name(), f.get(31),
+                    "batch header field 32 must carry deductor type " + type.name());
+        }
     }
 
     @Test
