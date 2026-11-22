@@ -301,8 +301,9 @@ type and (later) the deductee's senior-citizen status.
 | `194Q` | `1031` | 8(ii) | purchase of goods |
 
 **194A threshold derivation:** the company's `interestPayerType` (`OTHER`, `BANK`,
-`CO_OPERATIVE_BANK`, `POST_OFFICE`) decides the annual threshold — Rs 50,000 for the three
-bank-like types, Rs 10,000 for `OTHER` — and the Form 140 code (1021 vs 1022). The
+`CO_OPERATIVE_BANK`, `POST_OFFICE`) decides the annual threshold — for the three bank-like
+types Rs 40,000 before 1 April 2025 (1961 Act), Rs 50,000 from 1 April 2025 (Finance Act 2025)
+and under Act 2025 s.393 from 1 April 2026; Rs 10,000 for `OTHER` in every period — and the Form 140 code (1021 vs 1022). The
 Rs 1,00,000 senior-citizen threshold (code 1020) needs the deductee's date of birth; the
 rule helper already exposes that seam, but no DOB is stored yet.
 

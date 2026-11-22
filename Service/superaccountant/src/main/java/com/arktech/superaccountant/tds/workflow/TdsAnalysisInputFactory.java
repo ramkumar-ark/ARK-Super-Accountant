@@ -65,24 +65,25 @@ public class TdsAnalysisInputFactory {
         if (!configsBySection.containsKey("194I") && configsBySection.containsKey("194I_B")) {
             configsBySection.put("194I", configsBySection.get("194I_B"));
         }
-        applyInterestPayerThreshold(org, configsBySection);
+        applyInterestPayerThreshold(org, configsBySection, ctx.periodStart());
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
     }
 
     /**
      * Section 194A has one stored threshold but two company-level thresholds: a bank, co-operative
-     * bank or post office gets Rs 50,000, every other payer Rs 10,000. Apply the company's choice
+     * bank or post office gets Rs 50,000 (Rs 40,000 before 1 April 2025), every other payer Rs 10,000. Apply the company's choice
      * to a detached copy so the stored config (and the managed entity) is never mutated.
      */
     private void applyInterestPayerThreshold(Organization org,
-                                             Map<String, TdsSectionConfig> configsBySection) {
+                                             Map<String, TdsSectionConfig> configsBySection,
+                                             LocalDate periodStart) {
         TdsSectionConfig config = configsBySection.get("194A");
         if (config == null) {
             return;
         }
-        BigDecimal threshold = Tds194aRules.thresholdAnnual(
-                InterestPayerType.from(org.getInterestPayerType()));
+        BigDecimal threshold = Tds194aRules.thresholdAnnualForPeriod(
+                InterestPayerType.from(org.getInterestPayerType()), periodStart);
         if (config.getThresholdAnnual() != null
                 && config.getThresholdAnnual().compareTo(threshold) == 0) {
             return;

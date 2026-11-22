@@ -2,6 +2,7 @@ package com.arktech.superaccountant.tds;
 
 import com.arktech.superaccountant.masters.models.InterestPayerType;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,5 +44,13 @@ class Tds194aRulesTest {
         assertEquals(InterestPayerType.OTHER, InterestPayerType.from("UNKNOWN"));
         assertTrue(InterestPayerType.BANK.isBankOrPostOffice());
         assertTrue(!InterestPayerType.OTHER.isBankOrPostOffice());
+    }
+
+    @Test
+    void thresholdByPeriod() {
+        assertEquals("40000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.BANK, LocalDate.of(2024, 6, 1)).toPlainString());
+        assertEquals("50000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.BANK, LocalDate.of(2025, 6, 1)).toPlainString());
+        assertEquals("40000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.CO_OPERATIVE_BANK, LocalDate.of(2024, 6, 1)).toPlainString());
+        assertEquals("10000.00", Tds194aRules.thresholdAnnualForPeriod(InterestPayerType.OTHER, LocalDate.of(2024, 6, 1)).toPlainString());
     }
 }

@@ -3,9 +3,13 @@ package com.arktech.superaccountant.tds.models;
 import com.arktech.superaccountant.masters.models.InterestPayerType;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Section 194A interest rules that depend on the payer and the deductee.
+ *
+ * <p>1961 Act s.194A: bank/co-op/post office Rs 40,000 before 1 April 2025 and Rs 50,000 from
+ * 1 April 2025 (Finance Act 2025); every other payer Rs 10,000.
  *
  * <p>The Act 2025 s.393(1) Table 5(ii) gives banks, co-operative banks and post offices a
  * Rs 50,000 annual threshold (Rs 1,00,000 for senior citizens); Table 5(iii) gives every
@@ -16,6 +20,8 @@ import java.math.BigDecimal;
 public final class Tds194aRules {
 
     public static final BigDecimal BANK_THRESHOLD_ANNUAL = new BigDecimal("50000.00");
+    public static final BigDecimal OLD_ACT_BANK_THRESHOLD_ANNUAL = new BigDecimal("40000.00");
+    public static final LocalDate FINANCE_ACT_2025_EFFECTIVE = LocalDate.of(2025, 4, 1);
     public static final BigDecimal OTHER_THRESHOLD_ANNUAL = new BigDecimal("10000.00");
     public static final BigDecimal SENIOR_CITIZEN_THRESHOLD_ANNUAL = new BigDecimal("100000.00");
 
@@ -24,6 +30,14 @@ public final class Tds194aRules {
 
     public static BigDecimal thresholdAnnual(InterestPayerType payerType) {
         return isBankLike(payerType) ? BANK_THRESHOLD_ANNUAL : OTHER_THRESHOLD_ANNUAL;
+    }
+
+    public static BigDecimal thresholdAnnualForPeriod(InterestPayerType payerType, LocalDate periodStart) {
+        if (isBankLike(payerType) && periodStart != null
+                && periodStart.isBefore(FINANCE_ACT_2025_EFFECTIVE)) {
+            return OLD_ACT_BANK_THRESHOLD_ANNUAL;
+        }
+        return thresholdAnnual(payerType);
     }
 
     /** Senior-citizen seam; callers pass null/false until deductee dates of birth are stored. */
