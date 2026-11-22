@@ -141,6 +141,7 @@ describe('DeductorSection', () => {
         deductorType: 'Q',
         responsiblePersonName: 'Ravi Kumar',
         responsiblePersonDesignation: 'Proprietor',
+        interestPayerType: 'OTHER',
       })
     })
   })
