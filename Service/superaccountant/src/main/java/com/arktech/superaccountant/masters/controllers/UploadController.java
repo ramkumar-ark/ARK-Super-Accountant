@@ -638,7 +638,8 @@ public class UploadController {
         try {
             findingReviewService.act(finding, action, value, request.getNote(),
                     ReviewActor.of(principal), Instant.now(),
-                    new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, null, null));
+                    new MastersFindingApplier(findingOverrideMasterService, panFormatOverrideService, orgId, null, null,
+                            Boolean.TRUE.equals(request.getNoPan())));
         } catch (FindingReviewException e) {
             return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));
         }

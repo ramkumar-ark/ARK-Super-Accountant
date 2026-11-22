@@ -19,12 +19,15 @@ class PanFormatOverrideServiceTest {
     private final PanFormatOverrideService service = new PanFormatOverrideService(gateway);
 
     @Test
-    void rejectsOverLengthButAcceptsBlankNoPan() {
+    void rejectsOverLengthBlankAndNullUnlessNoPanIsExplicit() {
         assertThatThrownBy(() -> service.validate("AAPPK2262D1"))
                 .isInstanceOf(FindingReviewException.class)
                 .hasMessageContaining("format AAAAA9999A");
-        // Blank is the stored "No PAN / not available" correction; the controller gates entry.
-        service.validate("   ");
+        assertThatThrownBy(() -> service.validate("   "))
+                .isInstanceOf(FindingReviewException.class);
+        assertThatThrownBy(() -> service.validate(null))
+                .isInstanceOf(FindingReviewException.class);
+        service.validateAllowingNoPan("   ");
     }
 
     @Test

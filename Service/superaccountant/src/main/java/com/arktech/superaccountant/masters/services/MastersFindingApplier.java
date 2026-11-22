@@ -20,10 +20,18 @@ public class MastersFindingApplier implements FindingApplier<ValidationFinding> 
     private final UUID orgId;
     private final Map<String, PreconfiguredMaster> masters;
     private final Map<String, UploadLedgerSnapshot> snapshots;
+    private final boolean noPan;
 
     public MastersFindingApplier(FindingOverrideMasterService svc, PanFormatOverrideService panFormat, UUID orgId,
                                  Map<String, PreconfiguredMaster> masters,
                                  Map<String, UploadLedgerSnapshot> snapshots) {
+        this(svc, panFormat, orgId, masters, snapshots, false);
+    }
+
+    public MastersFindingApplier(FindingOverrideMasterService svc, PanFormatOverrideService panFormat, UUID orgId,
+                                 Map<String, PreconfiguredMaster> masters,
+                                 Map<String, UploadLedgerSnapshot> snapshots, boolean noPan) {
+        this.noPan = noPan;
         this.svc = svc;
         this.panFormat = panFormat;
         this.orgId = orgId;
@@ -34,7 +42,11 @@ public class MastersFindingApplier implements FindingApplier<ValidationFinding> 
     @Override
     public void validate(ValidationFinding finding, String proposedValue, String note) {
         if (PanFormat.RULE_CODE.equals(finding.getRuleCode())) {
-            panFormat.validate(proposedValue);
+            if (noPan) {
+                panFormat.validateAllowingNoPan(proposedValue);
+            } else {
+                panFormat.validate(proposedValue);
+            }
             return;
         }
         svc.validate(finding, proposedValue, orgId, snapshots);
