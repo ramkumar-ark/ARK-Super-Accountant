@@ -61,7 +61,7 @@ export function DebtorTanPanel() {
     setSaving(true)
     setError('')
     try {
-      await upsertDebtorTan(item.ledgerKey, {
+      await upsertDebtorTan({
         ledgerName: item.ledgerName,
         tan,
         tallyGuid: item.tallyGuid,
@@ -79,7 +79,7 @@ export function DebtorTanPanel() {
     setSaving(true)
     setError('')
     try {
-      await deleteDebtorTan(item.ledgerKey)
+      await deleteDebtorTan(item.ledgerName)
       await queryClient.invalidateQueries({ queryKey: ['debtor-tans'] })
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not clear this TAN. Try again.'))

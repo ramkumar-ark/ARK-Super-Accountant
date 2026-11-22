@@ -86,7 +86,7 @@ class DebtorTanControllerIT {
 
     @Test
     void listsEveryDebtorWithConfiguredOrMissingTan() throws Exception {
-        mockMvc.perform(put("/api/v1/tds/debtor-tans/{ledgerKey}", "acme corp")
+        mockMvc.perform(put("/api/v1/tds/debtor-tans")
                         .with(user(accountant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ledgerName\":\"Acme Corp\",\"tan\":\"blra12345c\",\"tallyGuid\":\"guid-1\"}"))
@@ -107,7 +107,7 @@ class DebtorTanControllerIT {
 
     @Test
     void rejectsInvalidTanWithTheSharedMessage() throws Exception {
-        mockMvc.perform(put("/api/v1/tds/debtor-tans/{ledgerKey}", "acme corp")
+        mockMvc.perform(put("/api/v1/tds/debtor-tans")
                         .with(user(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ledgerName\":\"Acme Corp\",\"tan\":\"not-a-tan\"}"))
@@ -118,7 +118,7 @@ class DebtorTanControllerIT {
 
     @Test
     void operatorCannotEditButCanView() throws Exception {
-        mockMvc.perform(put("/api/v1/tds/debtor-tans/{ledgerKey}", "acme corp")
+        mockMvc.perform(put("/api/v1/tds/debtor-tans")
                         .with(user(operator))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ledgerName\":\"Acme Corp\",\"tan\":\"BLRA12345C\"}"))
@@ -130,13 +130,13 @@ class DebtorTanControllerIT {
 
     @Test
     void deleteClearsTanButKeepsTheDebtorInTheLatestUpload() throws Exception {
-        mockMvc.perform(put("/api/v1/tds/debtor-tans/{ledgerKey}", "acme corp")
+        mockMvc.perform(put("/api/v1/tds/debtor-tans")
                         .with(user(accountant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ledgerName\":\"Acme Corp\",\"tan\":\"BLRA12345C\"}"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(delete("/api/v1/tds/debtor-tans/{ledgerKey}", "acme corp")
+        mockMvc.perform(delete("/api/v1/tds/debtor-tans").param("ledgerName", "Acme Corp")
                         .with(user(accountant)))
                 .andExpect(status().isNoContent());
 
@@ -149,7 +149,7 @@ class DebtorTanControllerIT {
 
     @Test
     void storedRecordOutsideTheLatestUploadIsListedAsStoredOnly() throws Exception {
-        mockMvc.perform(put("/api/v1/tds/debtor-tans/{ledgerKey}", "old customer")
+        mockMvc.perform(put("/api/v1/tds/debtor-tans")
                         .with(user(accountant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ledgerName\":\"Old Customer\",\"tan\":\"BLRA12345C\"}"))

@@ -79,10 +79,12 @@ public class DebtorTanStore implements DebtorTanGateway {
             String guid = ledger.getGuid();
             Optional<DebtorTan> byGuid = guid == null
                     ? Optional.empty()
-                    : repository.findByOrganizationIdAndTallyGuid(organizationId, guid);
+                    : repository.findByOrganizationIdAndTallyGuid(organizationId, guid).stream().findFirst();
             if (byGuid.isPresent()) {
                 DebtorTan record = byGuid.get();
-                if (!ledgerKey.equals(record.getLedgerKey()) || !ledgerName.equals(record.getLedgerName())) {
+                boolean keyTaken = !ledgerKey.equals(record.getLedgerKey())
+                        && repository.findByOrganizationIdAndLedgerKey(organizationId, ledgerKey).isPresent();
+                if (!keyTaken && (!ledgerKey.equals(record.getLedgerKey()) || !ledgerName.equals(record.getLedgerName()))) {
                     record.setLedgerName(ledgerName);
                     record.setLedgerKey(ledgerKey);
                     repository.save(record);

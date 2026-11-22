@@ -85,7 +85,7 @@ describe('DebtorTanPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
-      expect(mockPut).toHaveBeenCalledWith('/v1/tds/debtor-tans/beta%20traders', {
+      expect(mockPut).toHaveBeenCalledWith('/v1/tds/debtor-tans', {
         ledgerName: 'Beta Traders',
         tan: 'BLRA12345C',
         tallyGuid: 'guid-2',
@@ -117,7 +117,9 @@ describe('DebtorTanPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'Clear' }))
 
     await waitFor(() =>
-      expect(mockDelete).toHaveBeenCalledWith('/v1/tds/debtor-tans/acme%20corp'),
+      expect(mockDelete).toHaveBeenCalledWith('/v1/tds/debtor-tans', {
+        params: { ledgerName: 'Acme Corp' },
+      }),
     )
   })
 

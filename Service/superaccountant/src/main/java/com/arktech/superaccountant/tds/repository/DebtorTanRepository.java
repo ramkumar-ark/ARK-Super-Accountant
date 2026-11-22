@@ -12,7 +12,7 @@ import java.util.UUID;
 public interface DebtorTanRepository extends JpaRepository<DebtorTan, UUID> {
     Optional<DebtorTan> findByOrganizationIdAndLedgerKey(UUID organizationId, String ledgerKey);
 
-    Optional<DebtorTan> findByOrganizationIdAndTallyGuid(UUID organizationId, String tallyGuid);
+    List<DebtorTan> findByOrganizationIdAndTallyGuid(UUID organizationId, String tallyGuid);
 
     List<DebtorTan> findByOrganizationIdOrderByLedgerNameAsc(UUID organizationId);
 }

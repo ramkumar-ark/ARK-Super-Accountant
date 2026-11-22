@@ -66,10 +66,9 @@ public class DebtorTanController {
                 .toList();
     }
 
-    @PutMapping("/{ledgerKey}")
+    @PutMapping
     @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
-    public ResponseEntity<?> upsert(@PathVariable String ledgerKey,
-                                    @Valid @RequestBody DebtorTanRequest request,
+    public ResponseEntity<?> upsert(@Valid @RequestBody DebtorTanRequest request,
                                     @AuthenticationPrincipal UserDetailsImpl principal) {
         UUID orgId = principal.getOrganizationId();
         try {
@@ -85,11 +84,11 @@ public class DebtorTanController {
         return ResponseEntity.ok(toResponse(snapshot, record, snapshot != null));
     }
 
-    @DeleteMapping("/{ledgerKey}")
+    @DeleteMapping
     @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
-    public ResponseEntity<Void> delete(@PathVariable String ledgerKey,
+    public ResponseEntity<Void> delete(@RequestParam String ledgerName,
                                        @AuthenticationPrincipal UserDetailsImpl principal) {
-        debtorTanGateway.deleteTan(principal.getOrganizationId(), ledgerKey);
+        debtorTanGateway.deleteTan(principal.getOrganizationId(), ledgerName);
         return ResponseEntity.noContent().build();
     }
 

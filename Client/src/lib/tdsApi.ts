@@ -183,16 +183,15 @@ export function listDebtorTans(): Promise<DebtorTanItem[]> {
 }
 
 export function upsertDebtorTan(
-  ledgerKey: string,
   request: DebtorTanRequest,
 ): Promise<DebtorTanItem> {
   return api
-    .put(`/v1/tds/debtor-tans/${encodeURIComponent(ledgerKey)}`, request)
+    .put('/v1/tds/debtor-tans', request)
     .then((res) => res.data)
 }
 
-export function deleteDebtorTan(ledgerKey: string): Promise<void> {
+export function deleteDebtorTan(ledgerName: string): Promise<void> {
   return api
-    .delete(`/v1/tds/debtor-tans/${encodeURIComponent(ledgerKey)}`)
+    .delete('/v1/tds/debtor-tans', { params: { ledgerName } })
     .then(() => undefined)
 }
