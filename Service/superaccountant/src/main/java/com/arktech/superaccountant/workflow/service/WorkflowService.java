@@ -101,6 +101,7 @@ public class WorkflowService {
 
     public List<Workflow> list(UUID orgId, String type, Integer fy, String stage) {
         List<Workflow> all = workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId);
+        java.util.Map<Integer, Boolean> applicableByFy = new java.util.HashMap<>();
         return all.stream()
                 .filter(w -> type == null || w.getType().name().equals(type))
                 .filter(w -> fy == null || w.getFinancialYear() == fy)
@@ -108,8 +109,9 @@ public class WorkflowService {
                 .filter(w -> !isTdsType(w.getType())
                         || w.getStage() == WorkflowStage.FINALIZED
                         || w.getStage() == WorkflowStage.FILED
-                        || tdsApplicabilityServiceProvider.getObject()
-                                .isApplicable(orgId, w.getFinancialYear()))
+                        || applicableByFy.computeIfAbsent(w.getFinancialYear(),
+                                year -> tdsApplicabilityServiceProvider.getObject()
+                                        .isApplicable(orgId, year)))
                 .toList();
     }
 

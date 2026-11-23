@@ -128,9 +128,11 @@ public class ResponsibilityStartSettingsService {
                     CompliancePeriods.periods(type, coverageService.coverageStart(organizationId),
                             row.getFirstPeriodStart(), org.getFinancialYearStart(),
                             d -> workflowService.profileInForce(organizationId, d));
+            java.util.Map<Integer, Boolean> applicableByFy = new java.util.HashMap<>();
             for (com.arktech.superaccountant.workflow.service.period.PeriodCalendar.PeriodRange range : periods) {
-                if (isTdsType(type) && !tdsApplicabilityServiceProvider.getObject()
-                        .isApplicable(organizationId, range.financialYear())) {
+                if (isTdsType(type) && !applicableByFy.computeIfAbsent(range.financialYear(),
+                        year -> tdsApplicabilityServiceProvider.getObject()
+                                .isApplicable(organizationId, year))) {
                     continue;
                 }
                 Workflow w = new Workflow();

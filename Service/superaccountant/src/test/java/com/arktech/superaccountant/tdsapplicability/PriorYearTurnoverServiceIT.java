@@ -119,10 +119,16 @@ class PriorYearTurnoverServiceIT {
 
     private void voucher(UUID orgId, UUID jobId, LocalDate date, boolean cancelled,
                          List<Object[]> entries) {
+        voucher(orgId, jobId, null, date, cancelled, entries);
+    }
+
+    private void voucher(UUID orgId, UUID jobId, String guid, LocalDate date, boolean cancelled,
+                         List<Object[]> entries) {
         // entries: [ledgerName, amount] — negative amount = credit (Tally convention)
         ParsedVoucher v = new ParsedVoucher();
         v.setOrganizationId(orgId);
         v.setUploadJobId(jobId);
+        v.setVoucherGuid(guid);
         v.setVoucherTypeName("Sales");
         v.setVoucherDate(date);
         v.setCancelled(cancelled);
@@ -164,6 +170,27 @@ class PriorYearTurnoverServiceIT {
         assertEquals(TurnoverEstimate.TurnoverSource.BOOKS, estimate.source());
         assertEquals(0, new BigDecimal("5900000").compareTo(estimate.amount()));
         assertTrue(estimate.complete());
+    }
+
+    @Test
+    void voucherReuploadedInOverlappingJobsCountsOnce() throws Exception {
+        Organization org = createOrg("Overlap Org " + UUID.randomUUID());
+        UUID mastersJob = latestMastersJob(org.getId());
+        ledger(org.getId(), mastersJob, "Sales Account", LedgerCategory.INCOME,
+                "sales accounts");
+        UUID first = dayBookJob(org.getId(), FY_START, LocalDate.of(2025, 12, 31));
+        Thread.sleep(20);
+        UUID second = dayBookJob(org.getId(), FY_START, FY_END);
+
+        for (UUID job : List.of(first, second)) {
+            voucher(org.getId(), job, "guid-1", LocalDate.of(2025, 5, 10), false, List.of(
+                    new Object[]{"Sales Account", new BigDecimal("-3000000")},
+                    new Object[]{"Local Customer", new BigDecimal("3000000")}));
+        }
+
+        TurnoverEstimate estimate = service.estimateFor(org.getId(), 2026);
+
+        assertEquals(0, new BigDecimal("3000000").compareTo(estimate.amount()));
     }
 
     @Test

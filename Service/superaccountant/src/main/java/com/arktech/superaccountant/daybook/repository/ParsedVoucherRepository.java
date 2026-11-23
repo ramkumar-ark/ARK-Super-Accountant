@@ -18,11 +18,18 @@ public interface ParsedVoucherRepository extends JpaRepository<ParsedVoucher, UU
      * Turnover on specific ledgers for one date window: sum of (credit - debit) across
      * entries of non-cancelled vouchers dated in the window. Entry amounts preserve the
      * Tally sign (negative = credit), so negating the sum yields credit minus debit.
-     * Callers must pass ledger names normalized via LedgerNames.normalize.
+     * A voucher re-uploaded in several overlapping jobs counts once: only its copy from the
+     * latest job (by GUID) is considered. Callers must pass ledger names normalized via
+     * LedgerNames.normalize.
      */
     @Query("SELECT COALESCE(SUM(-e.amount), 0) FROM ParsedVoucherEntry e JOIN e.parsedVoucher v " +
            "WHERE e.organizationId = :organizationId AND v.isCancelled = :cancelled " +
            "AND v.voucherDate BETWEEN :from AND :to " +
+           "AND (v.voucherGuid IS NULL OR NOT EXISTS (SELECT 1 FROM ParsedVoucher v2, " +
+           "DayBookUploadJob j1, DayBookUploadJob j2 " +
+           "WHERE v2.organizationId = v.organizationId AND v2.voucherGuid = v.voucherGuid " +
+           "AND j1.id = v.uploadJobId AND j2.id = v2.uploadJobId " +
+           "AND (j2.createdAt > j1.createdAt OR (j2.createdAt = j1.createdAt AND v2.id > v.id)))) " +
            "AND LOWER(TRIM(e.ledgerName)) IN :ledgerNames")
     java.math.BigDecimal sumCreditMinusDebitForLedgers(@Param("organizationId") UUID organizationId,
                                                        @Param("cancelled") boolean cancelled,
