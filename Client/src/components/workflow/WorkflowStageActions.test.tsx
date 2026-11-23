@@ -263,7 +263,6 @@ describe('WorkflowStageActions', () => {
 
   describe('discard workflow', () => {
     it('shows discard button for started workflow with no data to accountant and owner', async () => {
-      const user = userEvent.setup()
       for (const role of ['ROLE_ACCOUNTANT', 'ROLE_OWNER']) {
         const { unmount } = renderActions(makeDetail({ stage: 'STARTED' }), role)
         const discardBtn = screen.getByRole('button', { name: 'Discard workflow' })
