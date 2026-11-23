@@ -83,7 +83,9 @@ public class DebtorTanController {
             @AuthenticationPrincipal UserDetailsImpl principal) {
         UUID orgId = principal.getOrganizationId();
         Optional<DayBookUploadJob> dayBookJob = dayBookUploadJobRepository
-                .findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(orgId, UploadJobStatus.COMPLETED);
+                .findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(orgId,
+                        java.util.EnumSet.of(UploadJobStatus.COMPLETED,
+                                UploadJobStatus.COMPLETED_WITH_MISMATCHES));
         if (dayBookJob.isEmpty()) {
             return List.of();
         }

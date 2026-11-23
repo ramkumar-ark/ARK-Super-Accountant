@@ -57,7 +57,7 @@ describe('TdsApplicabilityBanner', () => {
 
     expect(await screen.findByText(/₹1,20,00,000/)).toBeInTheDocument()
     expect(screen.getByText(/FY 2025-26/)).toBeInTheDocument()
-    expect(screen.getByText(/1 April 2025/)).toBeInTheDocument()
+    expect(screen.getByText(/1 April 2026/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'TDS applies' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'It does not (give reason)' })).toBeInTheDocument()
   })

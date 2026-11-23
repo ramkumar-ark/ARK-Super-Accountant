@@ -269,6 +269,20 @@ class TdsApplicabilityControllerIT {
     }
 
     @Test
+    void putWithoutApplicableFieldIsBadRequest() throws Exception {
+        Organization org = orgWithPan("AAAPA1234A", "ta_missing_field_owner", ERole.ROLE_OWNER);
+        String jwt = user("ta_missing_field_owner", ERole.ROLE_OWNER, org.getId());
+
+        mockMvc.perform(put("/api/v1/organizations/" + org.getId() + "/tds-applicability/2025")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType("application/json")
+                        .content("{\"note\":\"no applicable field\"}"))
+                .andExpect(status().isBadRequest());
+
+        assertThat(tdsApplicabilityService.resolve(org.getId(), 2025).applicable()).isTrue();
+    }
+
+    @Test
     void operatorCannotChangeApplicability() throws Exception {
         Organization org = orgWithPan("AAAPA1234A", "ta_operator", ERole.ROLE_OPERATOR);
         String jwt = user("ta_operator", ERole.ROLE_OPERATOR, org.getId());

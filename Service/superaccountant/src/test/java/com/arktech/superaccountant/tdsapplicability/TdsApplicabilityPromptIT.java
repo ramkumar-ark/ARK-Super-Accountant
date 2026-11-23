@@ -145,6 +145,9 @@ class TdsApplicabilityPromptIT {
         assertThat(new BigDecimal(prompts.get(0).get("estimate").get("amount").asText()))
                 .isEqualByComparingTo(BOOKS_1_2_CR);
         assertThat(prompts.get(0).get("message").asText()).contains("₹1,20,00,000");
+        String message = prompts.get(0).get("message").asText();
+        assertThat(message).contains("1 April 2026");
+        assertThat(message).doesNotContain("1 April 2025");
     }
 
     @Test
@@ -241,6 +244,26 @@ class TdsApplicabilityPromptIT {
         assertThat(activeIds).doesNotContain(oldRow.getId());
         assertThat(activeIds).isNotEmpty();
         assertThat(workflowRepository.findById(oldRow.getId()).orElseThrow().isActive()).isFalse();
+    }
+
+    @Test
+    void confirmWithoutApplicableFieldIsBadRequest() throws Exception {
+        Organization org = qOrg("ta_confirm_missing_owner");
+        seedBooks(org.getId(), BOOKS_1_2_CR);
+        recordNotApplicable(org.getId(), 2026);
+        publishBaselineConfirmed(org.getId());
+        UUID promptId = promptIdFrom(openPrompts(org.getId(), "ta_confirm_missing_owner"));
+
+        mockMvc.perform(post("/api/v1/organizations/" + org.getId()
+                                + "/tds-applicability/prompts/" + promptId + "/confirm")
+                        .header("Authorization", "Bearer " + jwt(org.getId(), "ta_confirm_missing_owner"))
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        // The prompt stays open and no "not applicable" confirmation was recorded.
+        assertThat(openPrompts(org.getId(), "ta_confirm_missing_owner").size()).isEqualTo(1);
+        assertThat(tdsApplicabilityService.isApplicable(org.getId(), 2026)).isFalse();
     }
 
     @Test

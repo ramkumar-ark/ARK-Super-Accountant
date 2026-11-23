@@ -19,7 +19,7 @@ function booksExceedMessage(prompt: TdsApplicabilityPrompt): string {
   return (
     `Books show receipts of ${rupees} for ${fyLabel(measuredFy)}. ` +
     `If this exceeds ₹1 crore (business) or ₹50 lakh (profession), ` +
-    `TDS has applied since 1 April ${measuredFy} and deductions for this year are due.`
+    `TDS has applied since 1 April ${prompt.financialYear} and deductions for this year are due.`
   )
 }
 

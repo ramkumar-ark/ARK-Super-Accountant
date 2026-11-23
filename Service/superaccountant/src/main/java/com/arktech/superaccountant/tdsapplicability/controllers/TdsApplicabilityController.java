@@ -15,6 +15,8 @@ import com.arktech.superaccountant.tdsapplicability.models.TurnoverNature;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -94,7 +96,7 @@ public class TdsApplicabilityController {
 
     /** PUT body for answering or changing one year's applicability. */
     public record UpdateTdsApplicabilityRequest(
-            Boolean applicable,
+            @NotNull Boolean applicable,
             BigDecimal priorYearTurnover,
             TurnoverNature turnoverNature,
             String note) {
@@ -110,7 +112,7 @@ public class TdsApplicabilityController {
     @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @PutMapping("/{id}/tds-applicability/{fy}")
     public ResponseEntity<?> update(@PathVariable UUID id, @PathVariable int fy,
-                                    @RequestBody UpdateTdsApplicabilityRequest request,
+                                    @Valid @RequestBody UpdateTdsApplicabilityRequest request,
                                     @AuthenticationPrincipal UserDetailsImpl principal) {
 
         var membership = userOrganizationRepository.findByUserIdAndOrganizationId(principal.getId(), id);
@@ -130,7 +132,7 @@ public class TdsApplicabilityController {
                     "Entity type " + effective.code() + " always deducts TDS"));
         }
 
-        boolean applicable = Boolean.TRUE.equals(request.applicable());
+        boolean applicable = request.applicable();
         if (!applicable && workflowRepository
                 .existsByOrganizationIdAndTypeInAndFinancialYearAndStageInAndActiveTrue(id,
                         List.of(WorkflowType.TDS_PAYMENT, WorkflowType.TDS_26Q), fy,
@@ -164,7 +166,7 @@ public class TdsApplicabilityController {
 
     /** POST body for confirming a prompt: whether TDS applies, with the books figure when known. */
     public record ConfirmPromptRequest(
-            Boolean applicable,
+            @NotNull Boolean applicable,
             BigDecimal priorYearTurnover,
             TurnoverNature turnoverNature) {
     }
@@ -191,7 +193,7 @@ public class TdsApplicabilityController {
     @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @PostMapping("/{id}/tds-applicability/prompts/{promptId}/confirm")
     public ResponseEntity<?> confirmPrompt(@PathVariable UUID id, @PathVariable UUID promptId,
-                                           @RequestBody ConfirmPromptRequest request,
+                                           @Valid @RequestBody ConfirmPromptRequest request,
                                            @AuthenticationPrincipal UserDetailsImpl principal) {
         if (userOrganizationRepository
                 .findByUserIdAndOrganizationId(principal.getId(), id).isEmpty()) {
@@ -200,7 +202,7 @@ public class TdsApplicabilityController {
         if (organizationRepository.findById(id).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        boolean applicable = Boolean.TRUE.equals(request.applicable());
+        boolean applicable = request.applicable();
         try {
             return ResponseEntity.ok(promptService.confirm(id, promptId, applicable,
                     request.priorYearTurnover(), request.turnoverNature(), principal.getUsername()));

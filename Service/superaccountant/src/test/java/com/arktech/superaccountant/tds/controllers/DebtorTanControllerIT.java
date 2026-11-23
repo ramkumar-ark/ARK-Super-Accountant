@@ -220,6 +220,58 @@ class DebtorTanControllerIT {
                 .andExpect(jsonPath("$[0].deducted").value(1000.00));
     }
 
+    @Test
+    void missingUsesLatestJobEvenWhenItHasMismatchStatus() throws Exception {
+        Organization qOrg = new Organization("Q Mismatch " + UUID.randomUUID());
+        qOrg.setPan("AAAPA1234A");
+        qOrg.setBooksStartDate(LocalDate.of(2025, 4, 1));
+        UUID qOrgId = organizationRepository.save(qOrg).getId();
+        tdsApplicabilityService.recordYear(qOrgId, 2026, false,
+                TdsApplicabilityBasis.DECLARED, null, null, null, "it");
+        UserDetailsImpl qOwner = principal(ERole.ROLE_OWNER, qOrgId);
+
+        UploadJob mastersJob = new UploadJob();
+        mastersJob.setOrganizationId(qOrgId);
+        mastersJob.setFileName("masters.xml");
+        mastersJob.setStatus(UploadJobStatus.COMPLETED);
+        mastersJob.setUploadedBy("it");
+        UUID mastersJobId = uploadJobRepository.save(mastersJob).getId();
+        snapshotFor(mastersJobId, qOrgId, "TDS Receivable 194J", "guid-9", "Current Liabilities");
+        snapshotFor(mastersJobId, qOrgId, "Acme Corp", "guid-8", "Sundry Debtors|Current Assets");
+
+        DayBookUploadJob oldJob = new DayBookUploadJob();
+        oldJob.setOrganizationId(qOrgId);
+        oldJob.setFileName("daybook-old.xml");
+        oldJob.setStatus(UploadJobStatus.COMPLETED);
+        oldJob.setUploadedBy("it");
+        dayBookUploadJobRepository.save(oldJob);
+
+        DayBookUploadJob latestJob = new DayBookUploadJob();
+        latestJob.setOrganizationId(qOrgId);
+        latestJob.setFileName("daybook-latest.xml");
+        latestJob.setStatus(UploadJobStatus.COMPLETED_WITH_MISMATCHES);
+        latestJob.setUploadedBy("it");
+        UUID latestJobId = dayBookUploadJobRepository.save(latestJob).getId();
+
+        ParsedVoucher voucher = new ParsedVoucher();
+        voucher.setUploadJobId(latestJobId);
+        voucher.setOrganizationId(qOrgId);
+        voucher.setVoucherTypeName("Journal");
+        voucher.setVoucherNumber("J-9");
+        voucher.setVoucherDate(LocalDate.of(2026, 5, 10));
+        voucher.setCancelled(false);
+        ParsedVoucherEntry receivable = entry(voucher, qOrgId, "TDS Receivable 194J", "1000.00");
+        ParsedVoucherEntry debtor = entry(voucher, qOrgId, "Acme Corp", "-1000.00");
+        voucher.setEntries(List.of(receivable, debtor));
+        parsedVoucherRepository.save(voucher);
+
+        mockMvc.perform(get("/api/v1/tds/debtor-tans/missing").with(user(qOwner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].debtorLedgerName").value("Acme Corp"))
+                .andExpect(jsonPath("$[0].voucherNumber").value("J-9"));
+    }
+
     private ParsedVoucherEntry entry(ParsedVoucher voucher, UUID orgId, String ledgerName, String amount) {
         ParsedVoucherEntry e = new ParsedVoucherEntry();
         e.setParsedVoucher(voucher);

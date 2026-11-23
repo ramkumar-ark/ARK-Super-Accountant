@@ -240,7 +240,7 @@ public class TdsApplicabilityPromptService {
                 yield "Books show receipts of ₹" + rupees + " for "
                         + "FY " + (fy - 1) + "-" + String.format("%02d", fy % 100)
                         + ". If this exceeds ₹1 crore (business) or ₹50 lakh (profession), "
-                        + "TDS has applied since 1 April " + (fy - 1)
+                        + "TDS has applied since 1 April " + fy
                         + " and deductions for this year are due.";
             }
             case NEXT_YEAR_DECLARATION -> label
