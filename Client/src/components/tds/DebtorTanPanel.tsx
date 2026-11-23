@@ -91,6 +91,7 @@ export function DebtorTanPanel() {
         tallyGuid: item.tallyGuid,
       })
       await queryClient.invalidateQueries({ queryKey: ['debtor-tans'] })
+      await queryClient.invalidateQueries({ queryKey: ['debtor-tans-missing'] })
       cancelEdit()
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not save this TAN. Try again.'))
@@ -105,6 +106,7 @@ export function DebtorTanPanel() {
     try {
       await deleteDebtorTan(item.ledgerName)
       await queryClient.invalidateQueries({ queryKey: ['debtor-tans'] })
+      await queryClient.invalidateQueries({ queryKey: ['debtor-tans-missing'] })
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not clear this TAN. Try again.'))
     } finally {
