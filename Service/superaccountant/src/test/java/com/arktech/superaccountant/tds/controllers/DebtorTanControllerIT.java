@@ -5,7 +5,14 @@ import com.arktech.superaccountant.login.models.Role;
 import com.arktech.superaccountant.login.models.User;
 import com.arktech.superaccountant.login.repository.RoleRepository;
 import com.arktech.superaccountant.login.repository.UserRepository;
+import com.arktech.superaccountant.daybook.models.ParsedVoucher;
+import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.daybook.models.DayBookUploadJob;
+import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
+import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService;
+import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.UploadJob;
 import com.arktech.superaccountant.masters.models.UploadJobStatus;
@@ -26,6 +33,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -54,6 +62,9 @@ class DebtorTanControllerIT {
     @Autowired UserRepository userRepository;
     @Autowired UploadJobRepository uploadJobRepository;
     @Autowired UploadLedgerSnapshotRepository snapshotRepository;
+    @Autowired DayBookUploadJobRepository dayBookUploadJobRepository;
+    @Autowired ParsedVoucherRepository parsedVoucherRepository;
+    @Autowired TdsApplicabilityService tdsApplicabilityService;
 
     UUID orgId;
     UserDetailsImpl owner;
@@ -160,6 +171,83 @@ class DebtorTanControllerIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[2].ledgerName").value("Old Customer"))
                 .andExpect(jsonPath("$[2].inLatestUpload").value(false));
+    }
+
+    @Test
+    void missingEndpointWorksForNonDeductor() throws Exception {
+        Organization qOrg = new Organization("Q Non-Deductor " + UUID.randomUUID());
+        qOrg.setPan("AAAPA1234A");
+        qOrg.setBooksStartDate(LocalDate.of(2025, 4, 1));
+        UUID qOrgId = organizationRepository.save(qOrg).getId();
+        tdsApplicabilityService.recordYear(qOrgId, 2026, false,
+                TdsApplicabilityBasis.DECLARED, null, null, null, "it");
+        UserDetailsImpl qOwner = principal(ERole.ROLE_OWNER, qOrgId);
+
+        UploadJob mastersJob = new UploadJob();
+        mastersJob.setOrganizationId(qOrgId);
+        mastersJob.setFileName("masters.xml");
+        mastersJob.setStatus(UploadJobStatus.COMPLETED);
+        mastersJob.setUploadedBy("it");
+        UUID mastersJobId = uploadJobRepository.save(mastersJob).getId();
+        snapshotFor(mastersJobId, qOrgId, "TDS Receivable 194J", "guid-9", "Current Liabilities");
+        snapshotFor(mastersJobId, qOrgId, "Acme Corp", "guid-8", "Sundry Debtors|Current Assets");
+
+        DayBookUploadJob dayBookJob = new DayBookUploadJob();
+        dayBookJob.setOrganizationId(qOrgId);
+        dayBookJob.setFileName("daybook.xml");
+        dayBookJob.setStatus(UploadJobStatus.COMPLETED);
+        dayBookJob.setUploadedBy("it");
+        UUID dayBookJobId = dayBookUploadJobRepository.save(dayBookJob).getId();
+
+        ParsedVoucher voucher = new ParsedVoucher();
+        voucher.setUploadJobId(dayBookJobId);
+        voucher.setOrganizationId(qOrgId);
+        voucher.setVoucherTypeName("Journal");
+        voucher.setVoucherNumber("J-1");
+        voucher.setVoucherDate(LocalDate.of(2026, 5, 10));
+        voucher.setCancelled(false);
+        ParsedVoucherEntry receivable = entry(voucher, qOrgId, "TDS Receivable 194J", "1000.00");
+        ParsedVoucherEntry debtor = entry(voucher, qOrgId, "Acme Corp", "-1000.00");
+        voucher.setEntries(List.of(receivable, debtor));
+        parsedVoucherRepository.save(voucher);
+
+        mockMvc.perform(get("/api/v1/tds/debtor-tans/missing").with(user(qOwner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].debtorLedgerName").value("Acme Corp"))
+                .andExpect(jsonPath("$[0].receivableLedgerName").value("TDS Receivable 194J"))
+                .andExpect(jsonPath("$[0].voucherNumber").value("J-1"))
+                .andExpect(jsonPath("$[0].deducted").value(1000.00));
+    }
+
+    private ParsedVoucherEntry entry(ParsedVoucher voucher, UUID orgId, String ledgerName, String amount) {
+        ParsedVoucherEntry e = new ParsedVoucherEntry();
+        e.setParsedVoucher(voucher);
+        e.setOrganizationId(orgId);
+        e.setLedgerName(ledgerName);
+        e.setAmount(new java.math.BigDecimal(amount));
+        e.setDebit(new java.math.BigDecimal(amount).signum() > 0);
+        return e;
+    }
+
+    private void snapshotFor(UUID jobId, UUID ownerId, String name, String guid, String groupChain) {
+        UploadLedgerSnapshot snapshot = new UploadLedgerSnapshot();
+        snapshot.setUploadJobId(jobId);
+        snapshot.setOrganizationId(ownerId);
+        snapshot.setLedgerName(name);
+        snapshot.setTallyGuid(guid);
+        snapshot.setGroupChain(groupChain);
+        snapshotRepository.save(snapshot);
+    }
+
+    private UserDetailsImpl principal(ERole roleName, UUID organizationId) {
+        Role role = roleRepository.findByName(roleName).orElseThrow();
+        User user = new User();
+        user.setUsername(roleName.name().substring(5, 8) + "-" + UUID.randomUUID().toString().substring(0, 8));
+        user.setPassword("x");
+        user.setEmail(UUID.randomUUID() + "@example.com");
+        user.setRole(role);
+        return UserDetailsImpl.build(userRepository.save(user), organizationId);
     }
 
     private UserDetailsImpl principal(ERole roleName) {

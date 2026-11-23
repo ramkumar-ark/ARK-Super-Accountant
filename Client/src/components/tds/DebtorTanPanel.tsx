@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { apiErrorMessage } from '@/lib/apiError'
-import { deleteDebtorTan, listDebtorTans, upsertDebtorTan, type DebtorTanItem } from '@/lib/tdsApi'
+import { deleteDebtorTan, listDebtorTans, listMissingDebtorTans, upsertDebtorTan, type DebtorTanGap, type DebtorTanItem } from '@/lib/tdsApi'
 import { TAN_PATTERN } from '@/components/workflow/findingValueInputs'
 import { useAuthStore } from '@/store/authStore'
 
@@ -33,6 +33,30 @@ export function DebtorTanPanel() {
     queryKey: ['debtor-tans'],
     queryFn: listDebtorTans,
   })
+
+  const { data: gaps } = useQuery({
+    queryKey: ['debtor-tans-missing'],
+    queryFn: listMissingDebtorTans,
+  })
+
+  function gapItem(gap: DebtorTanGap): DebtorTanItem {
+    return {
+      ledgerName: gap.debtorLedgerName,
+      ledgerKey: gap.debtorLedgerName.trim().toLowerCase(),
+      tallyGuid: null,
+      tan: null,
+      sourceFindingId: null,
+      updatedBy: null,
+      updatedAt: null,
+      inLatestUpload: true,
+    }
+  }
+
+  function startGapEdit(gap: DebtorTanGap) {
+    setEditingKey(gap.debtorLedgerName.trim().toLowerCase())
+    setDraft('')
+    setError('')
+  }
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -125,6 +149,70 @@ export function DebtorTanPanel() {
             ? 'No debtors match this search.'
             : 'No debtor ledgers yet. Upload masters to list your customers.'}
         </p>
+      )}
+
+      {!isLoading && !isError && gaps && gaps.length > 0 && (
+        <div className="mb-6 rounded-[var(--radius-md)] border border-[var(--color-border)] p-3">
+          <h4 className="text-sm font-semibold text-[var(--color-text-primary)]">
+            TDS deducted with no TAN stored
+          </h4>
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            Day-book vouchers where a customer's TDS was debited to a TDS Receivable ledger, but no
+            TAN is stored for the customer.
+          </p>
+          <ul className="mt-2 divide-y divide-[var(--color-border)]">
+            {gaps.map((gap) => {
+              const editing = editingKey === gap.debtorLedgerName.trim().toLowerCase()
+              return (
+                <li key={gap.voucherId + '|' + gap.debtorLedgerName} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                  <span className="font-medium text-[var(--color-text-primary)]">
+                    {gap.debtorLedgerName}
+                  </span>
+                  <span className="text-[var(--color-text-secondary)]">
+                    ₹{gap.deducted.toFixed(2)} to {gap.receivableLedgerName}
+                    {gap.voucherNumber ? ` in voucher ${gap.voucherNumber}` : ''}
+                    {gap.voucherDate ? ` dated ${gap.voucherDate}` : ''}
+                  </span>
+                  {canEdit &&
+                    (editing ? (
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          aria-label={`TAN for ${gap.debtorLedgerName}`}
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          className="h-9 w-40 px-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] font-mono text-sm"
+                        />
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => save(gapItem(gap))}
+                          className="text-[var(--color-primary)] disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="text-[var(--color-text-secondary)]"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startGapEdit(gap)}
+                        className="text-[var(--color-primary)]"
+                      >
+                        Add TAN for {gap.debtorLedgerName}
+                      </button>
+                    ))}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       )}
 
       {filtered.length > 0 && (

@@ -182,6 +182,19 @@ export function listDebtorTans(): Promise<DebtorTanItem[]> {
   return api.get('/v1/tds/debtor-tans').then((res) => res.data)
 }
 
+export interface DebtorTanGap {
+  debtorLedgerName: string
+  receivableLedgerName: string
+  voucherId: string
+  voucherNumber: string | null
+  voucherDate: string | null
+  deducted: number
+}
+
+export function listMissingDebtorTans(): Promise<DebtorTanGap[]> {
+  return api.get('/v1/tds/debtor-tans/missing').then((res) => res.data)
+}
+
 export function upsertDebtorTan(
   request: DebtorTanRequest,
 ): Promise<DebtorTanItem> {
