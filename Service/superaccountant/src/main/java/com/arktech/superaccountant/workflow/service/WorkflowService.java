@@ -20,6 +20,17 @@ import com.arktech.superaccountant.workflow.seam.UploadFreshnessGate;
 import com.arktech.superaccountant.workflow.seam.WorkflowGate;
 import com.arktech.superaccountant.workflow.service.compliance.CompliancePeriods;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
+import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
+import com.arktech.superaccountant.filedreturns.FiledReturnSnapshotRepository;
+import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
+import com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository;
+import com.arktech.superaccountant.tds.repository.Tds26qDetailRepository;
+import com.arktech.superaccountant.tds.repository.TdsChallanRepository;
+import com.arktech.superaccountant.tds.repository.TdsDeducteeEntryRepository;
+import com.arktech.superaccountant.tds.repository.TdsPaymentDetailRepository;
+import com.arktech.superaccountant.workflow.analysis.WorkflowAnalysisRunRepository;
+import com.arktech.superaccountant.workflow.findings.WorkflowFindingSource;
+import com.arktech.superaccountant.workflow.repository.BaselineImportRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +79,39 @@ public class WorkflowService {
     @Autowired
     private ResponsibilityStartService responsibilityStartService;
 
+    @Autowired
+    private DayBookUploadJobRepository dayBookUploadJobRepository;
+
+    @Autowired
+    private FiledReturnSnapshotRepository filedReturnSnapshotRepository;
+
+    @Autowired
+    private BaselineImportRepository baselineImportRepository;
+
+    @Autowired
+    private WorkflowAnalysisRunRepository workflowAnalysisRunRepository;
+
+    @Autowired
+    private Gstr1FillInRepository gstr1FillInRepository;
+
+    @Autowired
+    private PreparedReturnRepository preparedReturnRepository;
+
+    @Autowired
+    private TdsPaymentDetailRepository tdsPaymentDetailRepository;
+
+    @Autowired
+    private Tds26qDetailRepository tds26qDetailRepository;
+
+    @Autowired
+    private TdsChallanRepository tdsChallanRepository;
+
+    @Autowired
+    private TdsDeducteeEntryRepository tdsDeducteeEntryRepository;
+
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<WorkflowFindingSource> findingSourcesProvider;
+
     // ObjectProvider keeps this lazy so TdsApplicabilityService (which depends on
     // ResponsibilityStartSettingsService → WorkflowService) can be wired without a cycle.
     @Autowired
@@ -100,7 +144,7 @@ public class WorkflowService {
     // ---------- lookups ----------
 
     public List<Workflow> list(UUID orgId, String type, Integer fy, String stage) {
-        List<Workflow> all = workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId);
+        List<Workflow> all = workflowRepository.findAllByOrganizationIdAndActiveTrueOrderByCreatedAtDesc(orgId);
         java.util.Map<Integer, Boolean> applicableByFy = new java.util.HashMap<>();
         return all.stream()
                 .filter(w -> type == null || w.getType().name().equals(type))
@@ -565,6 +609,82 @@ public class WorkflowService {
 
     public int blockingFindingCount(UUID workflowId) {
         return workflowGate.blockingFindingCount(workflowId);
+    }
+
+    @Transactional
+    public Workflow discard(UUID organizationId, UUID id, String actor) {
+        Workflow w = get(organizationId, id);
+
+        if (w.getStage() != WorkflowStage.STARTED) {
+            throw new WorkflowConflictException(
+                    "Only a workflow in STARTED stage can be discarded; current stage is " + w.getStage());
+        }
+
+        if (w.getUploadJobId() != null || dayBookUploadJobRepository.existsByCreatedForWorkflowId(w.getId())) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: day-book upload data is attached");
+        }
+
+        if (w.getMastersJobId() != null) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: masters data is attached");
+        }
+
+        if (!workflowAnalysisRunRepository.findByWorkflowIdOrderByStartedAtAsc(w.getId()).isEmpty()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: analysis runs are recorded");
+        }
+
+        if (baselineImportRepository.findByWorkflowId(w.getId()).isPresent()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: baseline import data is attached");
+        }
+
+        if (filedReturnSnapshotRepository.existsByBaselineWorkflowId(w.getId())) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: filed return snapshot is attached");
+        }
+
+        if (!gstr1FillInRepository.findByWorkflowId(w.getId()).isEmpty()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: return fill-in data is attached");
+        }
+
+        if (preparedReturnRepository.findByWorkflowIdAndReturnKind(w.getId(), "GSTR1").isPresent()
+                || preparedReturnRepository.findByWorkflowIdAndReturnKind(w.getId(), "IFF").isPresent()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: prepared return is attached");
+        }
+
+        if (tdsPaymentDetailRepository.findByWorkflowId(w.getId()).isPresent()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: TDS payment detail is attached");
+        }
+
+        if (tds26qDetailRepository.findByWorkflowId(w.getId()).isPresent()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: TDS 26Q detail is attached");
+        }
+
+        if (!tdsChallanRepository.findByPaymentWorkflowIdOrderByDepositDateAsc(w.getId()).isEmpty()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: TDS challan data is attached");
+        }
+
+        if (!tdsDeducteeEntryRepository.findByWorkflowId(w.getId()).isEmpty()) {
+            throw new WorkflowConflictException("Workflow cannot be discarded: TDS deductee entry is attached");
+        }
+
+        if (findingSourcesProvider != null) {
+            for (WorkflowFindingSource source : findingSourcesProvider) {
+                if (!source.list(w).isEmpty()) {
+                    throw new WorkflowConflictException("Workflow cannot be discarded: findings exist for this workflow");
+                }
+            }
+        }
+
+        List<WorkflowEvent> events = workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(w.getId());
+        boolean hasEventsBeyondStart = events.stream()
+                .anyMatch(e -> e.getKind() != WorkflowEventKind.STARTED);
+        if (hasEventsBeyondStart) {
+            throw new WorkflowConflictException(
+                    "Workflow cannot be discarded: stage history or events beyond start exist");
+        }
+
+        w.setActive(false);
+        workflowRepository.save(w);
+        workflowEventRepository.save(event(w.getId(), actor, WorkflowEventKind.DISCARDED, null, null));
+        return w;
     }
 
     // ---------- events ----------

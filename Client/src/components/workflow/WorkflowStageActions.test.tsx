@@ -5,6 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WorkflowStageActions } from './WorkflowStageActions'
 import type { WorkflowDetail, WorkflowStage, WorkflowType } from '@/lib/workflowApi'
 
+const mockNavigate = vi.fn()
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => mockNavigate,
+}))
+
 vi.mock('@/lib/api', () => ({
   api: {
     get: vi.fn(),
@@ -254,5 +259,68 @@ describe('WorkflowStageActions', () => {
         unmount()
       }
     }
+  })
+
+  describe('discard workflow', () => {
+    it('shows discard button for started workflow with no data to accountant and owner', async () => {
+      const user = userEvent.setup()
+      for (const role of ['ROLE_ACCOUNTANT', 'ROLE_OWNER']) {
+        const { unmount } = renderActions(makeDetail({ stage: 'STARTED' }), role)
+        const discardBtn = screen.getByRole('button', { name: 'Discard workflow' })
+        expect(discardBtn).toBeInTheDocument()
+        unmount()
+      }
+    })
+
+    it('hides discard button for operator and auditor', () => {
+      for (const role of ['ROLE_OPERATOR', 'ROLE_AUDITOR_CA']) {
+        const { unmount } = renderActions(makeDetail({ stage: 'STARTED' }), role)
+        expect(screen.queryByRole('button', { name: 'Discard workflow' })).toBeNull()
+        unmount()
+      }
+    })
+
+    it('hides discard button if uploadJobId is present or blocking findings exist', () => {
+      const withUpload = makeDetail({ stage: 'STARTED' })
+      withUpload.workflow.uploadJobId = 'job-1'
+      const { unmount: unmount1 } = renderActions(withUpload, 'ROLE_ACCOUNTANT')
+      expect(screen.queryByRole('button', { name: 'Discard workflow' })).toBeNull()
+      unmount1()
+
+      const withFindings = makeDetail({ stage: 'STARTED', blockingFindings: 1 })
+      const { unmount: unmount2 } = renderActions(withFindings, 'ROLE_ACCOUNTANT')
+      expect(screen.queryByRole('button', { name: 'Discard workflow' })).toBeNull()
+      unmount2()
+    })
+
+    it('opens confirm drawer and submits discard on confirm', async () => {
+      const user = userEvent.setup()
+      vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 'wf-1', active: false } })
+
+      const { invalidateSpy } = renderActions(makeDetail({ stage: 'STARTED' }), 'ROLE_ACCOUNTANT')
+
+      await user.click(screen.getByRole('button', { name: 'Discard workflow' }))
+      expect(screen.getByText(/Are you sure you want to discard this started workflow/)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Confirm discard' }))
+
+      await waitFor(() => {
+        expect(api.post).toHaveBeenCalledWith('/v1/workflows/wf-1/discard')
+        expect(mockNavigate).toHaveBeenCalledWith({ to: '/workflows' })
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['workflows'] })
+      })
+    })
+
+    it('cancels discard drawer on cancel button click', async () => {
+      const user = userEvent.setup()
+      renderActions(makeDetail({ stage: 'STARTED' }), 'ROLE_OWNER')
+
+      await user.click(screen.getByRole('button', { name: 'Discard workflow' }))
+      expect(screen.getByText(/Are you sure you want to discard this started workflow/)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(screen.queryByText(/Are you sure you want to discard this started workflow/)).toBeNull()
+      expect(api.post).not.toHaveBeenCalled()
+    })
   })
 })

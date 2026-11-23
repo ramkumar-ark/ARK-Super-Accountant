@@ -2,6 +2,10 @@ package com.arktech.superaccountant.workflow.service;
 
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.workflow.models.WorkflowEvent;
+import com.arktech.superaccountant.workflow.models.WorkflowEventKind;
+import com.arktech.superaccountant.workflow.findings.WorkflowFindingSource;
+import com.arktech.superaccountant.workflow.findings.WorkflowFindingView;
 import com.arktech.superaccountant.workflow.models.FilerFrequency;
 import com.arktech.superaccountant.workflow.models.FilerProfile;
 import com.arktech.superaccountant.workflow.models.FinancialYearClose;
@@ -46,6 +50,16 @@ class WorkflowServiceTest {
     private UploadFreshnessGate uploadFreshnessGate;
     private ResponsibilityStartService responsibilityStartService;
     private BaselineGate baselineGate;
+    private com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository dayBookUploadJobRepository;
+    private com.arktech.superaccountant.filedreturns.FiledReturnSnapshotRepository filedReturnSnapshotRepository;
+    private com.arktech.superaccountant.workflow.repository.BaselineImportRepository baselineImportRepository;
+    private com.arktech.superaccountant.workflow.analysis.WorkflowAnalysisRunRepository workflowAnalysisRunRepository;
+    private com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository gstr1FillInRepository;
+    private com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository preparedReturnRepository;
+    private com.arktech.superaccountant.tds.repository.TdsPaymentDetailRepository tdsPaymentDetailRepository;
+    private com.arktech.superaccountant.tds.repository.Tds26qDetailRepository tds26qDetailRepository;
+    private com.arktech.superaccountant.tds.repository.TdsChallanRepository tdsChallanRepository;
+    private com.arktech.superaccountant.tds.repository.TdsDeducteeEntryRepository tdsDeducteeEntryRepository;
     private WorkflowService service;
 
     private final UUID orgId = UUID.randomUUID();
@@ -63,6 +77,16 @@ class WorkflowServiceTest {
         uploadFreshnessGate = Mockito.mock(UploadFreshnessGate.class);
         responsibilityStartService = Mockito.mock(ResponsibilityStartService.class);
         baselineGate = Mockito.mock(BaselineGate.class);
+        dayBookUploadJobRepository = Mockito.mock(com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository.class);
+        filedReturnSnapshotRepository = Mockito.mock(com.arktech.superaccountant.filedreturns.FiledReturnSnapshotRepository.class);
+        baselineImportRepository = Mockito.mock(com.arktech.superaccountant.workflow.repository.BaselineImportRepository.class);
+        workflowAnalysisRunRepository = Mockito.mock(com.arktech.superaccountant.workflow.analysis.WorkflowAnalysisRunRepository.class);
+        gstr1FillInRepository = Mockito.mock(com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository.class);
+        preparedReturnRepository = Mockito.mock(com.arktech.superaccountant.gstr1.repository.PreparedReturnRepository.class);
+        tdsPaymentDetailRepository = Mockito.mock(com.arktech.superaccountant.tds.repository.TdsPaymentDetailRepository.class);
+        tds26qDetailRepository = Mockito.mock(com.arktech.superaccountant.tds.repository.Tds26qDetailRepository.class);
+        tdsChallanRepository = Mockito.mock(com.arktech.superaccountant.tds.repository.TdsChallanRepository.class);
+        tdsDeducteeEntryRepository = Mockito.mock(com.arktech.superaccountant.tds.repository.TdsDeducteeEntryRepository.class);
 
         CoverageService coverageService = new CoverageService();
         try {
@@ -87,6 +111,16 @@ class WorkflowServiceTest {
         inject("uploadFreshnessGate", uploadFreshnessGate);
         inject("responsibilityStartService", responsibilityStartService);
         inject("baselineGate", baselineGate);
+        inject("dayBookUploadJobRepository", dayBookUploadJobRepository);
+        inject("filedReturnSnapshotRepository", filedReturnSnapshotRepository);
+        inject("baselineImportRepository", baselineImportRepository);
+        inject("workflowAnalysisRunRepository", workflowAnalysisRunRepository);
+        inject("gstr1FillInRepository", gstr1FillInRepository);
+        inject("preparedReturnRepository", preparedReturnRepository);
+        inject("tdsPaymentDetailRepository", tdsPaymentDetailRepository);
+        inject("tds26qDetailRepository", tds26qDetailRepository);
+        inject("tdsChallanRepository", tdsChallanRepository);
+        inject("tdsDeducteeEntryRepository", tdsDeducteeEntryRepository);
         inject("finalizePreconditions", List.of());
         inject("snapshotService", snapshotService);
         inject("coverageService", coverageService);
@@ -306,6 +340,19 @@ class WorkflowServiceTest {
         w.setPeriodStart(LocalDate.of(2026, 4, 1));
         w.setPeriodEnd(LocalDate.of(2026, 4, 30));
         w.setStage(WorkflowStage.PREPARE);
+        w.setActive(true);
+        return w;
+    }
+
+    private Workflow startedWorkflow(WorkflowType type, String periodKey) {
+        Workflow w = new Workflow();
+        w.setId(UUID.randomUUID());
+        w.setOrganizationId(orgId);
+        w.setType(type);
+        w.setPeriodKey(periodKey);
+        w.setPeriodStart(LocalDate.of(2026, 4, 1));
+        w.setPeriodEnd(LocalDate.of(2026, 4, 30));
+        w.setStage(WorkflowStage.STARTED);
         w.setActive(true);
         return w;
     }
@@ -625,5 +672,107 @@ class WorkflowServiceTest {
 
         Workflow finalized = service.finalize(orgId, actor, w.getId());
         assertEquals(WorkflowStage.FINALIZED, finalized.getStage());
+    }
+
+    @Test
+    void discard_successAtStartedWithNoData() {
+        Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        WorkflowEvent startEvent = new WorkflowEvent();
+        startEvent.setKind(WorkflowEventKind.STARTED);
+        when(workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(w.getId()))
+                .thenReturn(List.of(startEvent));
+
+        Workflow discarded = service.discard(orgId, w.getId(), actor);
+        assertFalse(discarded.isActive());
+        org.mockito.Mockito.verify(workflowRepository).save(w);
+        org.mockito.Mockito.verify(workflowEventRepository).save(org.mockito.ArgumentMatchers.argThat(
+                e -> e.getKind() == WorkflowEventKind.DISCARDED && e.getWorkflowId().equals(w.getId())));
+    }
+
+    @Test
+    void discard_refusesWhenNotStarted() {
+        Workflow w = prepareWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.discard(orgId, w.getId(), actor));
+        assertTrue(e.getMessage().contains("Only a workflow in STARTED stage can be discarded"));
+    }
+
+    @Test
+    void discard_refusesWhenUploadJobAttached() {
+        Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        w.setUploadJobId(UUID.randomUUID());
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.discard(orgId, w.getId(), actor));
+        assertTrue(e.getMessage().contains("day-book upload data is attached"));
+    }
+
+    @Test
+    void discard_refusesWhenEventsBeyondStartExist() {
+        Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        WorkflowEvent startEvent = new WorkflowEvent();
+        startEvent.setKind(WorkflowEventKind.STARTED);
+        WorkflowEvent advancedEvent = new WorkflowEvent();
+        advancedEvent.setKind(WorkflowEventKind.ADVANCED);
+        when(workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(w.getId()))
+                .thenReturn(List.of(startEvent, advancedEvent));
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.discard(orgId, w.getId(), actor));
+        assertTrue(e.getMessage().contains("stage history or events beyond start exist"));
+    }
+
+    @Test
+    void discard_refusesWhenCreatedForWorkflowUploadJobExists() {
+        Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(dayBookUploadJobRepository.existsByCreatedForWorkflowId(w.getId())).thenReturn(true);
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.discard(orgId, w.getId(), actor));
+        assertTrue(e.getMessage().contains("day-book upload data is attached"));
+    }
+
+    @Test
+    void discard_refusesWhenFindingsExist() {
+        Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        WorkflowEvent startEvent = new WorkflowEvent();
+        startEvent.setKind(WorkflowEventKind.STARTED);
+        when(workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(w.getId()))
+                .thenReturn(List.of(startEvent));
+
+        WorkflowFindingSource findingSource = Mockito.mock(WorkflowFindingSource.class);
+        com.arktech.superaccountant.workflow.findings.WorkflowFindingView findingView =
+                Mockito.mock(com.arktech.superaccountant.workflow.findings.WorkflowFindingView.class);
+        when(findingSource.list(w)).thenReturn(List.of(findingView));
+
+        inject("findingSourcesProvider", new org.springframework.beans.factory.ObjectProvider<WorkflowFindingSource>() {
+            @Override
+            public WorkflowFindingSource getObject(Object... args) { return findingSource; }
+            @Override
+            public WorkflowFindingSource getIfAvailable() { return findingSource; }
+            @Override
+            public WorkflowFindingSource getIfUnique() { return findingSource; }
+            @Override
+            public WorkflowFindingSource getObject() { return findingSource; }
+            @Override
+            public java.util.Iterator<WorkflowFindingSource> iterator() {
+                return List.of(findingSource).iterator();
+            }
+            @Override
+            public java.util.stream.Stream<WorkflowFindingSource> stream() {
+                return java.util.stream.Stream.of(findingSource);
+            }
+        });
+
+        WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
+                () -> service.discard(orgId, w.getId(), actor));
+        assertTrue(e.getMessage().contains("findings exist for this workflow"));
     }
 }

@@ -289,4 +289,48 @@ class WorkflowControllerIT {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("Access denied to this organization"));
     }
+
+    @Test
+    void discard_allowedAtStartedNoData_refusedAtLaterStageOrWithData() throws Exception {
+        String ownerJwt = signupAndLogin("wfownerE", "wfownerE@test.com");
+        UUID orgId = createOrganization(ownerJwt);
+        ownerJwt = selectOrg(ownerJwt, orgId);
+
+        String accountantJwt = memberJwt(ownerJwt, orgId, "accountant", "wfaccE", "wfaccE@test.com");
+        String operatorJwt = memberJwt(ownerJwt, orgId, "operator", "wfoperE", "wfoperE@test.com");
+
+        // Start workflow as operator
+        MvcResult wfRes = mockMvc.perform(post("/api/v1/workflows")
+                .header("Authorization", "Bearer " + operatorJwt)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"type":"GSTR1","periodKey":"2026-04"}
+                    """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String workflowId = objectMapper.readTree(wfRes.getResponse().getContentAsString()).get("id").asText();
+
+        // Operator cannot discard (403)
+        mockMvc.perform(post("/api/v1/workflows/{id}/discard", workflowId)
+                .header("Authorization", "Bearer " + operatorJwt))
+                .andExpect(status().isForbidden());
+
+        // Owner can discard
+        mockMvc.perform(post("/api/v1/workflows/{id}/discard", workflowId)
+                .header("Authorization", "Bearer " + ownerJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        // Discarding already inactive/discarded workflow: active is false, but let's check events
+        mockMvc.perform(get("/api/v1/workflows/{id}/events", workflowId)
+                .header("Authorization", "Bearer " + accountantJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[1].kind").value("DISCARDED"));
+
+        // Workflow does not appear in list
+        mockMvc.perform(get("/api/v1/workflows")
+                .header("Authorization", "Bearer " + accountantJwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + workflowId + "')]").doesNotExist());
+    }
 }

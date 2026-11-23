@@ -14,6 +14,7 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@tanstack/react-router', () => ({
   useParams: () => ({ workflowId: 'wf-1' }),
+  useNavigate: () => vi.fn(),
   Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
 }))
 

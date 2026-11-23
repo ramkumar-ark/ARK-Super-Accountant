@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -6,6 +7,8 @@ import {
   FILING_REF_LABEL,
   WORKFLOW_TYPE_LABEL,
   advanceWorkflow,
+  canDiscardWorkflow,
+  discardWorkflow,
   finalizeWorkflow,
   invalidateWorkflow,
   isAccountant,
@@ -67,10 +70,11 @@ function Drawer({
 }
 
 export function WorkflowStageActions({ detail, role }: Props) {
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const workflow = detail.workflow
   const [advanceError, setAdvanceError] = useState('')
-  const [drawer, setDrawer] = useState<'finalize' | 'unfinalize' | 'filing' | null>(null)
+  const [drawer, setDrawer] = useState<'finalize' | 'unfinalize' | 'filing' | 'discard' | null>(null)
   const [drawerError, setDrawerError] = useState('')
   const [reason, setReason] = useState('')
   const [filingRef, setFilingRef] = useState('')
@@ -119,6 +123,64 @@ export function WorkflowStageActions({ detail, role }: Props) {
     },
     onError: (err) => setDrawerError(apiErrorMessage(err, 'Could not record the filing.')),
   })
+
+  const discardMutation = useMutation({
+    mutationFn: () => discardWorkflow(workflow.id),
+    onSuccess: () => {
+      closeDrawer()
+      void queryClient.invalidateQueries({ queryKey: ['workflows'] })
+      void navigate({ to: '/workflows' })
+    },
+    onError: (err) => setDrawerError(apiErrorMessage(err, 'Could not discard the workflow.')),
+  })
+
+  const isDiscardable =
+    workflow.stage === 'STARTED' &&
+    workflow.uploadJobId == null &&
+    detail.blockingFindings === 0
+
+  if (workflow.stage === 'STARTED') {
+    if (!canDiscardWorkflow(role) || !isDiscardable) {
+      return null
+    }
+
+    return (
+      <section className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <button
+          type="button"
+          onClick={() => setDrawer('discard')}
+          className="inline-flex h-9 w-fit items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-danger-border)] bg-transparent px-3 text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)]"
+        >
+          Discard workflow
+        </button>
+        {drawer === 'discard' && (
+          <Drawer label="Discard workflow" onClose={closeDrawer}>
+            <p className="text-sm text-[var(--color-text-primary)]">
+              Are you sure you want to discard this started workflow? This cannot be undone.
+            </p>
+            {drawerError && (
+              <p role="alert" className="text-sm text-[var(--color-danger)]">
+                {drawerError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => discardMutation.mutate()}
+                disabled={discardMutation.isPending}
+                className="inline-flex h-9 w-fit items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-danger)] px-3 text-sm font-medium text-white hover:bg-[var(--color-danger-hover,var(--color-danger))] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Confirm discard
+              </button>
+              <button type="button" onClick={closeDrawer} className={secondaryButtonClass}>
+                Cancel
+              </button>
+            </div>
+          </Drawer>
+        )}
+      </section>
+    )
+  }
 
   if (workflow.stage === 'FILED') {
     return (
