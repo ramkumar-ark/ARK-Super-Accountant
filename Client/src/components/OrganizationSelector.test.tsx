@@ -3,8 +3,9 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { OrganizationSelector } from './OrganizationSelector'
 
+const mockNavigate = vi.fn()
 vi.mock('@tanstack/react-router', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => mockNavigate,
 }))
 vi.mock('@/store/authStore')
 vi.mock('@/lib/api', () => ({
@@ -40,13 +41,33 @@ describe('OrganizationSelector — multi-org', () => {
     render(<OrganizationSelector />)
     await user.click(screen.getByRole('button', { name: /Acme/i }))
 
-    expect(screen.getByText('+ New Organization')).toBeInTheDocument()
+    const newOrgButton = screen.getByText('+ New Organization')
+    expect(newOrgButton).toBeInTheDocument()
+    await user.click(newOrgButton)
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/organization/new' })
   })
 
-  it('hides New Organization button in dropdown for non-OWNER', async () => {
+  it('shows New Organization button in dropdown for ROLE_ACCOUNTANT', async () => {
     const user = userEvent.setup()
     mockUseAuthStore.mockReturnValue({
-      user: { id: 2, username: 'bob', email: 'b@b.com', role: 'ROLE_CASHIER', organizationId: 'org-1', organizationName: 'Acme' },
+      user: { id: 2, username: 'charlie', email: 'c@c.com', role: 'ROLE_ACCOUNTANT', organizationId: 'org-1', organizationName: 'Acme' },
+      organizations: TWO_ORGS,
+      switchOrganization: vi.fn(),
+    } as unknown as ReturnType<typeof useAuthStore>)
+
+    render(<OrganizationSelector />)
+    await user.click(screen.getByRole('button', { name: /Acme/i }))
+
+    const newOrgButton = screen.getByText('+ New Organization')
+    expect(newOrgButton).toBeInTheDocument()
+    await user.click(newOrgButton)
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/organization/new' })
+  })
+
+  it('hides New Organization button in dropdown for role that is neither Owner nor Accountant', async () => {
+    const user = userEvent.setup()
+    mockUseAuthStore.mockReturnValue({
+      user: { id: 3, username: 'bob', email: 'b@b.com', role: 'ROLE_OPERATOR', organizationId: 'org-1', organizationName: 'Acme' },
       organizations: TWO_ORGS,
       switchOrganization: vi.fn(),
     } as unknown as ReturnType<typeof useAuthStore>)
@@ -59,9 +80,9 @@ describe('OrganizationSelector — multi-org', () => {
 })
 
 describe('OrganizationSelector — single org', () => {
-  it('renders plain span (no button) for non-OWNER with one org', () => {
+  it('renders plain span (no button) for role that is neither Owner nor Accountant with one org', () => {
     mockUseAuthStore.mockReturnValue({
-      user: { id: 2, username: 'bob', email: 'b@b.com', role: 'ROLE_CASHIER', organizationId: 'org-1', organizationName: 'Acme' },
+      user: { id: 3, username: 'bob', email: 'b@b.com', role: 'ROLE_OPERATOR', organizationId: 'org-1', organizationName: 'Acme' },
       organizations: ONE_ORG,
       switchOrganization: vi.fn(),
     } as unknown as ReturnType<typeof useAuthStore>)
@@ -83,6 +104,26 @@ describe('OrganizationSelector — single org', () => {
     render(<OrganizationSelector />)
     await user.click(screen.getByRole('button', { name: /Acme/i }))
 
-    expect(screen.getByText('+ New Organization')).toBeInTheDocument()
+    const newOrgButton = screen.getByText('+ New Organization')
+    expect(newOrgButton).toBeInTheDocument()
+    await user.click(newOrgButton)
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/organization/new' })
+  })
+
+  it('renders a dropdown with New Organization for single-org ACCOUNTANT', async () => {
+    const user = userEvent.setup()
+    mockUseAuthStore.mockReturnValue({
+      user: { id: 2, username: 'charlie', email: 'c@c.com', role: 'ROLE_ACCOUNTANT', organizationId: 'org-1', organizationName: 'Acme' },
+      organizations: ONE_ORG,
+      switchOrganization: vi.fn(),
+    } as unknown as ReturnType<typeof useAuthStore>)
+
+    render(<OrganizationSelector />)
+    await user.click(screen.getByRole('button', { name: /Acme/i }))
+
+    const newOrgButton = screen.getByText('+ New Organization')
+    expect(newOrgButton).toBeInTheDocument()
+    await user.click(newOrgButton)
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/organization/new' })
   })
 })

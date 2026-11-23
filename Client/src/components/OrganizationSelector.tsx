@@ -36,8 +36,10 @@ export function OrganizationSelector() {
     }
   }
 
+  const canCreateOrg = user?.role === 'ROLE_OWNER' || user?.role === 'ROLE_ACCOUNTANT'
+
   if (!canSwitch) {
-    if (user?.role !== 'ROLE_OWNER') {
+    if (!canCreateOrg) {
       return (
         <span className="flex items-center h-9 px-3 text-sm font-medium text-[var(--color-text-primary)]">
           {orgName}
@@ -128,7 +130,7 @@ export function OrganizationSelector() {
               </div>
             </div>
           ))}
-          {user?.role === 'ROLE_OWNER' && (
+          {canCreateOrg && (
             <>
               <div className="border-t border-[var(--color-border)] my-1" />
               <button
