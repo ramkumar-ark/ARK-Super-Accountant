@@ -23,8 +23,7 @@ class DebtorTdsReceivableScannerTest {
                 {"Acme Corp", "-1000.00"}});
 
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
-                List.of(voucher), Map.of("acme corp", LedgerCategory.OTHER),
-                Set.of("acme corp"), Map.of());
+                List.of(voucher), Set.of("acme corp"), Map.of());
 
         assertThat(gaps).hasSize(1);
         DebtorTdsReceivableScanner.DebtorTanGap gap = gaps.get(0);
@@ -43,8 +42,7 @@ class DebtorTdsReceivableScannerTest {
                 {"Acme Corp", "-1000.00"}});
 
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
-                List.of(voucher), Map.of("acme corp", LedgerCategory.OTHER),
-                Set.of("acme corp"), Map.of("acme corp", "BLRA12345C"));
+                List.of(voucher), Set.of("acme corp"), Map.of("acme corp", "BLRA12345C"));
 
         assertThat(gaps).isEmpty();
     }
@@ -57,8 +55,7 @@ class DebtorTdsReceivableScannerTest {
                 {"Acme Corp", "-1500.00"}});
 
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
-                List.of(voucher), Map.of("acme corp", LedgerCategory.OTHER),
-                Set.of("acme corp"), Map.of());
+                List.of(voucher), Set.of("acme corp"), Map.of());
 
         assertThat(gaps).hasSize(1);
         assertThat(gaps.get(0).deducted()).isEqualByComparingTo(new BigDecimal("1000.00"));

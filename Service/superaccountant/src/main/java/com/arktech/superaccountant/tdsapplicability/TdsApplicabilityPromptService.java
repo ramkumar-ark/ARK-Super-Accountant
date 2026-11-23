@@ -98,9 +98,10 @@ public class TdsApplicabilityPromptService {
         if (!isIndividualHuf(orgId)) {
             return;
         }
-        checkBooksExceed(orgId, closedFy + 1);
-
         int nextFy = closedFy + 1;
+        if (!tdsApplicabilityService.resolve(orgId, nextFy).applicable()) {
+            checkBooksExceed(orgId, nextFy);
+        }
         if (yearRepository.findByOrganizationIdAndFinancialYear(orgId, nextFy).isEmpty()
                 && !promptExists(orgId, PromptKind.NEXT_YEAR_DECLARATION, nextFy)) {
             create(orgId, PromptKind.NEXT_YEAR_DECLARATION, nextFy, null);

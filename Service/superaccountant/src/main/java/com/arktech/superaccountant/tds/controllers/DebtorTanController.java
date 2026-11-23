@@ -89,15 +89,9 @@ public class DebtorTanController {
         if (dayBookJob.isEmpty()) {
             return List.of();
         }
-        Map<String, com.arktech.superaccountant.masters.models.LedgerCategory> categoriesByKey =
-                new LinkedHashMap<>();
         Set<String> debtorKeys = new HashSet<>();
         mastersJobGate.latestCompletedMastersJob(orgId).ifPresent(mastersJobId -> {
             for (UploadLedgerSnapshot snapshot : snapshotRepository.findByUploadJobId(mastersJobId)) {
-                categoriesByKey.putIfAbsent(TdsEngine.key(snapshot.getLedgerName()),
-                        snapshot.getCategory() == null
-                                ? com.arktech.superaccountant.masters.models.LedgerCategory.OTHER
-                                : snapshot.getCategory());
                 if (isDebtor(snapshot)) {
                     debtorKeys.add(TdsEngine.key(snapshot.getLedgerName()));
                 }
@@ -109,7 +103,7 @@ public class DebtorTanController {
         }
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
                 parsedVoucherRepository.findByUploadJobId(dayBookJob.get().getId()),
-                categoriesByKey, debtorKeys, tansByKey);
+                debtorKeys, tansByKey);
         gaps.sort(Comparator.comparing(DebtorTdsReceivableScanner.DebtorTanGap::voucherDate,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(DebtorTdsReceivableScanner.DebtorTanGap::debtorLedgerName,

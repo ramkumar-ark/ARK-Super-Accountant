@@ -2,7 +2,6 @@ package com.arktech.superaccountant.tds.engine;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
-import com.arktech.superaccountant.masters.models.LedgerCategory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,7 +23,6 @@ public final class DebtorTdsReceivableScanner {
     }
 
     public static List<DebtorTanGap> scan(List<ParsedVoucher> vouchers,
-                                          Map<String, LedgerCategory> categoriesByKey,
                                           Set<String> debtorKeys,
                                           Map<String, ?> debtorTansByKey) {
         List<DebtorTanGap> gaps = new ArrayList<>();

@@ -134,6 +134,7 @@ public class TdsApplicabilityService {
                     fresh.setFinancialYear(financialYear);
                     return fresh;
                 });
+        boolean changed = resolve(orgId, financialYear).applicable() != applicable;
         row.setApplicable(applicable);
         row.setBasis(basis);
         row.setPriorYearTurnover(turnover);
@@ -142,8 +143,10 @@ public class TdsApplicabilityService {
         row.setDecidedBy(actor);
         row.setDecidedAt(Instant.now());
         repository.save(row);
-        responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_PAYMENT);
-        responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_26Q);
+        if (changed) {
+            responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_PAYMENT);
+            responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_26Q);
+        }
         return new TdsApplicability(financialYear, applicable, basis, false, turnover, nature);
     }
 

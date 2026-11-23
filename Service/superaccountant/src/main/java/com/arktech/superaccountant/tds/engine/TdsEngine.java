@@ -65,6 +65,7 @@ public class TdsEngine {
     private void runPerVoucherPass(TdsAnalysisInput input, List<VoucherFact> facts,
                                    List<TdsFinding> findings, List<TdsDeducteeEntry> entries) {
         Set<String> panFindingKeys = new HashSet<>();
+        Set<String> debtorKeys = debtorKeys(input);
         for (ParsedVoucher v : input.vouchers()) {
             if (v == null || v.isCancelled() || v.getVoucherDate() == null
                     || v.getEntries() == null
@@ -96,7 +97,7 @@ public class TdsEngine {
             }
             if (isInPeriod(v.getVoucherDate(), input)) {
                 for (DebtorTdsReceivableScanner.DebtorTanGap gap : DebtorTdsReceivableScanner.scan(
-                        List.of(v), debtorCategories(input), debtorKeys(input), input.debtorTansByName())) {
+                        List.of(v), debtorKeys, input.debtorTansByName())) {
                     BigDecimal deducted = gap.deducted();
                     TdsFinding f = finding(input, v,
                             TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN,
@@ -578,18 +579,6 @@ public class TdsEngine {
             }
         }
         return keys;
-    }
-
-    private static Map<String, LedgerCategory> debtorCategories(TdsAnalysisInput input) {
-        Map<String, LedgerCategory> categories = new LinkedHashMap<>();
-        for (Map.Entry<String, UploadLedgerSnapshot> entry : input.snapshotsByName().entrySet()) {
-            UploadLedgerSnapshot snapshot = entry.getValue();
-            categories.put(entry.getKey(),
-                    snapshot != null && snapshot.getCategory() != null
-                            ? snapshot.getCategory()
-                            : LedgerCategory.OTHER);
-        }
-        return categories;
     }
 
     private record VoucherFact(ParsedVoucher voucher, String partyName, String partyKey, String section,
