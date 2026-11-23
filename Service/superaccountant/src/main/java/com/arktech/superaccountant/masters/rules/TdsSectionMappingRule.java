@@ -24,6 +24,10 @@ public class TdsSectionMappingRule implements ValidationRule {
 
     @Override
     public List<ValidationFinding> execute(ValidationContext context, List<ParsedLedger> parsedLedgers) {
+        // A non-deductor organization has no deductor-side TDS obligations to check.
+        if (!context.tdsDeductor()) {
+            return List.of();
+        }
         List<ValidationFinding> findings = new ArrayList<>();
 
         for (PreconfiguredMaster master : context.preconfiguredMasters()) {

@@ -78,7 +78,7 @@ class WorkflowControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Workflow Org","financialYearStart":4}
+                    {"name":"Workflow Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

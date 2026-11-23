@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { StartWorkflowDialog } from '@/components/workflow/StartWorkflowDialog'
 import { useAuthStore } from '@/store/authStore'
+import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import {
   STAGE_LABEL,
   WORKFLOW_TYPE_LABEL,
@@ -19,9 +20,13 @@ function financialYearLabel(fy: number) {
   return `FY ${fy}-${String(fy + 1).slice(2)}`
 }
 
+const TDS_TYPES: WorkflowType[] = ['TDS_PAYMENT', 'TDS_26Q']
+
 export function WorkflowListPage() {
   const { user } = useAuthStore()
   const role = user?.role
+  const orgId = user?.organizationId
+  const { anyTdsOn } = useTdsApplicability(orgId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -88,7 +93,9 @@ export function WorkflowListPage() {
               className="h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
             >
               <option value="">All types</option>
-              {(Object.keys(WORKFLOW_TYPE_LABEL) as WorkflowType[]).map((value) => (
+              {(Object.keys(WORKFLOW_TYPE_LABEL) as WorkflowType[])
+                .filter((value) => !TDS_TYPES.includes(value) || anyTdsOn)
+                .map((value) => (
                 <option key={value} value={value}>
                   {WORKFLOW_TYPE_LABEL[value]}
                 </option>

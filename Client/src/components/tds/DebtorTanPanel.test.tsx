@@ -10,6 +10,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import { api } from '@/lib/api'
+import type { DebtorTanGap, DebtorTanItem } from '@/lib/tdsApi'
 
 const mockGet = vi.mocked(api.get)
 const mockPut = vi.mocked(api.put)
@@ -55,6 +56,15 @@ function setRole(role: string) {
   })
 }
 
+function mockEndpoints(items: DebtorTanItem[], gaps: DebtorTanGap[] = []) {
+  mockGet.mockImplementation((url: string) => {
+    if (url === '/v1/tds/debtor-tans/missing') {
+      return Promise.resolve({ data: gaps })
+    }
+    return Promise.resolve({ data: items })
+  })
+}
+
 describe('DebtorTanPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -62,7 +72,7 @@ describe('DebtorTanPanel', () => {
   })
 
   it('lists debtors with configured and missing TAN status', async () => {
-    mockGet.mockResolvedValue({ data: [CONFIGURED, MISSING] })
+    mockEndpoints([CONFIGURED, MISSING])
 
     renderPanel()
 
@@ -75,7 +85,7 @@ describe('DebtorTanPanel', () => {
   })
 
   it('saves a normalized TAN for a missing debtor', async () => {
-    mockGet.mockResolvedValue({ data: [MISSING] })
+    mockEndpoints([MISSING])
     mockPut.mockResolvedValue({ data: {} })
     const user = userEvent.setup()
 
@@ -94,7 +104,7 @@ describe('DebtorTanPanel', () => {
   })
 
   it('rejects a malformed TAN without calling the API', async () => {
-    mockGet.mockResolvedValue({ data: [MISSING] })
+    mockEndpoints([MISSING])
     const user = userEvent.setup()
 
     renderPanel()
@@ -109,7 +119,7 @@ describe('DebtorTanPanel', () => {
   })
 
   it('clears a configured TAN', async () => {
-    mockGet.mockResolvedValue({ data: [CONFIGURED] })
+    mockEndpoints([CONFIGURED])
     mockDelete.mockResolvedValue({ data: {} })
     const user = userEvent.setup()
 
@@ -125,7 +135,7 @@ describe('DebtorTanPanel', () => {
 
   it('hides edit controls from operators', async () => {
     setRole('ROLE_OPERATOR')
-    mockGet.mockResolvedValue({ data: [CONFIGURED, MISSING] })
+    mockEndpoints([CONFIGURED, MISSING])
 
     renderPanel()
 
@@ -135,8 +145,41 @@ describe('DebtorTanPanel', () => {
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
   })
 
+  it('shows missing TAN gaps from day-book vouchers above the stored TANs', async () => {
+    mockEndpoints([CONFIGURED, MISSING], [
+      {
+        debtorLedgerName: 'Gamma Traders',
+        receivableLedgerName: 'TDS Receivable 194J',
+        voucherId: 'v-1',
+        voucherNumber: 'J-7',
+        voucherDate: '2026-05-10',
+        deducted: 1000.0,
+      },
+    ])
+    const user = userEvent.setup()
+
+    renderPanel()
+
+    expect(await screen.findByText('Gamma Traders')).toBeInTheDocument()
+    expect(screen.getByText(/J-7/)).toBeInTheDocument()
+    expect(screen.getByText(/TDS Receivable 194J/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add TAN for Gamma Traders' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add TAN for Gamma Traders' }))
+    await user.type(screen.getByLabelText('TAN for Gamma Traders'), 'blra12345c')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(mockPut).toHaveBeenCalledWith('/v1/tds/debtor-tans', {
+        ledgerName: 'Gamma Traders',
+        tan: 'BLRA12345C',
+        tallyGuid: null,
+      }),
+    )
+  })
+
   it('filters the table by customer name', async () => {
-    mockGet.mockResolvedValue({ data: [CONFIGURED, MISSING] })
+    mockEndpoints([CONFIGURED, MISSING])
     const user = userEvent.setup()
 
     renderPanel()

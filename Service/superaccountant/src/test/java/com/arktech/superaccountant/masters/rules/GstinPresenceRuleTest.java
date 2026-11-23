@@ -36,7 +36,7 @@ class GstinPresenceRuleTest {
     }
 
     private ValidationContext ctx(List<PreconfiguredMaster> masters) {
-        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of());
+        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of(), true);
     }
 
     @Test

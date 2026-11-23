@@ -21,8 +21,14 @@ public interface DayBookUploadJobRepository extends JpaRepository<DayBookUploadJ
     Optional<DayBookUploadJob> findTopByOrganizationIdAndStatusOrderByCreatedAtDesc(
             UUID organizationId, UploadJobStatus status);
 
+    Optional<DayBookUploadJob> findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(
+            UUID organizationId, java.util.Collection<UploadJobStatus> statuses);
+
     List<DayBookUploadJob> findAllByOrganizationIdAndStatusOrderByCreatedAtDesc(
             UUID organizationId, UploadJobStatus status);
+
+    List<DayBookUploadJob> findAllByOrganizationIdAndStatusInOrderByCreatedAtDesc(
+            UUID organizationId, java.util.Collection<UploadJobStatus> statuses);
 
     @org.springframework.data.jpa.repository.Query("""
             select j from DayBookUploadJob j

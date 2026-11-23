@@ -11,10 +11,15 @@ import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.UploadJob;
 import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.masters.models.ValidationFinding;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.masters.repository.ValidationFindingRepository;
 import com.arktech.superaccountant.support.TestDatabase;
+import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
+import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityYear;
+import com.arktech.superaccountant.tdsapplicability.repository.TdsApplicabilityYearRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +33,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -328,5 +335,92 @@ class UploadControllerIT {
                 "SELECT character_maximum_length FROM information_schema.columns "
                         + "WHERE table_name = 'upload_ledger_snapshots' AND column_name = 'pan'",
                 Long.class);
+    }
+
+    // ── TDS applicability gating of masters rules ────────────────────────────
+
+    @Autowired
+    private TdsApplicabilityYearRepository tdsApplicabilityYearRepository;
+
+    @Autowired
+    private ValidationFindingRepository findingRepository;
+
+    /**
+     * An individual/HUF (Q) organization whose books start in FY 2025-26, with one declared
+     * applicability row for FY 2025. Today is in FY 2026, so coverage runs FY 2025 → FY 2026.
+     */
+    private Organization qOrg(String name, boolean fy2025Applicable) {
+        Organization org = new Organization(name + " " + UUID.randomUUID());
+        org.setPan("AAPPU2262D"); // 4th char 'P' → Individual/HUF (Q)
+        org.setBooksStartDate(LocalDate.of(2025, 4, 1));
+        org = organizationRepository.save(org);
+        TdsApplicabilityYear row = new TdsApplicabilityYear();
+        row.setOrganizationId(org.getId());
+        row.setFinancialYear(2025);
+        row.setApplicable(fy2025Applicable);
+        row.setBasis(TdsApplicabilityBasis.DECLARED);
+        row.setDecidedBy("it");
+        row.setDecidedAt(Instant.now());
+        tdsApplicabilityYearRepository.save(row);
+        return org;
+    }
+
+    private UploadJob uploadMasters(Organization org, String jwt, String tallyJson) throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "masters.json",
+                "application/json", tallyJson.getBytes());
+        mockMvc.perform(multipart("/api/v1/uploads")
+                        .file(file)
+                        .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isCreated());
+        return uploadJobRepository
+                .findTopByOrganizationIdAndStatusNotInOrderByCreatedAtDesc(org.getId(),
+                        java.util.List.of(UploadJobStatus.DISCARDED, UploadJobStatus.FAILED))
+                .orElse(null);
+    }
+
+    // Review Focus case 4: a Q deductor that was applicable in a covered year (FY 2025) keeps the
+    // TDS masters rules running even though the current year (FY 2026) is not applicable.
+    @Test
+    void tdsRulesRunWhenAnyCoveredYearApplicable() throws Exception {
+        Organization org = qOrg("Applicable Q Org", true);
+        String jwt = jwtUtils.generateJwtTokenForUser("upload_accountant", org.getId());
+
+        String masters = """
+                {"tallymessage": [
+                  {"group": {"name": "Indirect Expenses", "parent": ""}},
+                  {"ledger": {"name": "Office Rent", "guid": "g-tds-applicable", "parent": "Indirect Expenses"}}
+                ]}
+                """;
+        UploadJob job = uploadMasters(org, jwt, masters);
+        assertThat(job).isNotNull();
+
+        assertThat(findingRepository.findByUploadJobId(job.getId()))
+                .extracting(ValidationFinding::getRuleCode)
+                .contains("TDS_SECTION_MAPPING");
+    }
+
+    @Test
+    void nonDeductorUploadHasNoTdsFindingsButKeepsPanFormat() throws Exception {
+        Organization org = qOrg("Non Deductor Q Org", false);
+        String jwt = jwtUtils.generateJwtTokenForUser("upload_accountant", org.getId());
+
+        String masters = """
+                {"tallymessage": [
+                  {"group": {"name": "Indirect Expenses", "parent": ""}},
+                  {"ledger": {"name": "Office Rent", "guid": "g-tds-off", "parent": "Indirect Expenses"}},
+                  {"ledger": {"name": "Bad Pan Party", "guid": "g-pan-bad", "parent": "Indirect Expenses",
+                              "incometaxnumber": "BADPAN"}}
+                ]}
+                """;
+        UploadJob job = uploadMasters(org, jwt, masters);
+        assertThat(job).isNotNull();
+
+        java.util.List<ValidationFinding> findings = findingRepository.findByUploadJobId(job.getId());
+        assertThat(findings)
+                .extracting(ValidationFinding::getRuleCode)
+                .doesNotContain("TDS_SECTION_MAPPING");
+        assertThat(findings)
+                .extracting(ValidationFinding::getRuleCode)
+                .contains("PAN_FORMAT");
     }
 }

@@ -104,3 +104,31 @@ has no PAN. It is stored as an empty-string `pan` in `tds_pan_overrides`; the ov
 suppresses `PAN_FORMAT`. Every read treats blank and null alike, and the Tally write-back clears
 the field by sending `incometaxnumber` as an empty string.
 _Avoid_: blank PAN, empty PAN
+
+## TDS applicability
+
+Whether the organization must deduct TDS for one financial year, stored as one
+`tds_applicability_years` row per organization and year. The resolver decides in order:
+entity type known and not Individual/HUF → applicable; a row for the year → the row;
+no rows at all → applicable (legacy default); otherwise the nearest recorded year carries
+forward with a "needs answer" flag. Non-individual entity types always deduct; only
+individuals/HUFs depend on the preceding year's turnover.
+_Avoid_: TDS settings (it is a per-year status, not a toggle), TDS enabled
+
+## Deductor year
+
+One financial year's applicability row for an organization. It records whether the
+organization was a deductor that year, why (entity type, declared, confirmed from books,
+legacy default or carried forward), the declared preceding-year turnover and its nature,
+and who decided it. Rows are kept and hidden, never deleted, so history and filed returns
+stay explainable.
+_Avoid_: TDS year, applicability flag
+
+## PAN-only TDS
+
+The TDS obligations that need no TAN and apply to individuals/HUFs below the turnover
+test: 194M (contract/commission/professional payments above ₹50 lakh to one payee) and
+194-IB (rent above ₹50,000 per month), plus the per-transaction 194-IA and 194S. They are
+advisories for a non-deductor, filed through challan-cum-statement forms (26QD/26QC/26QB/
+26QE; Form 141 from 1 April 2026), and never make the organization a 26Q deductor.
+_Avoid_: saying "TDS not applicable" for 194M/194-IB obligations

@@ -13,11 +13,13 @@ import com.arktech.superaccountant.workflow.payload.response.FinancialYearStatus
 import com.arktech.superaccountant.workflow.repository.FinancialYearCloseRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.seam.CompanyBlockerSource;
+import com.arktech.superaccountant.workflow.seam.FinancialYearClosedEvent;
 import com.arktech.superaccountant.workflow.service.CoverageService;
 import com.arktech.superaccountant.workflow.service.WorkflowBadRequestException;
 import com.arktech.superaccountant.workflow.service.WorkflowConflictException;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +52,9 @@ public class FinancialYearCloseService {
 
     @Autowired(required = false)
     private List<CompanyBlockerSource> blockerSources;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     public List<FinancialYearStatusResponse> listYears(UUID organizationId) {
         Organization org = organizationRepository.findById(organizationId).orElseThrow();
@@ -156,6 +161,8 @@ public class FinancialYearCloseService {
         close.setNote(request.getNote());
         close.setClosedBy(actor);
         financialYearCloseRepository.save(close);
+
+        eventPublisher.publishEvent(new FinancialYearClosedEvent(organizationId, financialYear));
 
         return new CloseFinancialYearResponse(status(organizationId, financialYear),
                 closeType == CloseType.HANDLED_ELSEWHERE

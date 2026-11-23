@@ -6,6 +6,7 @@ import { Database, Upload, SearchX, CheckCircle2, Loader2, AlertCircle } from 'l
 import { LedgerMappingPanel } from '@/components/LedgerMappingPanel'
 import { AppShell } from '@/components/AppShell'
 import { useAuthStore } from '@/store/authStore'
+import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import { ValidationSettingsPanel } from '@/components/ValidationSettingsPanel'
 import { DebtorTanPanel } from '@/components/tds/DebtorTanPanel'
 import { MastersChangeList } from '@/components/snapshot/MastersChangeList'
@@ -97,6 +98,8 @@ const VALUE_LABELS: Record<string, string> = {
 }
 
 export function MastersPage() {
+  const user = useAuthStore((st) => st.user)
+  const { anyTdsOn } = useTdsApplicability(user?.organizationId)
   const [activeTab, setActiveTab] = useState<
     'ledgers' | 'findings' | 'debtor-tans' | 'tally-changes' | 'settings'
   >('ledgers')
@@ -447,16 +450,16 @@ export function MastersPage() {
                 <table className="w-full">
                   <thead className="sticky top-0 z-[var(--z-sticky)] bg-[var(--color-bg)]">
                     <tr>
-                      {[
-                        'Ledger Name',
-                        'Category',
-                        'Parent Group',
-                        'TDS Section',
-                        'GST Applicability',
-                        'HSN / SAC',
-                        'GSTIN',
-                        'Actions',
-                      ].map((col) => (
+                    {[
+                      'Ledger Name',
+                      'Category',
+                      'Parent Group',
+                      ...(anyTdsOn ? ['TDS Section'] : []),
+                      'GST Applicability',
+                      'HSN / SAC',
+                      'GSTIN',
+                      'Actions',
+                    ].map((col) => (
                         <th
                           key={col}
                           scope="col"
@@ -482,21 +485,23 @@ export function MastersPage() {
                         <td className="px-4 py-2 text-sm text-[var(--color-text-secondary)] w-[160px]">
                           {master.expectedParentGroup ?? '—'}
                         </td>
-                        <td className="px-4 py-2 min-w-[220px] max-w-[320px]">
-                          {master.tdsSection ? (
-                            <span
-                              className={`text-sm ${
-                                master.tdsSection === 'NOT_SUBJECT'
-                                  ? 'text-[var(--color-text-muted)]'
-                                  : 'text-[var(--color-text-primary)]'
-                              }`}
-                            >
-                              {tdsSectionBothNames(master.tdsSection)}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-[var(--color-text-muted)]">—</span>
-                          )}
-                        </td>
+                        {anyTdsOn && (
+                          <td className="px-4 py-2 min-w-[220px] max-w-[320px]">
+                            {master.tdsSection ? (
+                              <span
+                                className={`text-sm ${
+                                  master.tdsSection === 'NOT_SUBJECT'
+                                    ? 'text-[var(--color-text-muted)]'
+                                    : 'text-[var(--color-text-primary)]'
+                                }`}
+                              >
+                                {tdsSectionBothNames(master.tdsSection)}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-[var(--color-text-muted)]">—</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-2 w-[140px]">
                           {master.gstApplicabilityType ? (
                             <GstBadge type={master.gstApplicabilityType} />
@@ -597,6 +602,7 @@ export function MastersPage() {
             total={findingsTotal}
             ruleFilter={ruleFilter}
             groupFilter={groupFilter}
+            anyTdsOn={anyTdsOn}
             groupOptions={groupOptions}
             page={findingsPage}
             onPageChange={setFindingsPage}
@@ -681,6 +687,7 @@ export function MastersPage() {
       {editingMaster && (
         <LedgerMappingPanel
           master={editingMaster}
+          showTdsSection={anyTdsOn}
           onClose={() => setEditingMaster(null)}
           onSaved={() => {
             setEditingMaster(null)
@@ -747,6 +754,7 @@ function FindingsTab({
   total,
   ruleFilter,
   groupFilter,
+  anyTdsOn,
   groupOptions,
   page,
   onPageChange,
@@ -766,6 +774,7 @@ function FindingsTab({
   total: number
   ruleFilter: string
   groupFilter: string
+  anyTdsOn: boolean
   groupOptions: { value: string; label: string }[]
   page: number
   onPageChange: (p: number) => void
@@ -1035,7 +1044,7 @@ function FindingsTab({
   // "Show resolved" lists closed findings only; otherwise the open and pending ones.
   const visibleFindings = showResolved ? filteredFindings.filter(isResolved) : openFindings
   const overridable = visibleFindings.filter(canBulkOverride)
-  const tdsEligible = visibleFindings.filter((f) => canBulkTyped(f, 'TDS_SECTION_MAPPING'))
+  const tdsEligible = anyTdsOn ? visibleFindings.filter((f) => canBulkTyped(f, 'TDS_SECTION_MAPPING')) : []
   const gstinEligible = visibleFindings.filter((f) => canBulkTyped(f, 'GSTIN_PRESENCE'))
   const selectedTds = tdsEligible.filter((f) => selectedIds.has(f.id))
   const selectedGstin = gstinEligible.filter((f) => selectedIds.has(f.id))
@@ -1068,7 +1077,7 @@ function FindingsTab({
       const res = await api.post(`/v1/uploads/${jobId}/findings/bulk-action`, body)
       return Number(res.data?.matched ?? 0)
     }
-    safe(canSubmit ? typedCount('TDS_SECTION_MAPPING', '194C') : Promise.resolve(0)).then((n) => live && setMatchedTds(n))
+    safe(anyTdsOn && canSubmit ? typedCount('TDS_SECTION_MAPPING', '194C') : Promise.resolve(0)).then((n) => live && setMatchedTds(n))
     safe(canSubmit ? typedCount('GSTIN_PRESENCE', GST_NOT_APPLICABLE) : Promise.resolve(0)).then(
       (n) => live && setMatchedGstin(n),
     )
@@ -1076,7 +1085,7 @@ function FindingsTab({
       live = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [findings, showResolved, canSubmit, isAccountant])
+  }, [findings, showResolved, canSubmit, isAccountant, anyTdsOn])
 
   const RULE_LABELS: Record<string, string> = {
     MISMATCH_DETECTION: 'Mismatch Detection',
@@ -1113,11 +1122,13 @@ function FindingsTab({
         className="h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)]"
       >
         <option value="">All Types</option>
-        {Object.keys(RULE_LABELS).map((code) => (
-          <option key={code} value={code}>
-            {RULE_LABELS[code] ?? code}
-          </option>
-        ))}
+        {Object.keys(RULE_LABELS)
+          .filter((code) => anyTdsOn || code !== 'TDS_SECTION_MAPPING')
+          .map((code) => (
+            <option key={code} value={code}>
+              {RULE_LABELS[code] ?? code}
+            </option>
+          ))}
       </select>
       <select
         value={groupFilter}
@@ -1306,7 +1317,7 @@ function FindingsTab({
             {overrideVerb} selected ({overrideCount})
           </button>
         )}
-        {tdsCount > 0 && (
+        {anyTdsOn && tdsCount > 0 && (
           <span className="flex items-center gap-2">
             <TdsSectionSelect
               ariaLabel="TDS section for selected"
@@ -1449,7 +1460,7 @@ function FindingsTab({
             <div className="flex items-start gap-4">
               {(canBulkOverride(finding) ||
                 canBulkApprove(finding) ||
-                canBulkTyped(finding, 'TDS_SECTION_MAPPING') ||
+                (anyTdsOn && canBulkTyped(finding, 'TDS_SECTION_MAPPING')) ||
                 canBulkTyped(finding, 'GSTIN_PRESENCE')) && (
                 <input
                   type="checkbox"

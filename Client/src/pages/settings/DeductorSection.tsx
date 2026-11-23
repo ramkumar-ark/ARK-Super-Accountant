@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { z } from 'zod'
 import { useAuthStore } from '@/store/authStore'
+import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import { apiErrorMessage } from '@/lib/apiError'
 import { getOrganization, updateDeductor, type DeductorDetails } from '@/lib/tdsApi'
 
@@ -40,19 +41,28 @@ export function DeductorSection() {
     enabled: !!orgId,
   })
 
-  if (!org) return <section />
+  const { data: applicability } = useTdsApplicability(orgId)
 
-  return <DeductorForm orgId={orgId as string} org={org} canEdit={canEdit} />
+  // Hidden entirely when no year has TDS on — the deductor is only asked about
+  // while TDS applies to some year.
+  if (!org || !applicability?.years) return <section />
+  const anyTdsOn = applicability.years.some((y) => y.applicable)
+  if (!anyTdsOn) return <section />
+  const tanMissing = !org.tan
+
+  return <DeductorForm orgId={orgId as string} org={org} canEdit={canEdit} tanMissing={tanMissing} />
 }
 
 function DeductorForm({
   orgId,
   org,
   canEdit,
+  tanMissing,
 }: {
   orgId: string
   org: DeductorDetails & Record<string, unknown>
   canEdit: boolean
+  tanMissing: boolean
 }) {
   const queryClient = useQueryClient()
   const [tan, setTan] = useState(org.tan ?? '')
@@ -97,6 +107,11 @@ function DeductorForm({
       <p className="text-sm text-[var(--color-text-muted)] mb-3">
         TAN and responsible person as reported in TDS returns (26Q).
       </p>
+      {tanMissing && (
+        <p className="text-sm text-amber-700 mb-2">
+          TAN missing — TDS returns cannot be finalized without it.
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-red-600 mb-2">
           {error}

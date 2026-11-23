@@ -365,7 +365,7 @@ class MastersTamperFlowIT {
         MvcResult createOrgResult = mockMvc.perform(post("/api/organizations")
                         .header("Authorization", "Bearer " + token)
                         .contentType("application/json")
-                        .content("{\"name\":\"Test Org " + suffix + "\",\"financialYearStart\":4}"))
+                        .content("{\"name\":\"Test Org " + suffix + "\",\"pan\":\"AAACA1234A\",\"financialYearStart\":4}"))
                 .andExpect(status().isCreated())
                 .andReturn();
         Map<?, ?> orgBody = json.readValue(createOrgResult.getResponse().getContentAsString(), Map.class);

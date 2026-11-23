@@ -157,6 +157,27 @@ vsa_bootstrap() {
   state_set bootstrapped 1
 }
 
+# vsa_org_accountant <orgId> <tag>: invite, sign up and select an accountant for
+# <orgId>; on success VSA_JWT holds that org-scoped accountant token and it is
+# also stored in state as "acct_token_<tag>".
+vsa_org_accountant() {
+  local org="$1" tag="$2" invite
+  local uname="v$(echo "$org" | tr -d '-' | cut -c1-12)a"
+  req "invite-$tag-accountant" POST "/api/organizations/$org/invites?role=accountant"
+  expect_status 200 || vsa_fail "invite $tag accountant failed: $RESP"
+  invite=$(echo "$RESP" | jq -r .token)
+  req "signup-$tag-accountant" POST "/api/auth/signup?invite=$invite" \
+    "{\"username\":\"$uname\",\"email\":\"$uname@verify.local\",\"role\":\"accountant\",\"password\":\"Verify!$tag\"}"
+  expect_status 200 || vsa_fail "signup $tag accountant failed: $RESP"
+  req "signin-$tag-accountant" POST /api/auth/signin "{\"username\":\"$uname\",\"password\":\"Verify!$tag\"}"
+  expect_status 200 || vsa_fail "signin $tag accountant failed: $RESP"
+  VSA_JWT="$(echo "$RESP" | jq -r .token)"
+  req "select-$tag-accountant" POST "/api/organizations/$org/select"
+  expect_status 200 || vsa_fail "select $tag accountant failed: $RESP"
+  state_set "acct_token_$tag" "$(echo "$RESP" | jq -r .token)"
+  VSA_JWT="$(state_get acct_token_$tag)"
+}
+
 bootstrapped() { [ "$(state_get bootstrapped)" = "1" ]; }
 as_accountant() { VSA_JWT=$(state_get accountant_token); }
 as_operator() { VSA_JWT=$(state_get operator_token); }
@@ -202,7 +223,11 @@ ensure_masters() {
 fresh_workflow() {
   local type="$1" period="$2" custom_daybook="${3:-}"
   ensure_masters
-  as_accountant
+  # Bootstrap accountant by default; a scenario operating on a different org
+  # can pass its own accountant token via VSA_WF_JWT (e.g. the individual org
+  # in tds-applicability-gating). Never trust the caller's token blindly:
+  # scenarios leave owner/operator tokens in VSA_JWT.
+  if [ -n "${VSA_WF_JWT:-}" ]; then VSA_JWT="$VSA_WF_JWT"; else as_accountant; fi
   req "create-workflow" POST /api/v1/workflows "{\"type\":\"$type\",\"periodKey\":\"$period\"}"
   expect_status 200 || vsa_fail "workflow create failed: $RESP"
   local id; id=$(echo "$RESP" | jq -r .id)

@@ -26,10 +26,13 @@ interface Master {
 
 export function LedgerMappingPanel({
   master,
+  showTdsSection = true,
   onClose,
   onSaved,
 }: {
   master: Master
+  /** False when the organization is not a TDS deductor: the field is hidden, not cleared. */
+  showTdsSection?: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -164,28 +167,30 @@ export function LedgerMappingPanel({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
           {/* TDS Section */}
-          <div>
-            <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-              TDS Section
-            </label>
-            <select
-              value={form.tdsSection}
-              onChange={(e) => handleChange('tdsSection', e.target.value)}
-              className={inputClass}
-            >
-              <option value="" disabled>
-                Select TDS section…
-              </option>
-              {TDS_SECTION_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
+          {showTdsSection && (
+            <div>
+              <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+                TDS Section
+              </label>
+              <select
+                value={form.tdsSection}
+                onChange={(e) => handleChange('tdsSection', e.target.value)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Select TDS section…
                 </option>
-              ))}
-            </select>
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">
-              Assign the applicable TDS deduction section, or select 'Not Subject to TDS'.
-            </p>
-          </div>
+                {TDS_SECTION_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                Assign the applicable TDS deduction section, or select 'Not Subject to TDS'.
+              </p>
+            </div>
+          )}
           {/* GST Applicability */}
           <div>
             <label className="block text-sm font-semibold text-[var(--color-text-primary)] mb-1">

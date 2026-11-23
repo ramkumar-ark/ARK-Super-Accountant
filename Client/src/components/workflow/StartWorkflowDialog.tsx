@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { apiErrorMessage } from '@/lib/apiError'
+import { getOrganization } from '@/lib/tdsApi'
+import { useAuthStore } from '@/store/authStore'
+import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import {
   WORKFLOW_TYPE_LABEL,
   startWorkflow,
@@ -19,7 +23,27 @@ type Grain = 'MONTHLY' | 'QUARTERLY'
 const inputClass =
   'w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors'
 
+/** FY of a "yyyy-mm" value; FY 2026-27 starts in month 4 → 2026-05 is FY 2026. */
+function fyOfMonth(month: string, fyStartMonth: number): number {
+  const [year, m] = month.split('-').map(Number)
+  return m >= fyStartMonth ? year : year - 1
+}
+
+const TDS_TYPES: WorkflowType[] = ['TDS_PAYMENT', 'TDS_26Q']
+
 export function StartWorkflowDialog({ open, onClose, onStarted }: StartWorkflowDialogProps) {
+  const { user } = useAuthStore()
+  const orgId = user?.organizationId
+  const tdsApplicability = useTdsApplicability(orgId)
+  const anyTdsOn = tdsApplicability.anyTdsOn
+  const isTdsOnFor = tdsApplicability.isTdsOnFor
+  const { data: org } = useQuery({
+    queryKey: ['organization', orgId],
+    queryFn: () => getOrganization(orgId as string),
+    enabled: !!orgId,
+  })
+  const fyStartMonth = (org?.financialYearStart as number | undefined) ?? 4
+
   const [type, setType] = useState<WorkflowType>('GSTR1')
   const [grain, setGrain] = useState<Grain>('MONTHLY')
   const [month, setMonth] = useState('')
@@ -45,6 +69,12 @@ export function StartWorkflowDialog({ open, onClose, onStarted }: StartWorkflowD
   const effectiveGrain: Grain =
     type === 'TDS_PAYMENT' || type === 'IFF' ? 'MONTHLY' : type === 'TDS_26Q' ? 'QUARTERLY' : grain
   const periodKey = effectiveGrain === 'QUARTERLY' ? `${year}-${quarter}` : month
+  const monthFy = month ? fyOfMonth(month, fyStartMonth) : null
+  const periodNotApplicable =
+    type === 'TDS_PAYMENT' && monthFy !== null && !isTdsOnFor(monthFy)
+  const quarterNotApplicable =
+    type === 'TDS_26Q' && year !== '' && !isTdsOnFor(Number(year))
+  const notApplicableTooltip = 'Not a TDS deductor this year'
 
   async function handleStart() {
     setError(null)
@@ -97,7 +127,9 @@ export function StartWorkflowDialog({ open, onClose, onStarted }: StartWorkflowD
               onChange={(e) => setType(e.target.value as WorkflowType)}
               className={inputClass}
             >
-              {(Object.keys(WORKFLOW_TYPE_LABEL) as WorkflowType[]).map((value) => (
+              {(Object.keys(WORKFLOW_TYPE_LABEL) as WorkflowType[])
+                .filter((value) => !TDS_TYPES.includes(value) || anyTdsOn)
+                .map((value) => (
                 <option key={value} value={value}>
                   {WORKFLOW_TYPE_LABEL[value]}
                 </option>
@@ -131,6 +163,8 @@ export function StartWorkflowDialog({ open, onClose, onStarted }: StartWorkflowD
                 aria-label="Period"
                 type="month"
                 value={month}
+                disabled={periodNotApplicable}
+                title={periodNotApplicable ? notApplicableTooltip : undefined}
                 onChange={(e) => setMonth(e.target.value)}
                 className={inputClass}
               />
@@ -147,6 +181,8 @@ export function StartWorkflowDialog({ open, onClose, onStarted }: StartWorkflowD
                   min={2000}
                   max={2100}
                   value={year}
+                  disabled={quarterNotApplicable}
+                  title={quarterNotApplicable ? notApplicableTooltip : undefined}
                   onChange={(e) => setYear(e.target.value)}
                   className={inputClass}
                 />

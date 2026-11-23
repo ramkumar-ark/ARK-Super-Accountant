@@ -92,6 +92,22 @@ describe('CompliancePage — responsibility start', () => {
           ],
         })
       }
+      if (url === '/v1/organizations/org-abc/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            years: [
+              {
+                financialYear: 2025,
+                applicable: true,
+                basis: 'DECLARED',
+                needsAnswer: false,
+                priorYearTurnover: null,
+                turnoverNature: null,
+              },
+            ],
+          },
+        })
+      }
       return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
     })
 

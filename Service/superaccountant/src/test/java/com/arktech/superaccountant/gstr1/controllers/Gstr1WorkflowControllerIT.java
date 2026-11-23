@@ -110,7 +110,7 @@ class Gstr1WorkflowControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Gstr1 Prepare Org","financialYearStart":4}
+                    {"name":"Gstr1 Prepare Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

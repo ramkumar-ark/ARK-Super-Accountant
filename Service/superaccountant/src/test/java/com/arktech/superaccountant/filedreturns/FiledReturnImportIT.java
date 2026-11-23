@@ -102,7 +102,7 @@ class FiledReturnImportIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Filed Returns Org","financialYearStart":4}
+                    {"name":"Filed Returns Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

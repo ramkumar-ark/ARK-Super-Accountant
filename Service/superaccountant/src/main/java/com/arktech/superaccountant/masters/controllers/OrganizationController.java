@@ -16,6 +16,10 @@ import com.arktech.superaccountant.masters.payload.request.UpdateDeductorDetails
 import com.arktech.superaccountant.masters.repository.OrganizationInviteRepository;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
+import com.arktech.superaccountant.tdsapplicability.EntityClass;
+import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService;
+import com.arktech.superaccountant.tdsapplicability.models.TurnoverNature;
+import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +27,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,18 +56,85 @@ public class OrganizationController {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private TdsApplicabilityService tdsApplicabilityService;
+
+    private static final String INDIVIDUAL_HUF_CODE = "Q";
+    private static final BigDecimal BUSINESS_TURNOVER_LIMIT = new BigDecimal("10000000");
+    private static final BigDecimal PROFESSION_TURNOVER_LIMIT = new BigDecimal("5000000");
+
     @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
     @PostMapping
     public ResponseEntity<?> createOrganization(
             @Valid @RequestBody CreateOrganizationRequest request,
             @AuthenticationPrincipal UserDetailsImpl principal) {
 
+        String pan = request.getPan() != null ? request.getPan().trim().toUpperCase() : "";
+        String effectiveType = EntityClass.deductorCodeFromPan(pan).orElse(null);
+        if (effectiveType == null && request.getDeductorType() != null
+                && !request.getDeductorType().isBlank()) {
+            String requestedType = request.getDeductorType().trim().toUpperCase();
+            if (!DeductorType.isValid(requestedType)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid deductor type."));
+            }
+            effectiveType = requestedType;
+        }
+        if (effectiveType == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Choose the entity type"));
+        }
+
+        String tan = null;
+        if (request.getTan() != null && !request.getTan().isBlank()) {
+            tan = request.getTan().trim().toUpperCase();
+            if (!tan.matches(Organization.TAN_PATTERN)) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "TAN must be 10 characters in the format: ABCD12345E"));
+            }
+        }
+
+        boolean individual = INDIVIDUAL_HUF_CODE.equals(effectiveType);
+        Boolean turnoverExceeded = request.getTdsTurnoverExceeded();
+        TurnoverNature turnoverNature = null;
+        if (individual) {
+            if (request.getTurnoverNature() != null && !request.getTurnoverNature().isBlank()) {
+                try {
+                    turnoverNature = TurnoverNature.valueOf(request.getTurnoverNature().trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest().body(Map.of("error",
+                            "Invalid turnover nature. Expected BUSINESS or PROFESSION."));
+                }
+            }
+            if (turnoverExceeded == null && request.getPriorYearTurnover() != null
+                    && turnoverNature != null) {
+                BigDecimal limit = turnoverNature == TurnoverNature.PROFESSION
+                        ? PROFESSION_TURNOVER_LIMIT
+                        : BUSINESS_TURNOVER_LIMIT;
+                turnoverExceeded = request.getPriorYearTurnover().compareTo(limit) > 0;
+            }
+            if (turnoverExceeded == null) {
+                return ResponseEntity.badRequest().body(Map.of("error",
+                        "Tell us whether last year's turnover exceeded the TDS limit"));
+            }
+        }
+
         Organization org = new Organization(request.getName());
         org.setGstin(request.getGstin());
-        org.setPan(request.getPan());
+        org.setPan(pan);
         org.setRegisteredAddress(request.getRegisteredAddress());
         org.setFinancialYearStart(request.getFinancialYearStart() > 0 ? request.getFinancialYearStart() : 4);
+        org.setDeductorType(effectiveType);
+        // TAN is accepted for every deductor type but stored only when the organization
+        // will actually deduct: non-individual types, or an individual/HUF above the limit.
+        if (tan != null && (!individual || turnoverExceeded)) {
+            org.setTan(tan);
+        }
         final Organization savedOrg = organizationRepository.save(org);
+
+        if (individual) {
+            int currentFy = PeriodCalendar.financialYearOf(LocalDate.now(), savedOrg.getFinancialYearStart());
+            tdsApplicabilityService.recordDeclared(savedOrg.getId(), currentFy, turnoverExceeded,
+                    request.getPriorYearTurnover(), turnoverNature, principal.getUsername());
+        }
 
         userRepository.findById(principal.getId()).ifPresent(user -> {
             ERole membershipRole = user.getRole() != null ? user.getRole().getName() : ERole.ROLE_OWNER;
@@ -69,15 +142,21 @@ public class OrganizationController {
             userOrganizationRepository.save(membership);
         });
 
-        return ResponseEntity.status(201).body(Map.of(
-                "id", savedOrg.getId(),
-                "name", savedOrg.getName(),
-                "gstin", savedOrg.getGstin() != null ? savedOrg.getGstin() : "",
-                "pan", savedOrg.getPan() != null ? savedOrg.getPan() : "",
-                "registeredAddress", savedOrg.getRegisteredAddress() != null ? savedOrg.getRegisteredAddress() : "",
-                "financialYearStart", savedOrg.getFinancialYearStart(),
-                "interestPayerType", InterestPayerType.from(savedOrg.getInterestPayerType()).name(),
-                "createdAt", savedOrg.getCreatedAt()
+        int currentFy = PeriodCalendar.financialYearOf(LocalDate.now(), savedOrg.getFinancialYearStart());
+        boolean tdsApplicable = tdsApplicabilityService.resolve(savedOrg.getId(), currentFy).applicable();
+
+        return ResponseEntity.status(201).body(Map.ofEntries(
+                Map.entry("id", savedOrg.getId()),
+                Map.entry("name", savedOrg.getName()),
+                Map.entry("gstin", savedOrg.getGstin() != null ? savedOrg.getGstin() : ""),
+                Map.entry("pan", savedOrg.getPan() != null ? savedOrg.getPan() : ""),
+                Map.entry("registeredAddress", savedOrg.getRegisteredAddress() != null ? savedOrg.getRegisteredAddress() : ""),
+                Map.entry("financialYearStart", savedOrg.getFinancialYearStart()),
+                Map.entry("tan", savedOrg.getTan() != null ? savedOrg.getTan() : ""),
+                Map.entry("deductorType", savedOrg.getDeductorType() != null ? savedOrg.getDeductorType() : ""),
+                Map.entry("tdsApplicable", tdsApplicable),
+                Map.entry("interestPayerType", InterestPayerType.from(savedOrg.getInterestPayerType()).name()),
+                Map.entry("createdAt", savedOrg.getCreatedAt())
         ));
     }
 

@@ -22,7 +22,6 @@ run_scenario() {
   req "snapshots-list" GET "/api/v1/filed-returns/snapshots?workflowId=$id"
   expect_status 200
   expect_json 'type == "array"'
-  tds_nil_challan "$id"
   as_accountant
   local stage; stage=$(curl -s -H "Authorization: Bearer $VSA_JWT" \
     "http://localhost:${VSA_API_PORT}/api/v1/workflows/$id" | jq -r '.workflow.stage // .stage')

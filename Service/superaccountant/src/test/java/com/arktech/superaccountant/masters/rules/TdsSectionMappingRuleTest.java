@@ -30,7 +30,18 @@ class TdsSectionMappingRuleTest {
     }
 
     private ValidationContext ctx(List<PreconfiguredMaster> masters) {
-        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of());
+        return ctx(masters, true);
+    }
+
+    private ValidationContext ctx(List<PreconfiguredMaster> masters, boolean tdsDeductor) {
+        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of(), tdsDeductor);
+    }
+
+    @Test
+    void noFindingsWhenNotDeductor() {
+        PreconfiguredMaster expense = configured("Labour Charges", LedgerCategory.EXPENSE, null);
+        PreconfiguredMaster purchase = configured("Cement Purchase", LedgerCategory.PURCHASE, null);
+        assertTrue(rule.execute(ctx(List.of(expense, purchase), false), List.of()).isEmpty());
     }
 
     @Test

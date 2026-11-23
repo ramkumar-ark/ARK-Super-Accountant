@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StartWorkflowDialog } from './StartWorkflowDialog'
 import { api } from '@/lib/api'
 import type { Workflow } from '@/lib/workflowApi'
 
+const auth = vi.hoisted(() => ({
+  user: { role: 'ROLE_OPERATOR', organizationId: 'org-1' },
+}))
+
+vi.mock('@/store/authStore', () => ({
+  useAuthStore: () => auth,
+}))
 vi.mock('@/lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn() },
 }))
@@ -41,10 +49,47 @@ describe('StartWorkflowDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            years: [
+              { financialYear: 2025, applicable: true },
+              { financialYear: 2026, applicable: true },
+            ],
+          },
+        })
+      }
+      if (url === '/organizations/org-1') {
+        return Promise.resolve({ data: { financialYearStart: 4 } })
+      }
+      return Promise.resolve({ data: {} })
+    })
   })
 
+  function applicabilityYears(
+    years: Array<{ financialYear: number; applicable: boolean }>,
+  ) {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') {
+        return Promise.resolve({ data: { years } })
+      }
+      if (url === '/organizations/org-1') {
+        return Promise.resolve({ data: { financialYearStart: 4 } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+  }
+
   function renderDialog() {
-    return render(<StartWorkflowDialog open onClose={onClose} onStarted={onStarted} />)
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <StartWorkflowDialog open onClose={onClose} onStarted={onStarted} />
+      </QueryClientProvider>,
+    )
   }
 
   it('start_tdsPayment_postsMonthlyKey', async () => {
@@ -53,6 +98,7 @@ describe('StartWorkflowDialog', () => {
     vi.mocked(api.post).mockResolvedValue({ data: response })
 
     renderDialog()
+    await screen.findByRole("option", { name: "TDS payment" })
 
     await user.selectOptions(screen.getByLabelText('Type'), 'TDS_PAYMENT')
     fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2025-04' } })
@@ -72,6 +118,7 @@ describe('StartWorkflowDialog', () => {
     vi.mocked(api.post).mockResolvedValue({ data: started({ type: 'TDS_26Q' }) })
 
     renderDialog()
+    await screen.findByRole("option", { name: "TDS payment" })
 
     await user.selectOptions(screen.getByLabelText('Type'), 'TDS_26Q')
     expect(screen.queryByLabelText('Period grain')).not.toBeInTheDocument()
@@ -94,6 +141,7 @@ describe('StartWorkflowDialog', () => {
     vi.mocked(api.post).mockResolvedValue({ data: started({ type: 'GSTR3B' }) })
 
     renderDialog()
+    await screen.findByRole("option", { name: "TDS payment" })
 
     await user.selectOptions(screen.getByLabelText('Type'), 'GSTR3B')
     await user.selectOptions(screen.getByLabelText('Period grain'), 'QUARTERLY')
@@ -114,6 +162,7 @@ describe('StartWorkflowDialog', () => {
     vi.mocked(api.post).mockResolvedValue({ data: started({ type: 'IFF' }) })
 
     renderDialog()
+    await screen.findByRole("option", { name: "TDS payment" })
 
     await user.selectOptions(screen.getByLabelText('Type'), 'IFF')
     expect(screen.queryByLabelText('Period grain')).not.toBeInTheDocument()
@@ -128,6 +177,29 @@ describe('StartWorkflowDialog', () => {
     )
   })
 
+  it('nonApplicablePeriodsDisabled', async () => {
+    applicabilityYears([
+      { financialYear: 2025, applicable: true },
+      { financialYear: 2026, applicable: false },
+    ])
+
+    renderDialog()
+    await screen.findByRole("option", { name: "TDS payment" })
+
+    await userEvent.setup().selectOptions(screen.getByLabelText('Type'), 'TDS_PAYMENT')
+    const period = await screen.findByLabelText('Period')
+
+    // FY 2026-27 (April 2026 onwards) is not a deductor year.
+    fireEvent.change(period, { target: { value: '2026-04' } })
+    await waitFor(() => expect(period).toBeDisabled())
+    expect(period).toHaveAttribute('title', 'Not a TDS deductor this year')
+
+    // FY 2025-26 is applicable again.
+    fireEvent.change(period, { target: { value: '2025-04' } })
+    await waitFor(() => expect(period).toBeEnabled())
+    expect(period).not.toHaveAttribute('title', 'Not a TDS deductor this year')
+  })
+
   it('start_conflict_showsServerMessage', async () => {
     const user = userEvent.setup()
     vi.mocked(api.post).mockRejectedValue({
@@ -135,6 +207,7 @@ describe('StartWorkflowDialog', () => {
     })
 
     renderDialog()
+    await screen.findByRole("option", { name: "TDS payment" })
 
     await user.selectOptions(screen.getByLabelText('Type'), 'TDS_PAYMENT')
     fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2025-04' } })

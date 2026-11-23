@@ -137,7 +137,7 @@ class BaselineConfirmIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Baseline Org","financialYearStart":4}
+                    {"name":"Baseline Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

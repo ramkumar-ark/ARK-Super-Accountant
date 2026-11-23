@@ -68,6 +68,21 @@ public class WorkflowService {
     @Autowired
     private ResponsibilityStartService responsibilityStartService;
 
+    // ObjectProvider keeps this lazy so TdsApplicabilityService (which depends on
+    // ResponsibilityStartSettingsService → WorkflowService) can be wired without a cycle.
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<
+            com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService> tdsApplicabilityServiceProvider;
+
+    private boolean isTdsType(WorkflowType type) {
+        return type == WorkflowType.TDS_PAYMENT || type == WorkflowType.TDS_26Q;
+    }
+
+    /** FY 2025 renders as "FY 2025-26". */
+    public static String fyLabel(int financialYear) {
+        return "FY " + financialYear + "-" + String.format("%02d", (financialYear + 1) % 100);
+    }
+
     @Autowired
     private com.arktech.superaccountant.workflow.seam.BaselineGate baselineGate;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -86,10 +101,17 @@ public class WorkflowService {
 
     public List<Workflow> list(UUID orgId, String type, Integer fy, String stage) {
         List<Workflow> all = workflowRepository.findAllByOrganizationIdOrderByCreatedAtDesc(orgId);
+        java.util.Map<Integer, Boolean> applicableByFy = new java.util.HashMap<>();
         return all.stream()
                 .filter(w -> type == null || w.getType().name().equals(type))
                 .filter(w -> fy == null || w.getFinancialYear() == fy)
                 .filter(w -> stage == null || w.getStage().name().equals(stage))
+                .filter(w -> !isTdsType(w.getType())
+                        || w.getStage() == WorkflowStage.FINALIZED
+                        || w.getStage() == WorkflowStage.FILED
+                        || applicableByFy.computeIfAbsent(w.getFinancialYear(),
+                                year -> tdsApplicabilityServiceProvider.getObject()
+                                        .isApplicable(orgId, year)))
                 .toList();
     }
 
@@ -146,6 +168,12 @@ public class WorkflowService {
                     : PeriodCalendar.resolveMonthly(periodKey, fyStartMonth);
         } catch (java.time.DateTimeException e) {
             throw new WorkflowBadRequestException("Invalid period key: " + periodKey);
+        }
+
+        if (isTdsType(type) && !tdsApplicabilityServiceProvider.getObject()
+                .isApplicableOn(organizationId, range.start())) {
+            throw new WorkflowBadRequestException(
+                    "TDS is not applicable for " + fyLabel(range.financialYear()));
         }
 
         if (type == WorkflowType.GSTR1 || type == WorkflowType.GSTR3B) {

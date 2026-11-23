@@ -1,9 +1,15 @@
 package com.arktech.superaccountant.tds.controllers;
 
+import com.arktech.superaccountant.daybook.models.DayBookUploadJob;
+import com.arktech.superaccountant.daybook.models.ParsedVoucher;
+import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
+import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.tan.DebtorTanGateway;
+import com.arktech.superaccountant.tds.engine.DebtorTdsReceivableScanner;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
 import com.arktech.superaccountant.tds.models.DebtorTan;
 import com.arktech.superaccountant.tds.payload.request.DebtorTanRequest;
@@ -29,13 +35,19 @@ public class DebtorTanController {
     private final DebtorTanGateway debtorTanGateway;
     private final UploadLedgerSnapshotRepository snapshotRepository;
     private final MastersJobGate mastersJobGate;
+    private final DayBookUploadJobRepository dayBookUploadJobRepository;
+    private final ParsedVoucherRepository parsedVoucherRepository;
 
     public DebtorTanController(DebtorTanGateway debtorTanGateway,
                                UploadLedgerSnapshotRepository snapshotRepository,
-                               MastersJobGate mastersJobGate) {
+                               MastersJobGate mastersJobGate,
+                               DayBookUploadJobRepository dayBookUploadJobRepository,
+                               ParsedVoucherRepository parsedVoucherRepository) {
         this.debtorTanGateway = debtorTanGateway;
         this.snapshotRepository = snapshotRepository;
         this.mastersJobGate = mastersJobGate;
+        this.dayBookUploadJobRepository = dayBookUploadJobRepository;
+        this.parsedVoucherRepository = parsedVoucherRepository;
     }
 
     @GetMapping
@@ -64,6 +76,39 @@ public class DebtorTanController {
         return responses.values().stream()
                 .sorted(Comparator.comparing(DebtorTanResponse::ledgerName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
+    }
+
+    @GetMapping("/missing")
+    public List<DebtorTdsReceivableScanner.DebtorTanGap> missing(
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        UUID orgId = principal.getOrganizationId();
+        Optional<DayBookUploadJob> dayBookJob = dayBookUploadJobRepository
+                .findTopByOrganizationIdAndStatusInOrderByCreatedAtDesc(orgId,
+                        java.util.EnumSet.of(UploadJobStatus.COMPLETED,
+                                UploadJobStatus.COMPLETED_WITH_MISMATCHES));
+        if (dayBookJob.isEmpty()) {
+            return List.of();
+        }
+        Set<String> debtorKeys = new HashSet<>();
+        mastersJobGate.latestCompletedMastersJob(orgId).ifPresent(mastersJobId -> {
+            for (UploadLedgerSnapshot snapshot : snapshotRepository.findByUploadJobId(mastersJobId)) {
+                if (isDebtor(snapshot)) {
+                    debtorKeys.add(TdsEngine.key(snapshot.getLedgerName()));
+                }
+            }
+        });
+        Map<String, String> tansByKey = new HashMap<>();
+        for (DebtorTan record : debtorTanGateway.findAll(orgId)) {
+            tansByKey.putIfAbsent(record.getLedgerKey(), record.getTan());
+        }
+        List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
+                parsedVoucherRepository.findByUploadJobId(dayBookJob.get().getId()),
+                debtorKeys, tansByKey);
+        gaps.sort(Comparator.comparing(DebtorTdsReceivableScanner.DebtorTanGap::voucherDate,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(DebtorTdsReceivableScanner.DebtorTanGap::debtorLedgerName,
+                        String.CASE_INSENSITIVE_ORDER));
+        return gaps;
     }
 
     @PutMapping

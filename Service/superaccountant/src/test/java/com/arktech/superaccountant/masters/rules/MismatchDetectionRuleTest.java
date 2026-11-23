@@ -47,7 +47,28 @@ class MismatchDetectionRuleTest {
     }
 
     private ValidationContext ctx(List<PreconfiguredMaster> masters) {
-        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of());
+        return ctx(masters, true);
+    }
+
+    private ValidationContext ctx(List<PreconfiguredMaster> masters, boolean tdsDeductor) {
+        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of(), tdsDeductor);
+    }
+
+    @Test
+    void noTdsMismatchWhenNotDeductor() {
+        PreconfiguredMaster m = configured("TDS Payable - 194C", LedgerCategory.TDS, "Duties & Taxes", null, true);
+        ParsedLedger l = uploaded("TDS Payable - 194C", LedgerCategory.TDS, "Duties & Taxes", null, false);
+        List<ValidationFinding> findings = rule.execute(ctx(List.of(m), false), List.of(l));
+        assertTrue(findings.stream().noneMatch(f -> f.getMismatchType() == MismatchType.TDS_APPLICABILITY_MISMATCH));
+    }
+
+    @Test
+    void gstMismatchStillRaisedWhenNotDeductor() {
+        PreconfiguredMaster m = configured("Input CGST @6%", LedgerCategory.GST, "Duties & Taxes", true, null);
+        ParsedLedger l = uploaded("Input CGST @6%", LedgerCategory.GST, "Duties & Taxes", false, null);
+        List<ValidationFinding> findings = rule.execute(ctx(List.of(m), false), List.of(l));
+        assertEquals(1, findings.size());
+        assertEquals(MismatchType.GST_APPLICABILITY_MISMATCH, findings.get(0).getMismatchType());
     }
 
     @Test

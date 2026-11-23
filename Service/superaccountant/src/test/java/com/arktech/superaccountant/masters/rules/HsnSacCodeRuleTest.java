@@ -38,7 +38,7 @@ class HsnSacCodeRuleTest {
     }
 
     private ValidationContext ctx(List<PreconfiguredMaster> masters) {
-        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of());
+        return new ValidationContext(UUID.randomUUID(), "testuser", masters, Map.of(), true);
     }
 
     @Test
@@ -93,7 +93,7 @@ class HsnSacCodeRuleTest {
 
     private ValidationContext ctx(List<PreconfiguredMaster> masters, boolean requireOnExpense) {
         return new ValidationContext(UUID.randomUUID(), "testuser", masters,
-                Map.of("REQUIRE_HSN_SAC_ON_EXPENSE", requireOnExpense));
+                Map.of("REQUIRE_HSN_SAC_ON_EXPENSE", requireOnExpense), true);
     }
 
     @Test

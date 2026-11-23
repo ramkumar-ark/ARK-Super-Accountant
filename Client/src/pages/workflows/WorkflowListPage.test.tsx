@@ -7,7 +7,7 @@ import { WorkflowListPage } from './WorkflowListPage'
 import { api } from '@/lib/api'
 import type { Workflow } from '@/lib/workflowApi'
 
-const auth = vi.hoisted(() => ({ user: { role: 'ROLE_OPERATOR' } }))
+const auth = vi.hoisted(() => ({ user: { role: 'ROLE_OPERATOR', organizationId: undefined as string | undefined } }))
 
 vi.mock('@/store/authStore', () => ({
   useAuthStore: () => auth,
@@ -63,7 +63,7 @@ function renderPage() {
 describe('WorkflowListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    auth.user = { role: 'ROLE_OPERATOR' }
+    auth.user = { role: 'ROLE_OPERATOR', organizationId: 'org-1' }
   })
 
   it('list_groupsByFinancialYearInPeriodOrder', async () => {
@@ -131,7 +131,7 @@ describe('WorkflowListPage', () => {
 
   it('list_auditorSeesNoStartButton', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
-    auth.user = { role: 'ROLE_AUDITOR_CA' }
+    auth.user = { role: 'ROLE_AUDITOR_CA', organizationId: 'org-1' }
     renderPage()
     await screen.findByText('No workflows yet.')
     expect(screen.queryByRole('button', { name: 'Start workflow' })).not.toBeInTheDocument()
@@ -139,7 +139,7 @@ describe('WorkflowListPage', () => {
 
   it('list_ownerSeesNoStartButton', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
-    auth.user = { role: 'ROLE_OWNER' }
+    auth.user = { role: 'ROLE_OWNER', organizationId: 'org-1' }
     renderPage()
     await screen.findByText('No workflows yet.')
     expect(screen.queryByRole('button', { name: 'Start workflow' })).not.toBeInTheDocument()
@@ -149,6 +149,41 @@ describe('WorkflowListPage', () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
     renderPage()
     expect(await screen.findByText('No workflows yet.')).toBeInTheDocument()
+  })
+
+  it('tdsTypesHiddenWhenNoDeductorYear', async () => {
+    auth.user = { role: 'ROLE_OPERATOR', organizationId: 'org-1' }
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            years: [
+              { financialYear: 2025, applicable: false },
+              { financialYear: 2026, applicable: false },
+            ],
+          },
+        })
+      }
+      if (url === '/v1/workflows') return Promise.resolve({ data: [] })
+      return Promise.resolve({ data: {} })
+    })
+
+    renderPage()
+
+    await screen.findByText('No workflows yet.')
+    const filterOptions = within(screen.getByLabelText('Type')).getAllByRole('option')
+      .map((o) => o.getAttribute('value'))
+    expect(filterOptions).not.toContain('TDS_PAYMENT')
+    expect(filterOptions).not.toContain('TDS_26Q')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start workflow' }))
+    const dialogType = await screen.findByLabelText('Type', {
+      selector: '[role="dialog"] select',
+    })
+    const dialogValues = within(dialogType).getAllByRole('option')
+      .map((o) => o.getAttribute('value'))
+    expect(dialogValues).not.toContain('TDS_PAYMENT')
+    expect(dialogValues).not.toContain('TDS_26Q')
   })
 
   it('list_when403Forbidden_showsAccessDeniedAndOrgPrompt', async () => {

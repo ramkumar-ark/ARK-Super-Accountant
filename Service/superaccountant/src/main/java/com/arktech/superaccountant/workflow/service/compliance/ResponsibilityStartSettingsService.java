@@ -44,6 +44,16 @@ public class ResponsibilityStartSettingsService {
     @Autowired
     private SnapshotService snapshotService;
 
+    // ObjectProvider keeps this lazy to avoid a construction cycle with
+    // TdsApplicabilityService, which injects this service.
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<
+            com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService> tdsApplicabilityServiceProvider;
+
+    private static boolean isTdsType(WorkflowType type) {
+        return type == WorkflowType.TDS_PAYMENT || type == WorkflowType.TDS_26Q;
+    }
+
     public List<ResponsibilityStartResponse> list(UUID organizationId) {
         List<ResponsibilityStartResponse> responses = new ArrayList<>();
         for (WorkflowType type : WorkflowType.values()) {
@@ -64,6 +74,13 @@ public class ResponsibilityStartSettingsService {
         if (!isPeriodStart) {
             throw new WorkflowBadRequestException(
                     "firstPeriodStart must be a period start for " + type);
+        }
+        if (isTdsType(type) && !tdsApplicabilityServiceProvider.getObject()
+                .anyApplicableFrom(organizationId, firstPeriodStart)) {
+            throw new WorkflowBadRequestException("TDS is not applicable for "
+                    + com.arktech.superaccountant.workflow.service.WorkflowService.fyLabel(
+                            com.arktech.superaccountant.workflow.service.period.PeriodCalendar
+                                    .financialYearOf(firstPeriodStart, org.getFinancialYearStart())));
         }
         if (workflowRepository.existsByOrganizationIdAndTypeAndStageNot(organizationId, type, WorkflowStage.BASELINE)) {
             throw new WorkflowConflictException(
@@ -111,7 +128,13 @@ public class ResponsibilityStartSettingsService {
                     CompliancePeriods.periods(type, coverageService.coverageStart(organizationId),
                             row.getFirstPeriodStart(), org.getFinancialYearStart(),
                             d -> workflowService.profileInForce(organizationId, d));
+            java.util.Map<Integer, Boolean> applicableByFy = new java.util.HashMap<>();
             for (com.arktech.superaccountant.workflow.service.period.PeriodCalendar.PeriodRange range : periods) {
+                if (isTdsType(type) && !applicableByFy.computeIfAbsent(range.financialYear(),
+                        year -> tdsApplicabilityServiceProvider.getObject()
+                                .isApplicable(organizationId, year))) {
+                    continue;
+                }
                 Workflow w = new Workflow();
                 w.setOrganizationId(organizationId);
                 w.setType(type);

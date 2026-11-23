@@ -143,7 +143,7 @@ class FiledReturnBaselineIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Baseline View Org","financialYearStart":4}
+                    {"name":"Baseline View Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

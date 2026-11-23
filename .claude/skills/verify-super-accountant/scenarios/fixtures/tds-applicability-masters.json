@@ -1,0 +1,14 @@
+{"tallymessage":[
+  {"group":{"name":"Sales Accounts","parent":""}},
+  {"group":{"name":"Indirect Expenses","parent":""}},
+  {"group":{"name":"Sundry Debtors","parent":""}},
+  {"group":{"name":"Sundry Creditors","parent":""}},
+  {"ledger":{"name":"Scenario Sales Ledger","guid":"SYN-TDSA-SALES","parent":"Sales Accounts","gstapplicable":"Yes"}},
+  {"ledger":{"name":"Scenario Sundry Debtor","guid":"SYN-TDSA-DEB","parent":"Sundry Debtors"}},
+  {"ledger":{"name":"TDS Receivable","guid":"SYN-TDSA-TDSRECL","parent":"Sundry Debtors"}},
+  {"ledger":{"name":"Scenario Bad PAN","guid":"SYN-TDSA-BADPAN","parent":"Sundry Creditors","incometaxnumber":"AB1PE1234F"}},
+  {"ledger":{"name":"Scenario Contractor Expense","guid":"SYN-TDSA-194C","parent":"Indirect Expenses"}},
+  {"ledger":{"name":"Scenario Rent Expense","guid":"SYN-TDSA-194IB","parent":"Indirect Expenses"}},
+  {"ledger":{"name":"Scenario TDS Payable 194C","guid":"SYN-TDSA-PAY194C","parent":"Sundry Creditors"}},
+  {"ledger":{"name":"Scenario Contractor Party","guid":"SYN-TDSA-PARTY","parent":"Sundry Creditors","incometaxnumber":"ABCPX1234F"}}
+]}

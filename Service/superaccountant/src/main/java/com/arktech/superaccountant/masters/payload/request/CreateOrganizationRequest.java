@@ -1,11 +1,14 @@
 package com.arktech.superaccountant.masters.payload.request;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+
+import java.math.BigDecimal;
 
 @Data
 public class CreateOrganizationRequest {
@@ -24,4 +27,18 @@ public class CreateOrganizationRequest {
     @Min(value = 1, message = "Financial year start must be a month number 1–12")
     @Max(value = 12, message = "Financial year start must be a month number 1–12")
     private int financialYearStart = 4;
+
+    /** Optional; accepted in any case and normalised to upper case by the controller. */
+    private String tan;
+
+    /** Used only when the PAN gives no deductor code; validated by {@code DeductorType.isValid}. */
+    private String deductorType;
+
+    /** Required for individual/HUF deductors unless derivable from turnover and nature. */
+    private Boolean tdsTurnoverExceeded;
+
+    @DecimalMin(value = "0", message = "Prior year turnover must be zero or more")
+    private BigDecimal priorYearTurnover;
+
+    private String turnoverNature;
 }

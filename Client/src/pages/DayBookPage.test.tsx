@@ -46,8 +46,18 @@ describe('DayBookPage — upload history', () => {
     mockGet.mockResolvedValue(uploadsPage as never)
   })
 
+  function renderPage() {
+    return render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <DayBookPage />
+      </QueryClientProvider>,
+    )
+  }
+
   it('does not query masters gate-status', async () => {
-    render(<DayBookPage />)
+    renderPage()
 
     await waitFor(() => {
       expect(mockGet).not.toHaveBeenCalledWith('/v1/masters/gate-status')
@@ -55,7 +65,7 @@ describe('DayBookPage — upload history', () => {
   })
 
   it('lists previous uploads with their coverage', async () => {
-    render(<DayBookPage />)
+    renderPage()
 
     await waitFor(() => {
       expect(screen.getByText('daybook-april.json')).toBeInTheDocument()
@@ -64,7 +74,7 @@ describe('DayBookPage — upload history', () => {
   })
 
   it('has no upload form', async () => {
-    render(<DayBookPage />)
+    renderPage()
 
     await waitFor(() => {
       expect(mockGet).toHaveBeenCalledWith('/v1/day-book/uploads', {
@@ -78,7 +88,7 @@ describe('DayBookPage — upload history', () => {
   })
 
   it('links to workflows', async () => {
-    render(<DayBookPage />)
+    renderPage()
 
     expect(screen.getByText('Uploads now happen inside a workflow.')).toBeInTheDocument()
     const link = screen.getByRole('link', { name: 'Go to Workflows' })

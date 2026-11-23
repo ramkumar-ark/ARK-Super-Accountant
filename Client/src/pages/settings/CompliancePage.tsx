@@ -2,6 +2,7 @@ import { useAuthStore } from '@/store/authStore'
 import { AppShell } from '@/components/AppShell'
 import { FilerProfileSection } from './FilerProfileSection'
 import { DeductorSection } from './DeductorSection'
+import { TdsApplicabilitySection } from './TdsApplicabilitySection'
 import { TaxLedgerMappingSection } from './TaxLedgerMappingSection'
 import { ResponsibilityStartSection } from './ResponsibilityStartSection'
 import { BaselineSection } from './BaselineSection'
@@ -16,6 +17,7 @@ export function CompliancePage() {
           <h1 className="text-xl font-semibold">Compliance settings</h1>
           <FilerProfileSection />
           <DeductorSection />
+          <TdsApplicabilitySection />
           <TaxLedgerMappingSection />
           <ResponsibilityStartSection />
           <BaselineSection />

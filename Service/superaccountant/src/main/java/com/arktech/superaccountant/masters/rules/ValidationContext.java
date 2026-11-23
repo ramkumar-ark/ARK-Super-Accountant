@@ -10,5 +10,6 @@ public record ValidationContext(
         UUID organizationId,
         String uploadedBy,
         List<PreconfiguredMaster> preconfiguredMasters,
-        Map<String, Object> settings
+        Map<String, Object> settings,
+        boolean tdsDeductor
 ) {}
