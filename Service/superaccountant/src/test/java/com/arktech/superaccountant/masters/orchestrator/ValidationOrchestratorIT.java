@@ -74,7 +74,7 @@ class ValidationOrchestratorIT {
         );
 
         ValidationContext ctx = new ValidationContext(
-                UUID.randomUUID(), "testuser", masters, Map.of()
+                UUID.randomUUID(), "testuser", masters, Map.of(), true
         );
 
         List<ValidationFinding> findings = tdsSectionMappingRule.execute(ctx, List.of());
@@ -98,7 +98,7 @@ class ValidationOrchestratorIT {
         );
 
         ValidationContext ctx = new ValidationContext(
-                UUID.randomUUID(), "testuser", masters, Map.of()
+                UUID.randomUUID(), "testuser", masters, Map.of(), true
         );
 
         List<ValidationFinding> findings = gstinPresenceRule.execute(ctx, List.of());

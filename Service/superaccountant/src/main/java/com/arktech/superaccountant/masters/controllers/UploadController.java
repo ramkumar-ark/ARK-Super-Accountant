@@ -59,6 +59,12 @@ public class UploadController {
     private OrganizationSettingsService organizationSettingsService;
 
     @Autowired
+    private com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService tdsApplicabilityService;
+
+    @Autowired
+    private com.arktech.superaccountant.workflow.service.CoverageService coverageService;
+
+    @Autowired
     private TallyParserService tallyParserService;
 
     @Autowired
@@ -274,11 +280,13 @@ public class UploadController {
 
         List<PreconfiguredMaster> configuredMasters = masterRepository.findByOrganizationIdAndActiveTrue(orgId);
 
+        boolean tdsDeductor = tdsApplicabilityService.anyApplicableFrom(orgId, coverageService.coverageStart(orgId));
         ValidationContext context = new ValidationContext(
                 orgId,
                 principal.getUsername(),
                 configuredMasters,
-                organizationSettingsService.validationSettings(orgId)
+                organizationSettingsService.validationSettings(orgId),
+                tdsDeductor
         );
 
         job = orchestrator.runAndPersist(job, parsedLedgers, context);

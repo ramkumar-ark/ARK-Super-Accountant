@@ -7,7 +7,7 @@ import { WorkflowListPage } from './WorkflowListPage'
 import { api } from '@/lib/api'
 import type { Workflow } from '@/lib/workflowApi'
 
-const auth = vi.hoisted(() => ({ user: { role: 'ROLE_OPERATOR' } }))
+const auth = vi.hoisted(() => ({ user: { role: 'ROLE_OPERATOR', organizationId: undefined as string | undefined } }))
 
 vi.mock('@/store/authStore', () => ({
   useAuthStore: () => auth,
@@ -63,7 +63,7 @@ function renderPage() {
 describe('WorkflowListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    auth.user = { role: 'ROLE_OPERATOR' }
+    auth.user = { role: 'ROLE_OPERATOR', organizationId: 'org-1' }
   })
 
   it('list_groupsByFinancialYearInPeriodOrder', async () => {
@@ -131,7 +131,7 @@ describe('WorkflowListPage', () => {
 
   it('list_auditorSeesNoStartButton', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
-    auth.user = { role: 'ROLE_AUDITOR_CA' }
+    auth.user = { role: 'ROLE_AUDITOR_CA', organizationId: 'org-1' }
     renderPage()
     await screen.findByText('No workflows yet.')
     expect(screen.queryByRole('button', { name: 'Start workflow' })).not.toBeInTheDocument()
@@ -139,7 +139,7 @@ describe('WorkflowListPage', () => {
 
   it('list_ownerSeesNoStartButton', async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] })
-    auth.user = { role: 'ROLE_OWNER' }
+    auth.user = { role: 'ROLE_OWNER', organizationId: 'org-1' }
     renderPage()
     await screen.findByText('No workflows yet.')
     expect(screen.queryByRole('button', { name: 'Start workflow' })).not.toBeInTheDocument()

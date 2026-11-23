@@ -47,9 +47,35 @@ const baseFinding = {
 
 function setRole(role: string) {
   useAuthStore.setState({
-    user: { id: 1, username: 'u', email: 'u@t.com', role },
+    user: { id: 1, username: 'u', email: 'u@t.com', role, organizationId: 'org-1' },
     isAuthenticated: true,
   })
+}
+
+function renderPage() {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MastersPage />
+    </QueryClientProvider>,
+  )
+}
+
+const TDS_ON_YEARS = {
+  data: {
+    years: [
+      { financialYear: 2025, applicable: true },
+      { financialYear: 2026, applicable: true },
+    ],
+  },
+}
+
+const TDS_OFF_YEARS = {
+  data: {
+    years: [
+      { financialYear: 2025, applicable: false },
+      { financialYear: 2026, applicable: false },
+    ],
+  },
 }
 
 const stubConfirm = (answer: boolean) => {
@@ -66,6 +92,7 @@ describe('MastersPage — findings resolution (two-stage)', () => {
     current = { ...baseFinding }
     setRole('ROLE_OPERATOR')
     mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') return Promise.resolve(TDS_ON_YEARS)
       if (url.startsWith('/v1/preconfigured-masters')) {
         return Promise.resolve({ data: { content: [], totalElements: 0 } })
       }
@@ -81,7 +108,7 @@ describe('MastersPage — findings resolution (two-stage)', () => {
   })
 
   async function openFindingsTab() {
-    render(<MastersPage />)
+    renderPage()
     const findingsTab = await screen.findByRole('tab', { name: /Findings/ })
     await waitFor(() => expect(findingsTab).not.toBeDisabled())
     await userEvent.click(findingsTab)
@@ -439,7 +466,7 @@ describe('MastersPage — show resolved, reason filter and bulk actions', () => 
   const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
 
   async function openTab() {
-    render(<MastersPage />)
+    renderPage()
     const tab = await screen.findByRole('tab', { name: /Findings/ })
     await waitFor(() => expect(tab).not.toBeDisabled())
     await userEvent.click(tab)
@@ -605,7 +632,7 @@ describe('MastersPage — findings paging and select-all-matching', { timeout: 1
   const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
 
   async function openTab(first = 'Ledger 000') {
-    render(<MastersPage />)
+    renderPage()
     const tab = await screen.findByRole('tab', { name: /Findings/ })
     await waitFor(() => expect(tab).not.toBeDisabled())
     await userEvent.click(tab)
@@ -779,6 +806,7 @@ describe('MastersPage — bulk TDS section and GST not applicable', () => {
       mk('h1', { ruleCode: 'HSN_SAC_CODE' }),
     ]
     mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') return Promise.resolve(TDS_ON_YEARS)
       if (url.startsWith('/v1/preconfigured-masters')) {
         return Promise.resolve({ data: { content: [], totalElements: 0 } })
       }
@@ -800,7 +828,7 @@ describe('MastersPage — bulk TDS section and GST not applicable', () => {
   const realPosts = () => mockPost.mock.calls.filter((c) => !(c[1] as { dryRun?: boolean })?.dryRun)
 
   async function openTab() {
-    render(<MastersPage />)
+    renderPage()
     const tab = await screen.findByRole('tab', { name: /Findings/ })
     await waitFor(() => expect(tab).not.toBeDisabled())
     await userEvent.click(tab)
@@ -896,7 +924,7 @@ describe('MastersPage — validation settings tab', () => {
       if (url === '/v1/validation-settings') return Promise.resolve({ data: { requireHsnSacOnExpense: true } })
       return Promise.resolve({ data: {} })
     })
-    render(<MastersPage />)
+    renderPage()
     await userEvent.click(await screen.findByRole('tab', { name: /Validation settings/ }))
     expect(await screen.findByRole('checkbox', { name: /Require HSN\/SAC/ })).toBeInTheDocument()
   })
@@ -1000,7 +1028,7 @@ describe('MastersPage — reason visibility and Tally group filter', () => {
   })
 
   async function openTab() {
-    render(<MastersPage />)
+    renderPage()
     const tab = await screen.findByRole('tab', { name: /Findings/ })
     await waitFor(() => expect(tab).not.toBeDisabled())
     await userEvent.click(tab)
@@ -1081,5 +1109,91 @@ describe('MastersPage — tally changes tab', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Tally changes' }))
     expect(await screen.findByText(/Back up the company/)).toBeInTheDocument()
     expect(mockGet).toHaveBeenCalledWith('/v1/tally-changes', { params: undefined })
+  })
+})
+
+describe('MastersPage — TDS gating for non-deductors', () => {
+  const tdsFinding = {
+    ...baseFinding,
+    id: 't-1',
+    ruleCode: 'TDS_SECTION_MAPPING',
+    mismatchType: null,
+    ledgerName: 'Rent Ledger',
+  }
+  const masterRow = {
+    id: 'm-1',
+    ledgerName: 'Rent Ledger',
+    category: 'EXPENSE',
+    expectedParentGroup: 'Indirect Expenses',
+    expectedGstApplicable: null,
+    expectedTdsApplicable: null,
+    active: true,
+    createdAt: '2025-05-10T10:00:00Z',
+    updatedAt: '2025-05-10T10:00:00Z',
+    tdsSection: null,
+    gstApplicabilityType: null,
+    hsnSacCode: null,
+    gstin: null,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setRole('ROLE_OPERATOR')
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') return Promise.resolve(TDS_OFF_YEARS)
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [masterRow], totalElements: 1 } })
+      }
+      if (url.includes('size=1&showResolved=false')) return Promise.resolve({ data: { totalElements: 1 } })
+      if (url.startsWith('/v1/uploads/latest/mismatches')) {
+        return Promise.resolve({ data: { content: [tdsFinding], totalElements: 1 } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    mockPost.mockResolvedValue({ data: {} })
+  })
+
+  it('hidesTdsColumnAndBulkWhenNotDeductor', async () => {
+    // Ledgers tab: the TDS Section column is gone.
+    renderPage()
+    await screen.findByText('Rent Ledger')
+    expect(screen.queryByRole('columnheader', { name: 'TDS Section' })).toBeNull()
+
+    // Findings tab: no TDS bulk controls and no TDS rule filter option.
+    await userEvent.click(await screen.findByRole('tab', { name: /Findings/ }))
+    await screen.findByText('Rent Ledger')
+    expect(screen.queryByLabelText('TDS section for selected')).toBeNull()
+    expect(screen.queryByRole('button', { name: /TDS section \(/ })).toBeNull()
+    const ruleFilter = screen.getByLabelText('Filter by rule type')
+    expect(screen.queryByRole('option', { name: 'TDS Section Mapping' })).toBeNull()
+    expect(ruleFilter).toBeInTheDocument()
+  })
+
+  it('keepsDebtorTanTab', async () => {
+    renderPage()
+    const tab = await screen.findByRole('tab', { name: 'Debtor TANs' })
+    await userEvent.click(tab)
+    expect(await screen.findByRole('heading', { name: 'Debtor TANs' })).toBeInTheDocument()
+  })
+
+  it('showsTdsColumnAndBulkWhenDeductor', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-1/tds-applicability') return Promise.resolve(TDS_ON_YEARS)
+      if (url.startsWith('/v1/preconfigured-masters')) {
+        return Promise.resolve({ data: { content: [masterRow], totalElements: 1 } })
+      }
+      if (url.includes('size=1&showResolved=false')) return Promise.resolve({ data: { totalElements: 1 } })
+      if (url.startsWith('/v1/uploads/latest/mismatches')) {
+        return Promise.resolve({ data: { content: [tdsFinding], totalElements: 1 } })
+      }
+      return Promise.resolve({ data: {} })
+    })
+    renderPage()
+    await screen.findByText('Rent Ledger')
+    expect(screen.getByRole('columnheader', { name: 'TDS Section' })).toBeInTheDocument()
+
+    await userEvent.click(await screen.findByRole('tab', { name: /Findings/ }))
+    await screen.findByText('Rent Ledger')
+    expect(screen.getByRole('option', { name: 'TDS Section Mapping' })).toBeInTheDocument()
   })
 })

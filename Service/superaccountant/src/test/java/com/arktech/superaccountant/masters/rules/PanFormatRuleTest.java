@@ -21,7 +21,7 @@ class PanFormatRuleTest {
     private final PanOverrideGateway gateway = mock(PanOverrideGateway.class);
     private final PanFormatRule rule = new PanFormatRule(gateway);
     private final ValidationContext context =
-            new ValidationContext(ORG, "uploader", List.of(), Map.of());
+            new ValidationContext(ORG, "uploader", List.of(), Map.of(), true);
 
     private ParsedLedger ledger(String name, String pan) {
         return ParsedLedger.builder()

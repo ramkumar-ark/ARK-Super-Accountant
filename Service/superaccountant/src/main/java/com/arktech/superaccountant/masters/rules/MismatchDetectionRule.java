@@ -94,8 +94,9 @@ public class MismatchDetectionRule implements ValidationRule {
                         String.valueOf(uploaded.getGstApplicable()), null));
             }
 
-            // TDS_APPLICABILITY_MISMATCH
-            if (configured.getExpectedTdsApplicable() != null
+            // TDS_APPLICABILITY_MISMATCH (deductor-side; skipped when TDS is off for every covered year)
+            if (context.tdsDeductor()
+                    && configured.getExpectedTdsApplicable() != null
                     && !Objects.equals(uploaded.getTdsApplicable(), configured.getExpectedTdsApplicable())) {
                 findings.add(buildFinding(uploaded.getName(), uploaded.getCategory(),
                         MismatchType.TDS_APPLICABILITY_MISMATCH, FindingSeverity.HIGH,
