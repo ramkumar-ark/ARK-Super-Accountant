@@ -164,7 +164,7 @@ class FiledReturnReconIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Recon Org","financialYearStart":4}
+                    {"name":"Recon Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

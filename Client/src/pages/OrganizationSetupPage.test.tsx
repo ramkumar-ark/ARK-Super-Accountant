@@ -303,3 +303,63 @@ describe('OrganizationSetupPage — PAN derived from GSTIN', () => {
     })
   })
 })
+
+describe('OrganizationSetupPage — TDS applicability at registration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setupAuthStoreMock()
+    mockGet.mockResolvedValue({ data: [] })
+    mockPost.mockResolvedValue({ data: { id: 'org-123' } })
+  })
+
+  it('showsTurnoverQuestionForIndividualPan', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    await user.type(screen.getByLabelText('PAN'), 'AAAPA1234A')
+
+    expect(screen.getByText(/Did your turnover last financial year exceed/)).toBeInTheDocument()
+  })
+
+  it('hidesTanWhenIndividualAnswersNo', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    await user.type(screen.getByLabelText('PAN'), 'AAAPA1234A')
+    await user.click(screen.getByRole('radio', { name: 'No' }))
+
+    expect(screen.queryByLabelText('TAN')).not.toBeInTheDocument()
+  })
+
+  it('showsAlwaysDeductsNoteForCompanyPan', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    await user.type(screen.getByLabelText('PAN'), 'AAACA1234A')
+
+    expect(
+      screen.getByText('Companies, firms, trusts and AOPs always deduct TDS.')
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('TAN')).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'Yes' })).not.toBeInTheDocument()
+  })
+
+  it('asksEntityTypeWhenNoGstin', () => {
+    render(<OrganizationSetupPage />)
+
+    expect(screen.getByLabelText('Entity type')).toBeInTheDocument()
+  })
+
+  it('rejectsMalformedTan', async () => {
+    const user = userEvent.setup()
+    render(<OrganizationSetupPage />)
+
+    await user.type(screen.getByLabelText('PAN'), 'AAACA1234A')
+    await user.type(screen.getByLabelText('TAN'), 'ABC')
+    await user.tab()
+
+    expect(
+      screen.getByText('TAN must be 10 characters in the format: ABCD12345E')
+    ).toBeInTheDocument()
+  })
+})

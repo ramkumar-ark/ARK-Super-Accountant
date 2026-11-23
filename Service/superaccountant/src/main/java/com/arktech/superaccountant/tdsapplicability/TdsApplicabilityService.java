@@ -5,11 +5,14 @@ import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicability;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityYear;
+import com.arktech.superaccountant.tdsapplicability.models.TurnoverNature;
 import com.arktech.superaccountant.tdsapplicability.repository.TdsApplicabilityYearRepository;
 import com.arktech.superaccountant.workflow.service.CoverageService;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -77,6 +80,28 @@ public class TdsApplicabilityService {
                         .thenComparing(TdsApplicabilityYear::getFinancialYear))
                 .orElseThrow();
         return fromRow(financialYear, nearest, TdsApplicabilityBasis.CARRIED_FORWARD, true);
+    }
+
+    /**
+     * Writes the user's declared answer for one financial year as a {@code DECLARED}
+     * row (registration and the yearly re-confirmation ask). The row wins over the
+     * entity type on the next resolve for individual/HUF deductors.
+     */
+    public TdsApplicability recordDeclared(UUID orgId, int financialYear, boolean applicable,
+                                           BigDecimal priorYearTurnover, TurnoverNature nature,
+                                           String actor) {
+        TdsApplicabilityYear row = new TdsApplicabilityYear();
+        row.setOrganizationId(orgId);
+        row.setFinancialYear(financialYear);
+        row.setApplicable(applicable);
+        row.setBasis(TdsApplicabilityBasis.DECLARED);
+        row.setPriorYearTurnover(priorYearTurnover);
+        row.setTurnoverNature(nature);
+        row.setDecidedBy(actor);
+        row.setDecidedAt(Instant.now());
+        repository.save(row);
+        return new TdsApplicability(financialYear, applicable, TdsApplicabilityBasis.DECLARED,
+                false, priorYearTurnover, nature);
     }
 
     public boolean isApplicable(UUID orgId, int financialYear) {

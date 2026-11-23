@@ -7,6 +7,39 @@ import { Header } from '@/components/Header'
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/
+const TAN_REGEX = /^[A-Z]{4}[0-9]{5}[A-Z]$/
+const TAN_ERROR = 'TAN must be 10 characters in the format: ABCD12345E'
+
+// Non-government deductor categories per e-TDS file format Annexure 4 (Form 26Q v5.8),
+// matching the entity-type select in settings (DeductorSection.tsx).
+const ENTITY_TYPES = [
+  { code: 'K', label: 'Company' },
+  { code: 'M', label: 'Branch / Division of Company' },
+  { code: 'P', label: 'Association of Person (AOP)' },
+  { code: 'T', label: 'Association of Person (Trust)' },
+  { code: 'J', label: 'Artificial Juridical Person' },
+  { code: 'B', label: 'Body of Individuals' },
+  { code: 'Q', label: 'Individual/HUF' },
+  { code: 'F', label: 'Firm' },
+]
+
+// PAN 4th character → deductor class, per the income-tax PAN structure
+// (mirrors EntityClass on the backend). Individual/HUF is code Q.
+const PAN_CLASS_TO_CODE: Record<string, string> = {
+  C: 'K',
+  F: 'F',
+  A: 'P',
+  T: 'T',
+  B: 'B',
+  J: 'J',
+  P: 'Q',
+  H: 'Q',
+}
+
+function deductorCodeFromPan(pan: string): string | null {
+  if (!PAN_REGEX.test(pan)) return null
+  return PAN_CLASS_TO_CODE[pan.charAt(3)] ?? null
+}
 
 /**
  * Extracts a human-readable message from an unknown axios error.
@@ -45,6 +78,12 @@ export function OrganizationSetupPage() {
   const [fieldErrors, setFieldErrors] = useState({ gstin: '', pan: '' })
   const [fieldValid, setFieldValid] = useState({ gstin: false, pan: false })
   const [panDerived, setPanDerived] = useState(false)
+  const [tan, setTan] = useState('')
+  const [tanError, setTanError] = useState('')
+  const [entityType, setEntityType] = useState('')
+  const [tdsTurnoverExceeded, setTdsTurnoverExceeded] = useState<boolean | null>(null)
+  const [priorYearTurnover, setPriorYearTurnover] = useState('')
+  const [turnoverNature, setTurnoverNature] = useState<'BUSINESS' | 'PROFESSION'>('BUSINESS')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<1 | 2>(1)
@@ -126,12 +165,40 @@ export function OrganizationSetupPage() {
     }
   }
 
+  function handleTanChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setTan(e.target.value.trim().toUpperCase())
+  }
+
+  function handleTanBlur() {
+    if (tan !== '' && !TAN_REGEX.test(tan)) {
+      setTanError(TAN_ERROR)
+    } else {
+      setTanError('')
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (tan !== '' && !TAN_REGEX.test(tan)) {
+      setTanError(TAN_ERROR)
+      return
+    }
+    setTanError('')
+    const derivedCode = deductorCodeFromPan(form.pan)
+    const isIndividual = (derivedCode ?? entityType) === 'Q'
+
+    const payload: Record<string, unknown> = { ...form }
+    if (tan !== '') payload.tan = tan
+    if (derivedCode === null && entityType !== '') payload.deductorType = entityType
+    if (isIndividual) {
+      if (tdsTurnoverExceeded !== null) payload.tdsTurnoverExceeded = tdsTurnoverExceeded
+      if (priorYearTurnover !== '') payload.priorYearTurnover = Number(priorYearTurnover)
+      payload.turnoverNature = turnoverNature
+    }
     setLoading(true)
     try {
-      const response = await api.post('/organizations', { ...form })
+      const response = await api.post('/organizations', payload)
       setCreatedOrgId(response.data.id)
       setStep(2)
     } catch (err: unknown) {
@@ -440,6 +507,155 @@ export function OrganizationSetupPage() {
                   </p>
                 )}
               </div>
+
+              {/* Entity class: TDS question, always-deducts note, entity-type fallback */}
+              {(() => {
+                const derivedCode = deductorCodeFromPan(form.pan)
+                const effectiveCode = derivedCode ?? (entityType === '' ? null : entityType)
+                const isIndividual = effectiveCode === 'Q'
+                const showTan = effectiveCode !== null && (!isIndividual || tdsTurnoverExceeded === true)
+                return (
+                  <>
+                    {derivedCode === null && (
+                      <div>
+                        <label
+                          htmlFor="entity-type"
+                          className="block text-sm font-medium text-[var(--color-text-primary)] mb-1.5"
+                        >
+                          Entity type
+                        </label>
+                        <select
+                          id="entity-type"
+                          aria-label="Entity type"
+                          value={entityType}
+                          onChange={(e) => setEntityType(e.target.value)}
+                          className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors"
+                        >
+                          <option value="">Select</option>
+                          {ENTITY_TYPES.map((t) => (
+                            <option key={t.code} value={t.code}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          Needed to work out whether TDS applies to you
+                        </p>
+                      </div>
+                    )}
+
+                    {effectiveCode !== null && !isIndividual && (
+                      <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-2.5">
+                        <p className="text-sm text-[var(--color-text-primary)]">
+                          Companies, firms, trusts and AOPs always deduct TDS.
+                        </p>
+                      </div>
+                    )}
+
+                    {isIndividual && (
+                      <fieldset>
+                        <legend className="block text-sm font-medium text-[var(--color-text-primary)] mb-1.5">
+                          Did your turnover last financial year exceed ₹1 crore (business) or ₹50
+                          lakh (profession)?
+                        </legend>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
+                            <input
+                              type="radio"
+                              name="tds-turnover-exceeded"
+                              value="yes"
+                              checked={tdsTurnoverExceeded === true}
+                              onChange={() => setTdsTurnoverExceeded(true)}
+                            />
+                            Yes
+                          </label>
+                          <label className="flex items-center gap-1.5 text-sm text-[var(--color-text-primary)]">
+                            <input
+                              type="radio"
+                              name="tds-turnover-exceeded"
+                              value="no"
+                              checked={tdsTurnoverExceeded === false}
+                              onChange={() => setTdsTurnoverExceeded(false)}
+                            />
+                            No
+                          </label>
+                        </div>
+                        {tdsTurnoverExceeded === true && (
+                          <div className="mt-3 grid grid-cols-2 gap-3">
+                            <div>
+                              <label
+                                htmlFor="prior-year-turnover"
+                                className="block text-sm font-medium text-[var(--color-text-primary)] mb-1.5"
+                              >
+                                Last year&rsquo;s turnover (optional)
+                              </label>
+                              <input
+                                id="prior-year-turnover"
+                                type="number"
+                                min={0}
+                                value={priorYearTurnover}
+                                onChange={(e) => setPriorYearTurnover(e.target.value)}
+                                className={inputClass}
+                                placeholder="₹"
+                              />
+                            </div>
+                            <div>
+                              <label
+                                htmlFor="turnover-nature"
+                                className="block text-sm font-medium text-[var(--color-text-primary)] mb-1.5"
+                              >
+                                Nature
+                              </label>
+                              <select
+                                id="turnover-nature"
+                                value={turnoverNature}
+                                onChange={(e) =>
+                                  setTurnoverNature(e.target.value as 'BUSINESS' | 'PROFESSION')
+                                }
+                                className="w-full h-11 px-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] text-sm focus:outline-none focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-subtle)] transition-colors"
+                              >
+                                <option value="BUSINESS">Business</option>
+                                <option value="PROFESSION">Profession</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </fieldset>
+                    )}
+
+                    {showTan && (
+                      <div>
+                        <label
+                          htmlFor="tan"
+                          className="block text-sm font-medium text-[var(--color-text-primary)] mb-1.5"
+                        >
+                          TAN
+                        </label>
+                        <input
+                          id="tan"
+                          type="text"
+                          maxLength={10}
+                          value={tan}
+                          onChange={handleTanChange}
+                          onBlur={handleTanBlur}
+                          aria-describedby="tan-hint"
+                          className={`${inputClass} font-mono`}
+                          placeholder="ABCD12345E"
+                        />
+                        {tanError ? (
+                          <p id="tan-hint" role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
+                            {tanError}
+                          </p>
+                        ) : (
+                          <p id="tan-hint" className="mt-1 text-xs text-[var(--color-text-muted)]">
+                            10-character Tax Deduction and Collection Account Number
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
 
               {/* Registered Address */}
               <div>

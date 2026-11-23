@@ -297,7 +297,7 @@ class SnapshotControllerIT {
         MvcResult createOrgResult = mockMvc.perform(post("/api/organizations")
                         .header("Authorization", "Bearer " + token)
                         .contentType("application/json")
-                        .content("{\"name\":\"Snapshot S5 Org " + suffix + "\",\"financialYearStart\":4}"))
+                        .content("{\"name\":\"Snapshot S5 Org " + suffix + "\",\"pan\":\"AAACA1234A\",\"financialYearStart\":4}"))
                 .andExpect(status().isCreated())
                 .andReturn();
         UUID id = UUID.fromString(json.readValue(createOrgResult.getResponse().getContentAsString(),

@@ -84,7 +84,7 @@ class ResponsibilityStartIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"Compliance Org","financialYearStart":4,"booksStartDate":"2025-04-01"}
+                    {"name":"Compliance Org","pan":"AAACA1234A","financialYearStart":4,"booksStartDate":"2025-04-01"}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();

@@ -472,7 +472,7 @@ class MastersTamperOutcomesIT {
         MvcResult createOrgResult = mockMvc.perform(post("/api/organizations")
                         .header("Authorization", "Bearer " + token)
                         .contentType("application/json")
-                        .content("{\"name\":\"Masters Outcomes Org " + suffix + "\",\"financialYearStart\":4}"))
+                        .content("{\"name\":\"Masters Outcomes Org " + suffix + "\",\"pan\":\"AAACA1234A\",\"financialYearStart\":4}"))
                 .andExpect(status().isCreated()).andReturn();
         Map<?, ?> orgBody = json.readValue(createOrgResult.getResponse().getContentAsString(), Map.class);
         orgId = UUID.fromString(orgBody.get("id").toString());

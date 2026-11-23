@@ -273,7 +273,7 @@ class PreconfiguredMastersControllerIT {
         String token = (String) signinBody.get("token");
 
         // 3. Create org → get org ID
-        String orgPayload = "{\"name\":\"Test Org " + suffix + "\",\"financialYearStart\":4"
+        String orgPayload = "{\"name\":\"Test Org " + suffix + "\",\"pan\":\"AAACA1234A\",\"financialYearStart\":4"
                 + (gstin == null ? "" : ",\"gstin\":\"" + gstin + "\"") + "}";
         MvcResult createOrgResult = mockMvc.perform(post("/api/organizations")
                         .header("Authorization", "Bearer " + token)

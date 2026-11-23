@@ -124,7 +124,7 @@ class FilerProfileAndYearCloseIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("Authorization", "Bearer " + jwt)
                 .content("""
-                    {"name":"FY Org","financialYearStart":4}
+                    {"name":"FY Org","pan":"AAACA1234A","financialYearStart":4}
                     """))
                 .andExpect(status().isCreated())
                 .andReturn();
