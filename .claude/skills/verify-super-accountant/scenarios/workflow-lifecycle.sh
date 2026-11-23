@@ -96,7 +96,7 @@ run_scenario() {
   req "operator-discard-forbidden" POST "/api/v1/workflows/$disc_id/discard"
   expect_status 403
 
-  # Accountant discards workflow (200)
+  # Accountant discards the clean workflow (200)
   VSA_JWT="$(state_get acct_token_discard)"
   req "accountant-discard" POST "/api/v1/workflows/$disc_id/discard"
   expect_status 200
@@ -118,6 +118,44 @@ run_scenario() {
   expect_status 200
   tds_locked=$(echo "$RESP" | jq -r '.[] | select(.type=="TDS_PAYMENT") | .locked')
   [ "$tds_locked" = "false" ] || vsa_fail "expected TDS_PAYMENT to be unlocked after discard, got: $tds_locked"
+
+  # Now verify that a workflow with day-book data bound cannot be discarded (409)
+  local disc_period_data="2026-06"
+  req "create-data-wf" POST /api/v1/workflows '{"type":"TDS_PAYMENT","periodKey":"'$disc_period_data'"}'
+  expect_status 200
+  local data_wf_id; data_wf_id=$(echo "$RESP" | jq -r .id)
+
+  # Upload masters and set tax ledger mapping for discard org so daybook upload succeeds
+  req "upload-discard-masters" POST /api/v1/uploads "" "$VSA_DIR/scenarios/fixtures/masters.json"
+  expect_status "200|201" || vsa_fail "discard org masters upload failed: $RESP"
+  local disc_items='['
+  local disc_first=1 dr dh drole dlabel
+  for dr in OUTPUT:Output INPUT:Input CASH_BALANCE:Cash LIABILITY_BALANCE:Liability CREDIT_BALANCE:"Credit Balance" GST_TDS:"GST TDS"; do
+    drole=${dr%%:*}; dlabel=${dr#*:}
+    for dh in CGST SGST IGST; do
+      [ $disc_first = 1 ] && disc_first=0 || disc_items="$disc_items,"
+      disc_items="$disc_items{\"ledgerName\":\"$dlabel $dh\",\"role\":\"$drole\",\"head\":\"$dh\"}"
+    done
+  done
+  disc_items="$disc_items]"
+  req "discard-tax-mapping" PUT /api/v1/gst/tax-ledger-mapping "{\"items\":$disc_items}"
+  expect_status "200|201" || vsa_fail "discard tax ledger mapping failed: $RESP"
+
+  local dbfile="$VSA_EVIDENCE_RUN/daybook-discard-data.json"
+  jq --arg pre "202606" \
+    '[.tallymessage | to_entries[] | .value.date = ($pre + (["01","05","07","09"])[.key % 4]) | .value] | {tallymessage: .}' \
+    "$VSA_DIR/scenarios/fixtures/daybook.json" > "$dbfile"
+  local url="http://localhost:${VSA_API_PORT}/api/v1/workflows/$data_wf_id/upload"
+  local out
+  out=$(curl -s -X POST -H "Authorization: Bearer $VSA_JWT" \
+        -F "file=@$dbfile" -F "coverageFrom=2026-04-01" -F "coverageTo=2026-06-30" \
+        -o "$VSA_EVIDENCE_RUN/last-body" -w '%{http_code}' "$url")
+  STATUS="$out"; RESP=$(cat "$VSA_EVIDENCE_RUN/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$data_wf_id/upload"; VSA_STEP="upload-data-wf"
+  expect_status 200 || vsa_fail "daybook upload for discard data check failed: $RESP"
+
+  # Discarding a workflow with day-book data bound is refused with 409
+  req "discard-with-data-conflict" POST "/api/v1/workflows/$data_wf_id/discard"
+  expect_status 409
 
   # Restore default accountant token for any subsequent scenarios
   as_accountant
