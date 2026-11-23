@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
+import { getOrganization } from '@/lib/tdsApi'
+import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import {
   getResponsibilityStarts,
   putResponsibilityStart,
@@ -11,11 +13,30 @@ import { WORKFLOW_TYPE_LABEL, WORKFLOW_TYPES, type WorkflowType } from '@/lib/wo
 
 const ORDER: WorkflowType[] = [...WORKFLOW_TYPES]
 
+const TDS_TYPES: WorkflowType[] = ['TDS_PAYMENT', 'TDS_26Q']
+
+/** FY of a "yyyy-mm-dd" value; FY 2026-27 starts in month 4 → 2026-05 is FY 2026. */
+function fyOfDate(date: string, fyStartMonth: number): number {
+  const [year, m] = date.split('-').map(Number)
+  return m >= fyStartMonth ? year : year - 1
+}
+
 export function ResponsibilityStartSection() {
   const { user } = useAuthStore()
+  const orgId = user?.organizationId
   const queryClient = useQueryClient()
   const canEdit = user?.role === 'ROLE_ACCOUNTANT'
   const [error, setError] = useState<string | null>(null)
+
+  const tdsApplicability = useTdsApplicability(orgId)
+  const anyTdsOn = tdsApplicability.anyTdsOn
+  const isTdsOnFor = tdsApplicability.isTdsOnFor
+  const { data: org } = useQuery({
+    queryKey: ['organization', orgId],
+    queryFn: () => getOrganization(orgId as string),
+    enabled: !!orgId,
+  })
+  const fyStartMonth = (org?.financialYearStart as number | undefined) ?? 4
 
   const { data: rows, isLoading } = useQuery({
     queryKey: ['responsibility-starts'],
@@ -60,9 +81,12 @@ export function ResponsibilityStartSection() {
           </tr>
         </thead>
         <tbody>
-          {ORDER.map((type) => {
+          {ORDER.filter((type) => !TDS_TYPES.includes(type) || anyTdsOn).map((type) => {
             const row = byType.get(type)
             const date = row?.firstPeriodStart ?? ''
+            const isTds = TDS_TYPES.includes(type)
+            const fy = isTds && date ? fyOfDate(date, fyStartMonth) : null
+            const notApplicable = fy !== null && !isTdsOnFor(fy)
             return (
               <tr key={type} className="border-b">
                 <td className="py-2">{WORKFLOW_TYPE_LABEL[type]}</td>
@@ -90,7 +114,8 @@ export function ResponsibilityStartSection() {
                     <RespEditControl
                       type={type}
                       initialDate={date}
-                      disabled={row?.locked ?? false}
+                      disabled={(row?.locked ?? false) || notApplicable}
+                      title={notApplicable ? 'Not a TDS deductor this year' : undefined}
                       onSave={(d) => mutation.mutate({ type, date: d })}
                     />
                   )}
@@ -108,11 +133,13 @@ function RespEditControl({
   type,
   initialDate,
   disabled,
+  title,
   onSave,
 }: {
   type: WorkflowType
   initialDate: string
   disabled: boolean
+  title?: string
   onSave: (date: string) => void
 }) {
   const [date, setDate] = useState(initialDate)
@@ -123,6 +150,7 @@ function RespEditControl({
         aria-label={`${WORKFLOW_TYPE_LABEL[type]} responsibility start date`}
         value={date}
         disabled={disabled}
+        title={title}
         onChange={(e) => setDate(e.target.value)}
         className="border rounded px-2 py-1 text-sm"
       />
