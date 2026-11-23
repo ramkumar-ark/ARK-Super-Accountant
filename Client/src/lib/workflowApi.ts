@@ -80,6 +80,10 @@ export function isAccountant(role: string | undefined): boolean {
   return role === 'ROLE_ACCOUNTANT'
 }
 
+export function canDiscardWorkflow(role: string | undefined): boolean {
+  return role === 'ROLE_OWNER' || role === 'ROLE_ACCOUNTANT'
+}
+
 export interface WorkflowDependency {
   type: string
   periodKey: string
@@ -190,6 +194,10 @@ export function recordPortalUpload(
   note?: string,
 ): Promise<{ recorded: boolean }> {
   return api.post(`/v1/workflows/${id}/gstr1/portal-upload`, { fileHash, note }).then((res) => res.data)
+}
+
+export function discardWorkflow(id: string): Promise<Workflow> {
+  return api.post(`/v1/workflows/${id}/discard`).then((res) => res.data)
 }
 
 export const FILING_REF_LABEL: Record<WorkflowType, string> = {

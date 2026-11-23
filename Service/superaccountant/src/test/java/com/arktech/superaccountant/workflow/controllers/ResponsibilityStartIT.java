@@ -289,6 +289,75 @@ class ResponsibilityStartIT {
     }
 
     @Test
+    void discardStartedWorkflow_unlocksResponsibilityStart() throws Exception {
+        Setup s = setup();
+        // 1. Initially unlocked
+        mockMvc.perform(get("/api/v1/compliance/responsibility-start")
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.type=='TDS_PAYMENT')].locked").value(false));
+
+        // 2. Start workflow for 2025-07 (TDS_PAYMENT)
+        MvcResult wfRes = mockMvc.perform(post("/api/v1/workflows")
+                .header("Authorization", "Bearer " + s.operatorJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"type":"TDS_PAYMENT","periodKey":"2025-07"}
+                    """))
+                .andExpect(status().isOk())
+                .andReturn();
+        String workflowId = objectMapper.readTree(wfRes.getResponse().getContentAsString()).get("id").asText();
+
+        // 3. Now responsibility-start is locked
+        mockMvc.perform(get("/api/v1/compliance/responsibility-start")
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.type=='TDS_PAYMENT')].locked").value(true));
+
+        // Setting responsibility start is refused with 409
+        mockMvc.perform(put("/api/v1/compliance/responsibility-start")
+                .header("Authorization", "Bearer " + s.accountantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"type":"TDS_PAYMENT","firstPeriodStart":"2025-06-01"}
+                    """))
+                .andExpect(status().isConflict());
+
+        // 4. Operator cannot discard (403)
+        mockMvc.perform(post("/api/v1/workflows/{id}/discard", workflowId)
+                .header("Authorization", "Bearer " + s.operatorJwt()))
+                .andExpect(status().isForbidden());
+
+        // 5. Accountant discards the started workflow
+        mockMvc.perform(post("/api/v1/workflows/{id}/discard", workflowId)
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        // 6. Workflow no longer appears in active workflows list
+        mockMvc.perform(get("/api/v1/workflows")
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='" + workflowId + "')]").doesNotExist());
+
+        // 7. Responsibility start is now unlocked again!
+        mockMvc.perform(get("/api/v1/compliance/responsibility-start")
+                .header("Authorization", "Bearer " + s.accountantJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.type=='TDS_PAYMENT')].locked").value(false));
+
+        // And setting responsibility start now succeeds (200)
+        mockMvc.perform(put("/api/v1/compliance/responsibility-start")
+                .header("Authorization", "Bearer " + s.accountantJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"type":"TDS_PAYMENT","firstPeriodStart":"2025-06-01"}
+                    """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locked").value(false));
+    }
+
+    @Test
     void start_beforeResponsibilityStart_is400() throws Exception {
         Setup s = setup();
         putStart(s.accountantJwt(), "TDS_PAYMENT", "2025-07-01", 200);

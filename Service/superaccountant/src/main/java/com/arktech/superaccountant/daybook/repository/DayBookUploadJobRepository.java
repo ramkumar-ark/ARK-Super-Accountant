@@ -50,4 +50,6 @@ public interface DayBookUploadJobRepository extends JpaRepository<DayBookUploadJ
      * Use this method on all read endpoints to prevent cross-tenant data access (T-4-01).
      */
     Optional<DayBookUploadJob> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+    boolean existsByCreatedForWorkflowId(UUID createdForWorkflowId);
 }

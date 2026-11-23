@@ -82,7 +82,7 @@ public class ResponsibilityStartSettingsService {
                             com.arktech.superaccountant.workflow.service.period.PeriodCalendar
                                     .financialYearOf(firstPeriodStart, org.getFinancialYearStart())));
         }
-        if (workflowRepository.existsByOrganizationIdAndTypeAndStageNot(organizationId, type, WorkflowStage.BASELINE)) {
+        if (workflowRepository.existsByOrganizationIdAndTypeAndStageNotAndActiveTrue(organizationId, type, WorkflowStage.BASELINE)) {
             throw new WorkflowConflictException(
                     "Responsibility start for " + type + " is locked: a workflow already exists");
         }
@@ -156,7 +156,7 @@ public class ResponsibilityStartSettingsService {
     private ResponsibilityStartResponse toResponse(UUID organizationId, WorkflowType type) {
         ResponsibilityStart row = responsibilityStartRepository
                 .findByOrganizationIdAndType(organizationId, type).orElse(null);
-        boolean locked = workflowRepository.existsByOrganizationIdAndTypeAndStageNot(
+        boolean locked = workflowRepository.existsByOrganizationIdAndTypeAndStageNotAndActiveTrue(
                 organizationId, type, WorkflowStage.BASELINE);
         int baselineRowCount = workflowRepository
                 .findAllByOrganizationIdAndTypeAndStageAndActiveTrue(organizationId, type, WorkflowStage.BASELINE)

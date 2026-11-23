@@ -21,4 +21,6 @@ public interface FiledReturnSnapshotRepository extends JpaRepository<FiledReturn
 
     List<FiledReturnSnapshot> findAllByOrganizationIdAndBaselineWorkflowIdOrderByFilingPeriodAscImportedAtAsc(
             UUID organizationId, UUID baselineWorkflowId);
+
+    boolean existsByBaselineWorkflowId(UUID baselineWorkflowId);
 }

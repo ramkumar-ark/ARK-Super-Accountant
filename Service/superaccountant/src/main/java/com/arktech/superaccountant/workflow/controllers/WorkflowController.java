@@ -156,6 +156,14 @@ public class WorkflowController {
                         request.getChannel())));
     }
 
+    @PostMapping("/{id}/discard")
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    public ResponseEntity<?> discard(@AuthenticationPrincipal UserDetailsImpl principal,
+                                     @PathVariable UUID id) {
+        return handle(principal, () -> WorkflowResponse.from(
+                workflowService.discard(principal.getOrganizationId(), id, principal.getUsername())));
+    }
+
     private ResponseEntity<?> handle(UserDetailsImpl principal, Supplier<Object> action) {
         UUID orgId = principal.getOrganizationId();
         if (orgId == null) {
