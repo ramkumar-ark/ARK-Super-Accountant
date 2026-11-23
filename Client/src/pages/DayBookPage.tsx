@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { AppShell } from '@/components/AppShell'
+import { PanOnlyAdvisoryPanel } from '@/components/tds/PanOnlyAdvisoryPanel'
 import { UploadChangeList } from '@/components/snapshot/UploadChangeList'
 import { api } from '@/lib/api'
 
@@ -102,7 +103,10 @@ export function DayBookPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+        </div>
+
+        <PanOnlyAdvisoryPanel />
+
         </section>
       </main>
     </AppShell>

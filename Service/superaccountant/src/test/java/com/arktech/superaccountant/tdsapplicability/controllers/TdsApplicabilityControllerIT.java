@@ -6,11 +6,23 @@ import com.arktech.superaccountant.login.models.User;
 import com.arktech.superaccountant.login.repository.RoleRepository;
 import com.arktech.superaccountant.login.repository.UserRepository;
 import com.arktech.superaccountant.login.security.jwt.JwtUtils;
+import com.arktech.superaccountant.daybook.models.DayBookUploadJob;
+import com.arktech.superaccountant.daybook.models.ParsedVoucher;
+import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
+import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
+import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.masters.models.Organization;
+import com.arktech.superaccountant.masters.models.UploadJob;
+import com.arktech.superaccountant.masters.models.UploadJobStatus;
+import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.models.UserOrganization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.masters.repository.UploadJobRepository;
+import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
 import com.arktech.superaccountant.support.TestDatabase;
+import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService;
+import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
 import com.arktech.superaccountant.workflow.models.ResponsibilityStart;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
@@ -78,6 +90,76 @@ class TdsApplicabilityControllerIT {
 
     @Autowired
     private ResponsibilityStartRepository responsibilityStartRepository;
+
+    @Autowired
+    private TdsApplicabilityService tdsApplicabilityService;
+
+    @Autowired
+    private UploadJobRepository uploadJobRepository;
+
+    @Autowired
+    private UploadLedgerSnapshotRepository snapshotRepository;
+
+    @Autowired
+    private DayBookUploadJobRepository dayBookUploadJobRepository;
+
+    @Autowired
+    private ParsedVoucherRepository parsedVoucherRepository;
+
+    @Test
+    void panOnlyAdvisoriesForNonDeductorQOrg() throws Exception {
+        Organization org = orgWithPan("AAAPA1234A", "ta_panonly_owner", ERole.ROLE_OWNER);
+        String jwt = user("ta_panonly_owner", ERole.ROLE_OWNER, org.getId());
+        tdsApplicabilityService.recordYear(org.getId(), 2025, false,
+                TdsApplicabilityBasis.DECLARED, null, null, null, "it");
+
+        UploadJob mastersJob = new UploadJob();
+        mastersJob.setOrganizationId(org.getId());
+        mastersJob.setFileName("masters.xml");
+        mastersJob.setStatus(UploadJobStatus.COMPLETED);
+        mastersJob.setUploadedBy("it");
+        UUID mastersJobId = uploadJobRepository.save(mastersJob).getId();
+        UploadLedgerSnapshot snapshot = new UploadLedgerSnapshot();
+        snapshot.setUploadJobId(mastersJobId);
+        snapshot.setOrganizationId(org.getId());
+        snapshot.setLedgerName("Contractor X");
+        snapshot.setTdsSection("194C");
+        snapshotRepository.save(snapshot);
+
+        DayBookUploadJob dayBookJob = new DayBookUploadJob();
+        dayBookJob.setOrganizationId(org.getId());
+        dayBookJob.setFileName("daybook.xml");
+        dayBookJob.setStatus(UploadJobStatus.COMPLETED);
+        dayBookJob.setUploadedBy("it");
+        UUID dayBookJobId = dayBookUploadJobRepository.save(dayBookJob).getId();
+
+        ParsedVoucher voucher = new ParsedVoucher();
+        voucher.setUploadJobId(dayBookJobId);
+        voucher.setOrganizationId(org.getId());
+        voucher.setVoucherTypeName("Payment");
+        voucher.setVoucherNumber("P-1");
+        voucher.setVoucherDate(LocalDate.of(2026, 3, 20));
+        voucher.setCancelled(false);
+        ParsedVoucherEntry entry = new ParsedVoucherEntry();
+        entry.setParsedVoucher(voucher);
+        entry.setOrganizationId(org.getId());
+        entry.setLedgerName("Contractor X");
+        entry.setAmount(new java.math.BigDecimal("6000000.00"));
+        voucher.setEntries(List.of(entry));
+        parsedVoucherRepository.save(voucher);
+
+        mockMvc.perform(get("/api/v1/organizations/" + org.getId()
+                                + "/tds-applicability/2025/pan-only-advisories")
+                        .header("Authorization", "Bearer " + jwt))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].section").value("194M"))
+                .andExpect(jsonPath("$[0].partyLedgerName").value("Contractor X"))
+                .andExpect(jsonPath("$[0].financialYear").value(2025))
+                .andExpect(jsonPath("$[0].month").doesNotExist())
+                .andExpect(jsonPath("$[0].amount").value(6000000.00))
+                .andExpect(jsonPath("$[0].form").value("Form 26QD"));
+    }
 
     @Test
     void getReturnsYearsFromCoverageStart() throws Exception {

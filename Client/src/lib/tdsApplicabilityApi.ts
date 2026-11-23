@@ -102,3 +102,20 @@ export function dismissTdsApplicabilityPrompt(
     .post(`/v1/organizations/${orgId}/tds-applicability/prompts/${promptId}/dismiss`, { reason })
     .then((res) => res.data)
 }
+
+// ---- Task 9: PAN-only 194M / 194-IB advisories ----
+
+export interface PanOnlyAdvisory {
+  section: string
+  partyLedgerName: string
+  financialYear: number
+  month: string | null
+  amount: number
+  form: string
+}
+
+export function getPanOnlyAdvisories(orgId: string, financialYear: number): Promise<PanOnlyAdvisory[]> {
+  return api
+    .get(`/v1/organizations/${orgId}/tds-applicability/${financialYear}/pan-only-advisories`)
+    .then((res) => res.data)
+}

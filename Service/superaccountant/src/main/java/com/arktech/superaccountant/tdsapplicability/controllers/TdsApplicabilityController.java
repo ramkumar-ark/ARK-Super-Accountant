@@ -8,6 +8,7 @@ import com.arktech.superaccountant.masters.repository.UserOrganizationRepository
 import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityPromptService;
 import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService;
 import com.arktech.superaccountant.tdsapplicability.EntityClass;
+import com.arktech.superaccountant.tdsapplicability.PanOnlyTdsAdvisoryService;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicability;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
 import com.arktech.superaccountant.tdsapplicability.models.TurnoverNature;
@@ -52,6 +53,9 @@ public class TdsApplicabilityController {
 
     @Autowired
     private WorkflowRepository workflowRepository;
+
+    @Autowired
+    private PanOnlyTdsAdvisoryService panOnlyAdvisoryService;
 
     /**
      * Read-only applicability view: the effective deductor code, its source,
@@ -141,6 +145,22 @@ public class TdsApplicabilityController {
     }
 
     // ---- Task 8: applicability prompts ----
+
+    /** PAN-only 194M / 194-IB advisories for a non-deductor year of an individual/HUF org. */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}/tds-applicability/{fy}/pan-only-advisories")
+    public ResponseEntity<?> panOnlyAdvisories(@PathVariable UUID id, @PathVariable int fy,
+                                               @AuthenticationPrincipal UserDetailsImpl principal) {
+        var membership = userOrganizationRepository.findByUserIdAndOrganizationId(principal.getId(), id);
+        if (membership.isEmpty()) {
+            return ResponseEntity.status(403).body(new MessageResponse("Access denied to this organization"));
+        }
+        if (organizationRepository.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(panOnlyAdvisoryService.advisories(id, fy));
+    }
+
 
     /** POST body for confirming a prompt: whether TDS applies, with the books figure when known. */
     public record ConfirmPromptRequest(
