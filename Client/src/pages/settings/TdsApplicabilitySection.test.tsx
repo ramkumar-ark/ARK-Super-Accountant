@@ -74,6 +74,42 @@ describe('TdsApplicabilitySection', () => {
     expect(screen.getByText('Needs answer')).toBeInTheDocument()
   })
 
+  it('showsEstimateLabelForIncomplete', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-abc/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            ...APPLICABILITY,
+            years: [
+              {
+                ...APPLICABILITY.years[0],
+                turnoverEstimate: {
+                  measuredFinancialYear: 2025,
+                  amount: 5900000,
+                  source: 'BOOKS',
+                  complete: false,
+                },
+              },
+              APPLICABILITY.years[1],
+            ],
+          },
+        })
+      }
+      return Promise.reject(new Error('Unexpected GET ' + url))
+    })
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <TdsApplicabilitySection />
+      </QueryClientProvider>,
+    )
+
+    expect(
+      await screen.findByText('Estimate from part of FY 2025-26: ₹59,00,000'),
+    ).toBeInTheDocument()
+  })
+
   it('answering a year sends PUT /organizations/{id}/tds-applicability/{fy}', async () => {
     const user = userEvent.setup()
     mockPut.mockResolvedValue({ data: {} })

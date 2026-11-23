@@ -36,7 +36,8 @@ class TdsApplicabilityServiceTest {
         repository = mock(TdsApplicabilityYearRepository.class);
         CoverageService coverageService = mock(CoverageService.class);
         service = new TdsApplicabilityService(organizationRepository, repository, coverageService,
-                mock(WorkflowRepository.class), mock(ResponsibilityStartSettingsService.class));
+                mock(WorkflowRepository.class), mock(ResponsibilityStartSettingsService.class),
+                mock(PriorYearTurnoverService.class));
         when(organizationRepository.findById(orgId)).thenReturn(Optional.of(new Organization("Applicability Org")));
         when(repository.findByOrganizationIdOrderByFinancialYearAsc(orgId)).thenReturn(List.of());
     }

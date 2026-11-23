@@ -66,6 +66,22 @@ export function TdsApplicabilitySection() {
   )
 }
 
+function turnoverEstimateText(
+  estimate: TdsApplicabilityYear['turnoverEstimate'],
+): string | null {
+  if (!estimate || estimate.source === 'NONE' || estimate.amount == null) return null
+  const measuredLabel = fyLabel(estimate.measuredFinancialYear)
+  const rupees = `₹${estimate.amount.toLocaleString('en-IN')}`
+  if (estimate.source === 'BOOKS') {
+    return estimate.complete
+      ? `Books show ${rupees} for ${measuredLabel}`
+      : `Estimate from part of ${measuredLabel}: ${rupees}`
+  }
+  return estimate.complete
+    ? `GST returns show ${rupees} for ${measuredLabel} (GST returns of this GSTIN only)`
+    : `Estimate from GST returns, part of ${measuredLabel}: ${rupees} (GST returns of this GSTIN only)`
+}
+
 function YearRow({
   year,
   canEdit,
@@ -103,6 +119,11 @@ function YearRow({
           </button>
         )}
       </div>
+      {turnoverEstimateText(year.turnoverEstimate) && (
+        <p className="ml-4 text-xs text-[var(--color-text-muted)]">
+          {turnoverEstimateText(year.turnoverEstimate)}
+        </p>
+      )}
       {canEdit && editing && <AnswerForm year={year} orgId={user?.organizationId} onDone={onDone} />}
     </li>
   )

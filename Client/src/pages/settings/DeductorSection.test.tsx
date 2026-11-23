@@ -44,6 +44,7 @@ const APPLICABILITY_ON: TdsApplicabilityPayload = {
       needsAnswer: false,
       priorYearTurnover: 120000000,
       turnoverNature: 'BUSINESS',
+      turnoverEstimate: null,
     },
   ],
 }
@@ -60,6 +61,7 @@ const APPLICABILITY_OFF: TdsApplicabilityPayload = {
       needsAnswer: false,
       priorYearTurnover: null,
       turnoverNature: null,
+      turnoverEstimate: null,
     },
   ],
 }

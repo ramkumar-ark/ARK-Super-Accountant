@@ -15,6 +15,10 @@ public interface FiledReturnSnapshotRepository extends JpaRepository<FiledReturn
 
     List<FiledReturnSnapshot> findAllByOrganizationId(UUID organizationId);
 
+    List<FiledReturnSnapshot> findAllByOrganizationIdAndFormTypeAndSupersededAtIsNullAndCoverStartBetween(
+            UUID organizationId, FiledFormType formType, java.time.LocalDate coverStartFrom,
+            java.time.LocalDate coverStartTo);
+
     List<FiledReturnSnapshot> findAllByOrganizationIdAndBaselineWorkflowIdOrderByFilingPeriodAscImportedAtAsc(
             UUID organizationId, UUID baselineWorkflowId);
 }

@@ -48,17 +48,20 @@ public class TdsApplicabilityService {
     private final CoverageService coverageService;
     private final WorkflowRepository workflowRepository;
     private final ResponsibilityStartSettingsService responsibilityStartSettingsService;
+    private final PriorYearTurnoverService priorYearTurnoverService;
 
     public TdsApplicabilityService(OrganizationRepository organizationRepository,
                                    TdsApplicabilityYearRepository repository,
                                    CoverageService coverageService,
                                    WorkflowRepository workflowRepository,
-                                   ResponsibilityStartSettingsService responsibilityStartSettingsService) {
+                                   ResponsibilityStartSettingsService responsibilityStartSettingsService,
+                                   PriorYearTurnoverService priorYearTurnoverService) {
         this.organizationRepository = organizationRepository;
         this.repository = repository;
         this.coverageService = coverageService;
         this.workflowRepository = workflowRepository;
         this.responsibilityStartSettingsService = responsibilityStartSettingsService;
+        this.priorYearTurnoverService = priorYearTurnoverService;
     }
 
     public TdsApplicability resolve(UUID orgId, int financialYear) {
@@ -178,7 +181,10 @@ public class TdsApplicabilityService {
         int currentFy = PeriodCalendar.financialYearOf(LocalDate.now(), fyStartMonth);
         List<TdsApplicability> years = new ArrayList<>();
         for (int fy = fromFy; fy <= currentFy; fy++) {
-            years.add(resolve(orgId, fy));
+            TdsApplicability resolved = resolve(orgId, fy);
+            years.add(new TdsApplicability(fy, resolved.applicable(), resolved.basis(),
+                    resolved.needsAnswer(), resolved.priorYearTurnover(), resolved.turnoverNature(),
+                    priorYearTurnoverService.estimateFor(orgId, fy)));
         }
         return years;
     }

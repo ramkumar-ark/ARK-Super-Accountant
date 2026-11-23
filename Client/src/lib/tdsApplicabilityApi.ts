@@ -9,6 +9,15 @@ export type TdsApplicabilityBasis =
 
 export type TurnoverNature = 'BUSINESS' | 'PROFESSION'
 
+export type TurnoverSource = 'BOOKS' | 'GSTR3B' | 'NONE'
+
+export interface TurnoverEstimate {
+  measuredFinancialYear: number
+  amount: number | null
+  source: TurnoverSource
+  complete: boolean
+}
+
 export interface TdsApplicabilityYear {
   financialYear: number
   applicable: boolean
@@ -16,6 +25,7 @@ export interface TdsApplicabilityYear {
   needsAnswer: boolean
   priorYearTurnover: number | null
   turnoverNature: TurnoverNature | null
+  turnoverEstimate: TurnoverEstimate | null
 }
 
 export interface TdsApplicabilityPayload {
