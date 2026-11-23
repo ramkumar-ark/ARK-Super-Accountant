@@ -134,7 +134,7 @@ public class TdsApplicabilityService {
                     fresh.setFinancialYear(financialYear);
                     return fresh;
                 });
-        boolean changed = resolve(orgId, financialYear).applicable() != applicable;
+        List<Boolean> before = resolvedAnswers(orgId, financialYear);
         row.setApplicable(applicable);
         row.setBasis(basis);
         row.setPriorYearTurnover(turnover);
@@ -143,11 +143,26 @@ public class TdsApplicabilityService {
         row.setDecidedBy(actor);
         row.setDecidedAt(Instant.now());
         repository.save(row);
-        if (changed) {
+        if (!before.equals(resolvedAnswers(orgId, financialYear))) {
             responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_PAYMENT);
             responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_26Q);
         }
         return new TdsApplicability(financialYear, applicable, basis, false, turnover, nature);
+    }
+
+    private List<Boolean> resolvedAnswers(UUID orgId, int savedFinancialYear) {
+        Organization org = organizationRepository.findById(orgId)
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
+        int fyStartMonth = org.getFinancialYearStart();
+        int fromFy = Math.min(savedFinancialYear,
+                PeriodCalendar.financialYearOf(coverageService.coverageStart(orgId), fyStartMonth));
+        int toFy = Math.max(savedFinancialYear,
+                PeriodCalendar.financialYearOf(LocalDate.now(), fyStartMonth));
+        List<Boolean> answers = new ArrayList<>();
+        for (int fy = fromFy; fy <= toFy; fy++) {
+            answers.add(resolve(orgId, fy).applicable());
+        }
+        return answers;
     }
 
     public boolean isApplicable(UUID orgId, int financialYear) {
