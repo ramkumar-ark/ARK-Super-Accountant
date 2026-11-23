@@ -31,4 +31,7 @@ year, deductor-side features are hidden for that year (TDS masters findings, TDS
 TDS ledger mapping, deductor settings) while receivable-side checks such as
 `DEBTOR_TDS_RECEIVABLE_MISSING_TAN` stay on (ADR 0006); the PAN-only obligations (194M,
 194-IB, 194-IA, 194S) that need no TAN are advisories and never make the organization a
-deductor. Gating, registration capture and prompts are built in later slices.
+deductor. Registration captures the TAN and entity class; gating applies the resolver to the
+masters findings, TDS workflows and ledger mapping; and prompts (`BOOKS_EXCEED_LIMIT`,
+`NEXT_YEAR_DECLARATION`) ask an individual/HUF to confirm applicability, effective from
+1 April, when the books or a financial-year close suggest it.

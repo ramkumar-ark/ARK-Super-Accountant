@@ -311,6 +311,20 @@ class TdsApplicabilityControllerIT {
                 .contains("Entity type K always deducts TDS");
     }
 
+    private Workflow newActiveBaselineRow(UUID orgId) {
+        Workflow w = new Workflow();
+        w.setOrganizationId(orgId);
+        w.setType(WorkflowType.TDS_PAYMENT);
+        w.setPeriodStart(LocalDate.of(2025, 4, 1));
+        w.setPeriodEnd(LocalDate.of(2025, 4, 30));
+        w.setPeriodKey("2025-04");
+        w.setFinancialYear(2025);
+        w.setStage(WorkflowStage.BASELINE);
+        w.setActive(true);
+        w.setRevision(0);
+        return w;
+    }
+
     @Test
     void changingYearRebuildsTdsBaselineRows() throws Exception {
         Organization org = orgWithPan("AAAPA1234A", "ta_rebuild_owner", ERole.ROLE_OWNER);
@@ -335,6 +349,13 @@ class TdsApplicabilityControllerIT {
         oldRow.setRevision(0);
         oldRow = workflowRepository.save(oldRow);
 
+        // Rebuild only fires on a real change: answer "not applicable" first, then flip to applicable.
+        mockMvc.perform(put("/api/v1/organizations/" + org.getId() + "/tds-applicability/2025")
+                        .header("Authorization", "Bearer " + jwt)
+                        .contentType("application/json")
+                        .content(body(false, "1000000", "BUSINESS")))
+                .andExpect(status().isOk());
+        oldRow = workflowRepository.save(newActiveBaselineRow(org.getId()));
         mockMvc.perform(put("/api/v1/organizations/" + org.getId() + "/tds-applicability/2025")
                         .header("Authorization", "Bearer " + jwt)
                         .contentType("application/json")

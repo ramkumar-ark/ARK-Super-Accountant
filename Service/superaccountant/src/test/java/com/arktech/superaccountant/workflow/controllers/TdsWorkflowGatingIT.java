@@ -169,7 +169,9 @@ class TdsWorkflowGatingIT {
         start.setSetBy("seed");
         responsibilityStartRepository.save(start);
 
-        // Rebuilding via a settings write keeps only the applicable-FY baseline rows.
+        // Rebuilding happens only when an answer actually changes: flip FY 2025 off, then back on.
+        tdsApplicabilityService.recordYear(org.getId(), 2025, false,
+                TdsApplicabilityBasis.DECLARED, null, null, null, "test");
         tdsApplicabilityService.recordYear(org.getId(), 2025, true,
                 TdsApplicabilityBasis.DECLARED, null, null, null, "test");
 
