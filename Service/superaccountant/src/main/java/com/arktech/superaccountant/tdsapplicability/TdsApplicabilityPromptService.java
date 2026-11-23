@@ -10,6 +10,9 @@ import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityPromp
 import com.arktech.superaccountant.tdsapplicability.models.TurnoverNature;
 import com.arktech.superaccountant.tdsapplicability.repository.TdsApplicabilityPromptRepository;
 import com.arktech.superaccountant.tdsapplicability.repository.TdsApplicabilityYearRepository;
+import com.arktech.superaccountant.workflow.models.WorkflowStage;
+import com.arktech.superaccountant.workflow.models.WorkflowType;
+import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -51,17 +54,20 @@ public class TdsApplicabilityPromptService {
     private final TdsApplicabilityPromptRepository promptRepository;
     private final TdsApplicabilityService tdsApplicabilityService;
     private final PriorYearTurnoverService priorYearTurnoverService;
+    private final WorkflowRepository workflowRepository;
 
     public TdsApplicabilityPromptService(OrganizationRepository organizationRepository,
                                          TdsApplicabilityYearRepository yearRepository,
                                          TdsApplicabilityPromptRepository promptRepository,
                                          TdsApplicabilityService tdsApplicabilityService,
-                                         PriorYearTurnoverService priorYearTurnoverService) {
+                                         PriorYearTurnoverService priorYearTurnoverService,
+                                         WorkflowRepository workflowRepository) {
         this.organizationRepository = organizationRepository;
         this.yearRepository = yearRepository;
         this.promptRepository = promptRepository;
         this.tdsApplicabilityService = tdsApplicabilityService;
         this.priorYearTurnoverService = priorYearTurnoverService;
+        this.workflowRepository = workflowRepository;
     }
 
     /** The open prompts for one organization, as shown on the dashboard banner. */
@@ -116,6 +122,14 @@ public class TdsApplicabilityPromptService {
     public PromptView confirm(UUID orgId, UUID promptId, boolean applicable,
                               BigDecimal priorYearTurnover, TurnoverNature nature, String actor) {
         TdsApplicabilityPrompt prompt = openPrompt(orgId, promptId);
+        if (!applicable && workflowRepository
+                .existsByOrganizationIdAndTypeInAndFinancialYearAndStageInAndActiveTrue(orgId,
+                        List.of(WorkflowType.TDS_PAYMENT, WorkflowType.TDS_26Q),
+                        prompt.getFinancialYear(),
+                        List.of(WorkflowStage.FINALIZED, WorkflowStage.FILED))) {
+            throw new IllegalStateException(fyLabel(prompt.getFinancialYear())
+                    + " has a finalized TDS workflow; unfinalize it first");
+        }
         TdsApplicabilityBasis basis = prompt.getKind() == PromptKind.BOOKS_EXCEED_LIMIT
                 ? TdsApplicabilityBasis.CONFIRMED_FROM_BOOKS
                 : TdsApplicabilityBasis.DECLARED;
@@ -253,8 +267,12 @@ public class TdsApplicabilityPromptService {
         return head + (groups.length() > 0 ? groups + "," : "") + tail;
     }
 
-    private boolean isIndividualHuf(UUID orgId) {
-        Organization org = organizationRepository.findById(orgId).orElse(null);
+    /** FY 2025 renders as "FY 2025-26", matching the client's fyLabel. */
+    private static String fyLabel(int financialYear) {
+        return "FY " + financialYear + "-" + String.format("%02d", (financialYear + 1) % 100);
+    }
+
+    private boolean isIndividualHuf(UUID orgId) {        Organization org = organizationRepository.findById(orgId).orElse(null);
         if (org == null) {
             return false;
         }

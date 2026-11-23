@@ -334,6 +334,41 @@ class TdsApplicabilityPromptIT {
     }
 
     @Test
+    void promptConfirmWithFinalizedWorkflowIs409() throws Exception {
+        Organization org = qOrg("ta_final_prompt_owner");
+        seedBooks(org.getId(), BOOKS_1_2_CR);
+        recordNotApplicable(org.getId(), 2026);
+
+        Workflow finalized = new Workflow();
+        finalized.setOrganizationId(org.getId());
+        finalized.setType(WorkflowType.TDS_PAYMENT);
+        finalized.setPeriodStart(LocalDate.of(2026, 4, 1));
+        finalized.setPeriodEnd(LocalDate.of(2026, 4, 30));
+        finalized.setPeriodKey("2026-04");
+        finalized.setFinancialYear(2026);
+        finalized.setStage(WorkflowStage.FINALIZED);
+        finalized.setActive(true);
+        finalized.setRevision(0);
+        workflowRepository.save(finalized);
+
+        publishBaselineConfirmed(org.getId());
+        UUID promptId = promptIdFrom(openPrompts(org.getId(), "ta_final_prompt_owner"));
+
+        mockMvc.perform(post("/api/v1/organizations/" + org.getId()
+                                + "/tds-applicability/prompts/" + promptId + "/confirm")
+                        .header("Authorization", "Bearer " + jwt(org.getId(), "ta_final_prompt_owner"))
+                        .contentType("application/json")
+                        .content("{\"applicable\":false}"))
+                .andExpect(status().isConflict())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
+                        .contains("FY 2026-27 has a finalized TDS workflow; unfinalize it first"));
+
+        // The prompt stays open and the year is still not applicable.
+        assertThat(openPrompts(org.getId(), "ta_final_prompt_owner").size()).isEqualTo(1);
+        assertThat(tdsApplicabilityService.isApplicable(org.getId(), 2026)).isFalse();
+    }
+
+    @Test
     void companyNeverPrompted() throws Exception {
         Organization org = new Organization("Company Prompt Org " + UUID.randomUUID());
         org.setPan("AAACA1234A");
