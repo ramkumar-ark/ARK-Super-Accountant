@@ -6,7 +6,9 @@ import com.arktech.superaccountant.tdsapplicability.models.TdsApplicability;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityYear;
 import com.arktech.superaccountant.tdsapplicability.repository.TdsApplicabilityYearRepository;
+import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.service.CoverageService;
+import com.arktech.superaccountant.workflow.service.compliance.ResponsibilityStartSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +35,8 @@ class TdsApplicabilityServiceTest {
         organizationRepository = mock(OrganizationRepository.class);
         repository = mock(TdsApplicabilityYearRepository.class);
         CoverageService coverageService = mock(CoverageService.class);
-        service = new TdsApplicabilityService(organizationRepository, repository, coverageService);
+        service = new TdsApplicabilityService(organizationRepository, repository, coverageService,
+                mock(WorkflowRepository.class), mock(ResponsibilityStartSettingsService.class));
         when(organizationRepository.findById(orgId)).thenReturn(Optional.of(new Organization("Applicability Org")));
         when(repository.findByOrganizationIdOrderByFinancialYearAsc(orgId)).thenReturn(List.of());
     }

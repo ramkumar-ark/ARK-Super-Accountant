@@ -29,6 +29,23 @@ export function getTdsApplicability(orgId: string): Promise<TdsApplicabilityPayl
   return api.get(`/v1/organizations/${orgId}/tds-applicability`).then((res) => res.data)
 }
 
+export interface UpdateTdsApplicabilityBody {
+  applicable: boolean
+  priorYearTurnover?: number
+  turnoverNature?: TurnoverNature
+  note?: string
+}
+
+export function updateTdsApplicability(
+  orgId: string,
+  financialYear: number,
+  body: UpdateTdsApplicabilityBody,
+): Promise<TdsApplicabilityYear> {
+  return api
+    .put(`/v1/organizations/${orgId}/tds-applicability/${financialYear}`, body)
+    .then((res) => res.data)
+}
+
 /** FY 2025 renders as "FY 2025-26". */
 export function fyLabel(financialYear: number): string {
   return `FY ${financialYear}-${String((financialYear + 1) % 100).padStart(2, '0')}`

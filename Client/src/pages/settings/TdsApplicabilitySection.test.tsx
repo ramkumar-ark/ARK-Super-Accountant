@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TdsApplicabilitySection } from './TdsApplicabilitySection'
 
 vi.mock('@/store/authStore')
 vi.mock('@/lib/api', () => ({
-  api: { get: vi.fn() },
+  api: { get: vi.fn(), put: vi.fn() },
 }))
 
 import { useAuthStore } from '@/store/authStore'
@@ -13,6 +14,7 @@ import { api } from '@/lib/api'
 
 const mockUseAuthStore = vi.mocked(useAuthStore)
 const mockGet = vi.mocked(api.get)
+const mockPut = vi.mocked(api.put)
 
 const APPLICABILITY = {
   entityCode: 'Q',
@@ -70,5 +72,29 @@ describe('TdsApplicabilitySection', () => {
     expect(await screen.findByText('FY 2025-26 — Not a deductor (declared)')).toBeInTheDocument()
     expect(screen.getByText('FY 2026-27 — Not a deductor (carried forward)')).toBeInTheDocument()
     expect(screen.getByText('Needs answer')).toBeInTheDocument()
+  })
+
+  it('answering a year sends PUT /organizations/{id}/tds-applicability/{fy}', async () => {
+    const user = userEvent.setup()
+    mockPut.mockResolvedValue({ data: {} })
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <TdsApplicabilitySection />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('FY 2026-27 — Not a deductor (carried forward)')
+    await user.click(screen.getByRole('button', { name: 'Answer' }))
+    await user.click(screen.getByRole('radio', { name: 'Yes' }))
+    await user.click(screen.getByRole('button', { name: 'Save answer' }))
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith('/v1/organizations/org-abc/tds-applicability/2026', {
+        applicable: true,
+        turnoverNature: 'BUSINESS',
+      })
+    })
   })
 })

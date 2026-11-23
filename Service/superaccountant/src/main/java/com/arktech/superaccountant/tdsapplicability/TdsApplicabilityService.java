@@ -7,9 +7,12 @@ import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityYear;
 import com.arktech.superaccountant.tdsapplicability.models.TurnoverNature;
 import com.arktech.superaccountant.tdsapplicability.repository.TdsApplicabilityYearRepository;
+import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.service.CoverageService;
+import com.arktech.superaccountant.workflow.service.compliance.ResponsibilityStartSettingsService;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,13 +46,19 @@ public class TdsApplicabilityService {
     private final OrganizationRepository organizationRepository;
     private final TdsApplicabilityYearRepository repository;
     private final CoverageService coverageService;
+    private final WorkflowRepository workflowRepository;
+    private final ResponsibilityStartSettingsService responsibilityStartSettingsService;
 
     public TdsApplicabilityService(OrganizationRepository organizationRepository,
                                    TdsApplicabilityYearRepository repository,
-                                   CoverageService coverageService) {
+                                   CoverageService coverageService,
+                                   WorkflowRepository workflowRepository,
+                                   ResponsibilityStartSettingsService responsibilityStartSettingsService) {
         this.organizationRepository = organizationRepository;
         this.repository = repository;
         this.coverageService = coverageService;
+        this.workflowRepository = workflowRepository;
+        this.responsibilityStartSettingsService = responsibilityStartSettingsService;
     }
 
     public TdsApplicability resolve(UUID orgId, int financialYear) {
@@ -102,6 +111,37 @@ public class TdsApplicabilityService {
         repository.save(row);
         return new TdsApplicability(financialYear, applicable, TdsApplicabilityBasis.DECLARED,
                 false, priorYearTurnover, nature);
+    }
+
+    /**
+     * Records or updates the user's answer for one financial year with an explicit
+     * basis and note (settings edit, Task 2 registration, Task 8 confirmation).
+     * After saving, the TDS_PAYMENT and TDS_26Q baseline rows are rebuilt so the
+     * compliance settings follow the new applicability answer.
+     */
+    @Transactional
+    public TdsApplicability recordYear(UUID orgId, int financialYear, boolean applicable,
+                                       TdsApplicabilityBasis basis, BigDecimal turnover,
+                                       TurnoverNature nature, String note, String actor) {
+        TdsApplicabilityYear row = repository
+                .findByOrganizationIdAndFinancialYear(orgId, financialYear)
+                .orElseGet(() -> {
+                    TdsApplicabilityYear fresh = new TdsApplicabilityYear();
+                    fresh.setOrganizationId(orgId);
+                    fresh.setFinancialYear(financialYear);
+                    return fresh;
+                });
+        row.setApplicable(applicable);
+        row.setBasis(basis);
+        row.setPriorYearTurnover(turnover);
+        row.setTurnoverNature(nature);
+        row.setNote(note);
+        row.setDecidedBy(actor);
+        row.setDecidedAt(Instant.now());
+        repository.save(row);
+        responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_PAYMENT);
+        responsibilityStartSettingsService.rebuildBaselineRows(orgId, actor, com.arktech.superaccountant.workflow.models.WorkflowType.TDS_26Q);
+        return new TdsApplicability(financialYear, applicable, basis, false, turnover, nature);
     }
 
     public boolean isApplicable(UUID orgId, int financialYear) {
