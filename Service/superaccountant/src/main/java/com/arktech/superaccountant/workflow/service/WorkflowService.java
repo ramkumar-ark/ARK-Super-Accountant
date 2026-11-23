@@ -613,7 +613,13 @@ public class WorkflowService {
 
     @Transactional
     public Workflow discard(UUID organizationId, UUID id, String actor) {
-        Workflow w = get(organizationId, id);
+        Workflow w = workflowRepository.findByIdForUpdate(id)
+                .filter(found -> found.getOrganizationId().equals(organizationId))
+                .orElseThrow(() -> new WorkflowBadRequestException("Workflow not found"));
+
+        if (!w.isActive()) {
+            throw new WorkflowConflictException("Workflow is no longer active");
+        }
 
         if (w.getStage() != WorkflowStage.STARTED) {
             throw new WorkflowConflictException(

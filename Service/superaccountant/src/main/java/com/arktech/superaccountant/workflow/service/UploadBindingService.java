@@ -107,6 +107,9 @@ public class UploadBindingService {
     }
 
     private void assertChangeable(Workflow w) {
+        if (!w.isActive()) {
+            throw new WorkflowConflictException("Workflow is no longer active");
+        }
         switch (w.getStage()) {
             case STARTED, DATA_UPLOADED, FINDINGS_REVIEW, PREPARE -> { /* allowed */ }
             default -> throw new WorkflowConflictException(

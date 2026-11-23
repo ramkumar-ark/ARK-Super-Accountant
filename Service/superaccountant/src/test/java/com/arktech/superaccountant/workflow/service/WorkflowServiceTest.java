@@ -677,7 +677,7 @@ class WorkflowServiceTest {
     @Test
     void discard_successAtStartedWithNoData() {
         Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
-        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
         WorkflowEvent startEvent = new WorkflowEvent();
         startEvent.setKind(WorkflowEventKind.STARTED);
         when(workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(w.getId()))
@@ -691,9 +691,19 @@ class WorkflowServiceTest {
     }
 
     @Test
+    void discard_refusesWhenAlreadyInactive() {
+        Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
+        w.setActive(false);
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
+
+        assertThrows(WorkflowConflictException.class, () -> service.discard(orgId, w.getId(), actor));
+        org.mockito.Mockito.verify(workflowEventRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
     void discard_refusesWhenNotStarted() {
         Workflow w = prepareWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
-        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
 
         WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
                 () -> service.discard(orgId, w.getId(), actor));
@@ -704,7 +714,7 @@ class WorkflowServiceTest {
     void discard_refusesWhenUploadJobAttached() {
         Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
         w.setUploadJobId(UUID.randomUUID());
-        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
 
         WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
                 () -> service.discard(orgId, w.getId(), actor));
@@ -714,7 +724,7 @@ class WorkflowServiceTest {
     @Test
     void discard_refusesWhenEventsBeyondStartExist() {
         Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
-        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
         WorkflowEvent startEvent = new WorkflowEvent();
         startEvent.setKind(WorkflowEventKind.STARTED);
         WorkflowEvent advancedEvent = new WorkflowEvent();
@@ -730,7 +740,7 @@ class WorkflowServiceTest {
     @Test
     void discard_refusesWhenCreatedForWorkflowUploadJobExists() {
         Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
-        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
         when(dayBookUploadJobRepository.existsByCreatedForWorkflowId(w.getId())).thenReturn(true);
 
         WorkflowConflictException e = assertThrows(WorkflowConflictException.class,
@@ -741,7 +751,7 @@ class WorkflowServiceTest {
     @Test
     void discard_refusesWhenFindingsExist() {
         Workflow w = startedWorkflow(WorkflowType.TDS_PAYMENT, "2026-04");
-        when(workflowRepository.findById(w.getId())).thenReturn(Optional.of(w));
+        when(workflowRepository.findByIdForUpdate(w.getId())).thenReturn(Optional.of(w));
         WorkflowEvent startEvent = new WorkflowEvent();
         startEvent.setKind(WorkflowEventKind.STARTED);
         when(workflowEventRepository.findAllByWorkflowIdOrderByOccurredAtAsc(w.getId()))
