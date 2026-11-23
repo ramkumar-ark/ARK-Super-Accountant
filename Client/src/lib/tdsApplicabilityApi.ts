@@ -60,3 +60,45 @@ export function updateTdsApplicability(
 export function fyLabel(financialYear: number): string {
   return `FY ${financialYear}-${String((financialYear + 1) % 100).padStart(2, '0')}`
 }
+
+// ---- Task 8: applicability prompts ----
+
+export type PromptKind = 'BOOKS_EXCEED_LIMIT' | 'NEXT_YEAR_DECLARATION' | 'LEGACY_INDIVIDUAL_NOTE'
+
+export interface TdsApplicabilityPrompt {
+  id: string
+  kind: PromptKind
+  financialYear: number
+  estimate: TurnoverEstimate | null
+  message: string
+}
+
+export function getTdsApplicabilityPrompts(orgId: string): Promise<TdsApplicabilityPrompt[]> {
+  return api.get(`/v1/organizations/${orgId}/tds-applicability/prompts`).then((res) => res.data)
+}
+
+export interface ConfirmTdsPromptBody {
+  applicable: boolean
+  priorYearTurnover?: number
+  turnoverNature?: TurnoverNature
+}
+
+export function confirmTdsApplicabilityPrompt(
+  orgId: string,
+  promptId: string,
+  body: ConfirmTdsPromptBody,
+): Promise<TdsApplicabilityPrompt> {
+  return api
+    .post(`/v1/organizations/${orgId}/tds-applicability/prompts/${promptId}/confirm`, body)
+    .then((res) => res.data)
+}
+
+export function dismissTdsApplicabilityPrompt(
+  orgId: string,
+  promptId: string,
+  reason: string,
+): Promise<TdsApplicabilityPrompt> {
+  return api
+    .post(`/v1/organizations/${orgId}/tds-applicability/prompts/${promptId}/dismiss`, { reason })
+    .then((res) => res.data)
+}

@@ -5,6 +5,7 @@ import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
+import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityPromptService;
 import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService;
 import com.arktech.superaccountant.tdsapplicability.EntityClass;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicability;
@@ -20,6 +21,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +40,9 @@ public class TdsApplicabilityController {
 
     @Autowired
     private TdsApplicabilityService service;
+
+    @Autowired
+    private TdsApplicabilityPromptService promptService;
 
     @Autowired
     private OrganizationRepository organizationRepository;
@@ -133,5 +138,81 @@ public class TdsApplicabilityController {
         return ResponseEntity.ok(service.recordYear(id, fy, applicable, TdsApplicabilityBasis.DECLARED,
                 request.priorYearTurnover(), request.turnoverNature(), request.note(),
                 principal.getUsername()));
+    }
+
+    // ---- Task 8: applicability prompts ----
+
+    /** POST body for confirming a prompt: whether TDS applies, with the books figure when known. */
+    public record ConfirmPromptRequest(
+            Boolean applicable,
+            BigDecimal priorYearTurnover,
+            TurnoverNature turnoverNature) {
+    }
+
+    /** POST body for dismissing a prompt; the reason must be non-blank. */
+    public record DismissPromptRequest(String reason) {
+    }
+
+    /** Open prompts for the dashboard banner, plus the lazily created legacy note. */
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/{id}/tds-applicability/prompts")
+    public ResponseEntity<?> prompts(@PathVariable UUID id,
+                                     @AuthenticationPrincipal UserDetailsImpl principal) {
+        var membership = userOrganizationRepository.findByUserIdAndOrganizationId(principal.getId(), id);
+        if (membership.isEmpty()) {
+            return ResponseEntity.status(403).body(new MessageResponse("Access denied to this organization"));
+        }
+        if (organizationRepository.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(promptService.openPrompts(id));
+    }
+
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    @PostMapping("/{id}/tds-applicability/prompts/{promptId}/confirm")
+    public ResponseEntity<?> confirmPrompt(@PathVariable UUID id, @PathVariable UUID promptId,
+                                           @RequestBody ConfirmPromptRequest request,
+                                           @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (userOrganizationRepository
+                .findByUserIdAndOrganizationId(principal.getId(), id).isEmpty()) {
+            return ResponseEntity.status(403).body(new MessageResponse("Access denied to this organization"));
+        }
+        if (organizationRepository.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        boolean applicable = Boolean.TRUE.equals(request.applicable());
+        try {
+            return ResponseEntity.ok(promptService.confirm(id, promptId, applicable,
+                    request.priorYearTurnover(), request.turnoverNature(), principal.getUsername()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(new MessageResponse(e.getMessage()));
+        }
+    }
+
+    @PreAuthorize("hasRole('OWNER') or hasRole('ACCOUNTANT')")
+    @PostMapping("/{id}/tds-applicability/prompts/{promptId}/dismiss")
+    public ResponseEntity<?> dismissPrompt(@PathVariable UUID id, @PathVariable UUID promptId,
+                                           @RequestBody DismissPromptRequest request,
+                                           @AuthenticationPrincipal UserDetailsImpl principal) {
+        if (userOrganizationRepository
+                .findByUserIdAndOrganizationId(principal.getId(), id).isEmpty()) {
+            return ResponseEntity.status(403).body(new MessageResponse("Access denied to this organization"));
+        }
+        if (organizationRepository.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (request == null || request.reason() == null || request.reason().isBlank()) {
+            return ResponseEntity.badRequest().body(new MessageResponse("A reason is required to dismiss"));
+        }
+        try {
+            return ResponseEntity.ok(promptService.dismiss(id, promptId, request.reason(),
+                    principal.getUsername()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(409).body(new MessageResponse(e.getMessage()));
+        }
     }
 }
