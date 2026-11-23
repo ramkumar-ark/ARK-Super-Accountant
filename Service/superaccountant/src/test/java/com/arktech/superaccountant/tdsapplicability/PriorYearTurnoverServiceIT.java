@@ -203,6 +203,36 @@ class PriorYearTurnoverServiceIT {
     }
 
     @Test
+    void completeGstr3bBeatsPartialBooks() {
+        Organization org = createOrg("Partial Books Full Gstr Org " + UUID.randomUUID());
+        UUID mastersJob = latestMastersJob(org.getId());
+        ledger(org.getId(), mastersJob, "Sales Account", LedgerCategory.INCOME,
+                "sales accounts");
+        UUID job = dayBookJob(org.getId(), FY_START, LocalDate.of(2025, 9, 30));
+        voucher(org.getId(), job, LocalDate.of(2025, 5, 10), false, List.of(
+                new Object[]{"Sales Account", new BigDecimal("-2000000")},
+                new Object[]{"Local Customer", new BigDecimal("2000000")}));
+
+        for (int month = 4; month <= 12; month++) {
+            UUID snapshotId = snapshot(org.getId(), "2025-%02d".formatted(month),
+                    LocalDate.of(2025, month, 1), LocalDate.of(2025, month, 28));
+            line(snapshotId, "3.1a", "100000");
+        }
+        for (int month = 1; month <= 3; month++) {
+            UUID snapshotId = snapshot(org.getId(), "2026-%02d".formatted(month),
+                    LocalDate.of(2026, month, 1), LocalDate.of(2026, month, 28));
+            line(snapshotId, "3.1a", "100000");
+        }
+
+        TurnoverEstimate estimate = service.estimateFor(org.getId(), 2026);
+
+        assertEquals(2025, estimate.measuredFinancialYear());
+        assertEquals(TurnoverEstimate.TurnoverSource.GSTR3B, estimate.source());
+        assertEquals(0, new BigDecimal("1200000").compareTo(estimate.amount()));
+        assertTrue(estimate.complete());
+    }
+
+    @Test
     void noneWhenNoData() {
         Organization org = createOrg("No Data Org " + UUID.randomUUID());
 

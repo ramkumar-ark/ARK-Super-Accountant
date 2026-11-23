@@ -97,6 +97,7 @@ function YearRow({
 }) {
   const { user } = useAuthStore()
   const labels = BASIS_LABELS[year.basis]
+  const estimateText = turnoverEstimateText(year.turnoverEstimate)
 
   return (
     <li>
@@ -119,10 +120,8 @@ function YearRow({
           </button>
         )}
       </div>
-      {turnoverEstimateText(year.turnoverEstimate) && (
-        <p className="ml-4 text-xs text-[var(--color-text-muted)]">
-          {turnoverEstimateText(year.turnoverEstimate)}
-        </p>
+      {estimateText && (
+        <p className="ml-4 text-xs text-[var(--color-text-muted)]">{estimateText}</p>
       )}
       {canEdit && editing && <AnswerForm year={year} orgId={user?.organizationId} onDone={onDone} />}
     </li>

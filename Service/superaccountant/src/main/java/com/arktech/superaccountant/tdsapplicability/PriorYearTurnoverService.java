@@ -87,11 +87,28 @@ public class PriorYearTurnoverService {
         LocalDate fyEnd = fyStart.plusYears(1).minusDays(1);
 
         Optional<BigDecimal> books = booksFigure(orgId, fyStart, fyEnd);
-        if (books.isPresent()) {
+        boolean booksComplete = books.isPresent() && booksCoverageComplete(orgId, fyStart, fyEnd);
+        if (books.isPresent() && booksComplete) {
             return new TurnoverEstimate(measuredFy, books.get().max(BigDecimal.ZERO),
-                    TurnoverEstimate.TurnoverSource.BOOKS, booksCoverageComplete(orgId, fyStart, fyEnd));
+                    TurnoverEstimate.TurnoverSource.BOOKS, true);
         }
-        return gstr3bEstimate(orgId, measuredFy, fyStart, fyEnd);
+
+        // Incomplete (or absent) books ARE "not complete": a complete GSTR-3B figure wins.
+        List<FiledReturnSnapshot> gstr3bSnapshots = gstr3bSnapshots(orgId, fyStart, fyEnd);
+        if (!gstr3bSnapshots.isEmpty()) {
+            TurnoverEstimate gstr3b = gstr3bEstimate(measuredFy, gstr3bSnapshots);
+            if (gstr3b.complete()) {
+                return gstr3b;
+            }
+        }
+
+        if (books.isPresent()) {
+            // No complete GSTR-3B either: keep the books partial sum as an estimate
+            // (Review Focus case 5 — presented as "Estimate", never the year's turnover).
+            return new TurnoverEstimate(measuredFy, books.get().max(BigDecimal.ZERO),
+                    TurnoverEstimate.TurnoverSource.BOOKS, false);
+        }
+        return gstr3bEstimate(measuredFy, gstr3bSnapshots);
     }
 
     /** Present only when the organization has at least one completed day-book upload. */
@@ -164,11 +181,13 @@ public class PriorYearTurnoverService {
         return lower.contains("sales accounts") || lower.contains("direct incomes");
     }
 
-    private TurnoverEstimate gstr3bEstimate(UUID orgId, int measuredFy,
-                                            LocalDate fyStart, LocalDate fyEnd) {
-        List<FiledReturnSnapshot> snapshots = filedSnapshotRepository
+    private List<FiledReturnSnapshot> gstr3bSnapshots(UUID orgId, LocalDate fyStart, LocalDate fyEnd) {
+        return filedSnapshotRepository
                 .findAllByOrganizationIdAndFormTypeAndSupersededAtIsNullAndCoverStartBetween(
                         orgId, FiledFormType.GSTR3B, fyStart, fyEnd);
+    }
+
+    private TurnoverEstimate gstr3bEstimate(int measuredFy, List<FiledReturnSnapshot> snapshots) {
         if (snapshots.isEmpty()) {
             return TurnoverEstimate.none(measuredFy);
         }
@@ -178,6 +197,9 @@ public class PriorYearTurnoverService {
                 .map(FiledReturnSnapshot::getFilingPeriod)
                 .distinct()
                 .count();
+        // Quarterly filing periods are not produced today (FiledReturnImportService
+        // validates filingPeriod as monthly yyyy-MM), so completeness is the 12-monthly-
+        // periods rule; the plan's "or 4 quarterly" clause is future-proofing only.
         boolean complete = distinctPeriods >= MONTHS_PER_YEAR;
         return new TurnoverEstimate(measuredFy, amount, TurnoverEstimate.TurnoverSource.GSTR3B, complete);
     }
