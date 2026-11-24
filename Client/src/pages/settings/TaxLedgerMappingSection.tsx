@@ -58,7 +58,7 @@ export function TaxLedgerMappingSection() {
     onSuccess: () => {
       setDrafts({})
       queryClient.invalidateQueries({ queryKey: ['tax-ledger-mapping'] })
-      queryClient.invalidateQueries({ queryKey: ['compliance', 'baseline'] })
+      queryClient.invalidateQueries({ queryKey: ['baseline-status'] })
     },
   })
 
