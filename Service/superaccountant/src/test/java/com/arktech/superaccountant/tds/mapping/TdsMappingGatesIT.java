@@ -263,8 +263,8 @@ class TdsMappingGatesIT {
     @Test
     void savingAmbiguousCandidateAsNotTdsCompletesGate() throws Exception {
         UploadJob job1 = mastersJob("masters-1.json", Instant.now().minusSeconds(7200));
-        snapshot(job1, "TDS Suspense Payable Receivable", "Current Assets",
-                "Current Assets|Loans & Advances", null);
+        snapshot(job1, "TDS Suspense Payable Receivable", "Suspense A/c",
+                "Suspense A/c", null);
 
         mockMvc.perform(get("/api/v1/tds/ledger-mapping").with(user(accountant)))
                 .andExpect(status().isOk())
