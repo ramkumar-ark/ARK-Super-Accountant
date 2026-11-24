@@ -250,7 +250,9 @@ public class TdsEngine {
     private void attributeCombinedTds(Map<String, BigDecimal> tdsBySection, BigDecimal combinedTds,
                                       Map<String, BigDecimal> baseBySection, String partyKey,
                                       TdsAnalysisInput input) {
-        Map<String, BigDecimal> weights = new LinkedHashMap<>();
+        Map<String, BigDecimal> expectedBySection = new LinkedHashMap<>();
+        Map<String, BigDecimal> residualBySection = new LinkedHashMap<>();
+        BigDecimal residualTotal = BigDecimal.ZERO;
         BigDecimal expectedTotal = BigDecimal.ZERO;
         BigDecimal baseTotal = BigDecimal.ZERO;
         for (Map.Entry<String, BigDecimal> baseEntry : baseBySection.entrySet()) {
@@ -260,15 +262,34 @@ public class TdsEngine {
             }
             BigDecimal expected = baseEntry.getValue().multiply(rateFor(partyKey, cfg, input))
                     .divide(HUNDRED, 2, RoundingMode.HALF_UP);
-            weights.put(baseEntry.getKey(), expected);
+            BigDecimal attributed = tdsBySection.getOrDefault(baseEntry.getKey(), BigDecimal.ZERO);
+            BigDecimal residual = expected.subtract(attributed).max(BigDecimal.ZERO);
+            expectedBySection.put(baseEntry.getKey(), expected);
+            residualBySection.put(baseEntry.getKey(), residual);
+            residualTotal = residualTotal.add(residual);
             expectedTotal = expectedTotal.add(expected);
             baseTotal = baseTotal.add(baseEntry.getValue());
         }
-        if (weights.isEmpty()) {
+        if (expectedBySection.isEmpty()) {
             return;
         }
-        boolean byExpected = expectedTotal.signum() != 0;
-        BigDecimal total = byExpected ? expectedTotal : baseTotal;
+        // Weight by what each section still expects after section-mapped legs; fall back to full
+        // expected, then to base, only when nothing is left to explain.
+        Map<String, BigDecimal> weights;
+        BigDecimal total;
+        if (residualTotal.signum() != 0) {
+            weights = residualBySection;
+            total = residualTotal;
+        } else if (expectedTotal.signum() != 0) {
+            weights = expectedBySection;
+            total = expectedTotal;
+        } else {
+            weights = new LinkedHashMap<>();
+            for (String section : expectedBySection.keySet()) {
+                weights.put(section, baseBySection.get(section));
+            }
+            total = baseTotal;
+        }
         BigDecimal remaining = combinedTds;
         int index = 0;
         for (Map.Entry<String, BigDecimal> weight : weights.entrySet()) {
@@ -276,8 +297,7 @@ public class TdsEngine {
             if (++index == weights.size()) {
                 share = remaining;
             } else {
-                BigDecimal w = byExpected ? weight.getValue() : baseBySection.get(weight.getKey());
-                share = combinedTds.multiply(w).divide(total, 2, RoundingMode.HALF_UP);
+                share = combinedTds.multiply(weight.getValue()).divide(total, 2, RoundingMode.HALF_UP);
                 remaining = remaining.subtract(share);
             }
             tdsBySection.merge(weight.getKey(), share, BigDecimal::add);

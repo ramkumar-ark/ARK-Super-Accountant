@@ -244,6 +244,28 @@ class TdsEnginePass1Test {
     }
 
     @Test
+    void combinedPayable_weightedByResidualAfterSectionMappedLeg() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("TDS Payable"),
+                snap("TDS Payable", LedgerCategory.TDS, true, null, null));
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
+                {"ABC Contractors", "-94600"},
+                {"TDS Payable 194C", "-600"}, {"TDS Payable", "-4000"}});
+        var result = engine.analyze(inputQ1(List.of(v), snaps,
+                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null),
+                        mapping("TDS Payable 194C", TdsLedgerRole.TDS_PAYABLE, "194C"))));
+        assertEquals(0, new BigDecimal("600").compareTo(deductedFor(result, v, "194C")));
+        assertEquals(0, new BigDecimal("4000").compareTo(deductedFor(result, v, "194J_B")));
+        assertTrue(result.findings().stream().noneMatch(f ->
+                f.getFindingType() == TdsFindingType.EXCESS_DEDUCTED
+                        || f.getFindingType() == TdsFindingType.SHORT_DEDUCTED));
+    }
+
+    @Test
     void reversalLegOnMappedExpenseLedgerIsNotTdsDeduction() {
         Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
                 stdSnaps("ABCPE1234F");

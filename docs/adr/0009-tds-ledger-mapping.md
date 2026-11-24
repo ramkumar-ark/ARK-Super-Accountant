@@ -21,7 +21,9 @@ sections table planned separately (sa-statutory-config-plan).
 Mappings are authoritative from day one: there is no legacy name- or category-based
 fallback at analysis time. An unmapped TDS payable ledger blocks TDS analysis and
 workflow advance for the organization until it is mapped; an unmapped TDS receivable
-ledger only warns. Suggestions are computed from the ledger name, its parent group and
+ledger only warns. For TDS-applicable organizations an unmapped payable also refuses
+day-book uploads (422) until the mapping is saved. Candidates exclude GST-taxtype
+ledgers and EXPENSE, PURCHASE and GST-category ledgers. Suggestions are computed from the ledger name, its parent group and
 group chain, and the `istdsapplicable` ledger flag — nothing else — so the user can
 accept or correct them before a row is saved (who saved it and when are recorded).
 

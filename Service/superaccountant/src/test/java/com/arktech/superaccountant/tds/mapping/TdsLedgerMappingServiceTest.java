@@ -137,6 +137,23 @@ class TdsLedgerMappingServiceTest {
     }
 
     @Test
+    void receivableSavedAsNotTdsKeepsReceivableArea() {
+        stubMasters();
+        TdsLedgerMapping saved = new TdsLedgerMapping();
+        saved.setLedgerName("TDS Receivable 206A");
+        saved.setLedgerKey("tds receivable 206a");
+        saved.setRole(TdsLedgerRole.NOT_TDS);
+        when(repository.findByOrganizationId(org)).thenReturn(List.of(saved));
+
+        TdsLedgerMappingView view = service.view(org, gate);
+
+        TdsLedgerMappingView.Row row = view.ledgers().stream()
+                .filter(r -> r.ledgerName().equals("TDS Receivable 206A")).findFirst().orElseThrow();
+        assertEquals(TdsLedgerRole.NOT_TDS, row.role());
+        assertEquals(TdsLedgerArea.RECEIVABLE, row.area());
+    }
+
+    @Test
     void viewCarriesCompleteBlockersAndReceivableWarnings() {
         stubMasters();
         when(gate.isComplete(org)).thenReturn(true);

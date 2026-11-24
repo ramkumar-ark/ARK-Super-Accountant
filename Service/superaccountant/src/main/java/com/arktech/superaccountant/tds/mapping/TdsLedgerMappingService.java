@@ -72,7 +72,9 @@ public class TdsLedgerMappingService {
                     snapshot.getParentGroup(), snapshot.getGroupChain(), snapshot.getTdsApplicable(),
                     sectionCodes);
             TdsLedgerRole role = saved != null ? saved.getRole() : suggestion.role();
-            TdsLedgerArea area = role == TdsLedgerRole.TDS_RECEIVABLE
+            boolean receivable = role == TdsLedgerRole.TDS_RECEIVABLE
+                    || (role == TdsLedgerRole.NOT_TDS && suggestion.role() == TdsLedgerRole.TDS_RECEIVABLE);
+            TdsLedgerArea area = receivable
                     ? TdsLedgerArea.RECEIVABLE
                     : TdsLedgerArea.PAYABLE;
             rows.add(new TdsLedgerMappingView.Row(

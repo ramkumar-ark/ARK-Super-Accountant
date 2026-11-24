@@ -184,6 +184,18 @@ as_operator() { VSA_JWT=$(state_get operator_token); }
 as_owner() { VSA_JWT=$(state_get owner_token); }
 
 # ensure_masters: upload + validate synthetic masters once per run (per org).
+# save_tds_mapping_from_view: save the current org's TDS ledger mapping from
+# its view - "TDS Payable*" ledgers as TDS_PAYABLE (combined, null section),
+# every other candidate NOT_TDS - so the TDS mapping gate is complete.
+save_tds_mapping_from_view() {
+  req "tds-ledger-mapping-view" GET /api/v1/tds/ledger-mapping
+  expect_status "200" || vsa_fail "TDS ledger mapping view failed: $RESP"
+  local tds_items
+  tds_items=$(echo "$RESP" | jq -c '[.ledgers[] | {ledgerName, role: (if (.ledgerName | startswith("TDS Payable")) then "TDS_PAYABLE" else "NOT_TDS" end)}]')
+  req "tds-ledger-mapping" PUT /api/v1/tds/ledger-mapping "{\"items\":$tds_items}"
+  expect_status "200|201" || vsa_fail "TDS ledger mapping failed: $RESP"
+}
+
 ensure_masters() {
   [ "$(state_get masters_done)" = "1" ] && return 0
   as_accountant
@@ -219,12 +231,7 @@ ensure_masters() {
   # candidates). The two TDS Payable duty ledgers stay combined payables (null
   # section: the engine infers the per-voucher section); every other candidate
   # is explicitly NOT_TDS so TDS workflows pass the mapping gate.
-  req "tds-ledger-mapping-view" GET /api/v1/tds/ledger-mapping
-  expect_status "200" || vsa_fail "TDS ledger mapping view failed: $RESP"
-  local tds_items
-  tds_items=$(echo "$RESP" | jq -c '[.ledgers[] | {ledgerName, role: (if (.ledgerName | startswith("TDS Payable")) then "TDS_PAYABLE" else "NOT_TDS" end)}]')
-  req "tds-ledger-mapping" PUT /api/v1/tds/ledger-mapping "{\"items\":$tds_items}"
-  expect_status "200|201" || vsa_fail "TDS ledger mapping failed: $RESP"
+  save_tds_mapping_from_view
   state_set masters_done 1
 }
 

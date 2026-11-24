@@ -3,12 +3,10 @@
 # role/section/area (duty ledgers via the Duties & Taxes group chain with
 # sections from their names, an unseeded-section duty ledger, and a
 # loans-&-advances receivable); unmapped payable candidates block TDS
-# analysis (the workflow stays DATA_UPLOADED; an explicit analyze returns
-# 200 without moving) behind TDS_MAPPING / TDS_LEDGER_UNMAPPED findings
-# that also block advance (409); saving TDS_PAYABLE rows with their
-# sections shrinks the blocker list, a NOT_TDS save removes a candidate
-# from blockers, and completing the gate re-runs analysis automatically so
-# acknowledged findings advance to PREPARE; an unmapped receivable only
+# day-book uploads (422 until the mapping is saved); saving TDS_PAYABLE rows
+# with their sections shrinks the blocker list, a NOT_TDS save removes a
+# candidate from blockers, and once the gate is complete the uploads succeed,
+# analysis reaches FINDINGS_REVIEW and acknowledged findings advance to PREPARE; an unmapped receivable only
 # warns (warn-not-block while the payable side is clean) and mapping it
 # clears the warning with the row marked saved. PUT is Accountant-only
 # (operator 403) and rejects unknown ledgers / sections on non-payable
@@ -122,74 +120,6 @@ run_scenario() {
   expect_status 403 || vsa_fail "operator PUT should be a 403: $RESP"
   tdslm_as_map
 
-  # Baseline dance (bootstrap choreography): a GSTR3B workflow whose day-book
-  # upload lays the confirmed GSTR1 baseline the later advance needs.
-  local dd="$VSA_EVIDENCE_RUN"
-  tdslm_journal 20260510 "TDSLM-BASE-1" "$dd/tdslm-baseline-daybook.json"
-  req "tdslm-responsibility-start" PUT /api/v1/compliance/responsibility-start \
-    '{"type":"GSTR1","firstPeriodStart":"2026-05-01"}'
-  expect_status "200|201" || vsa_fail "responsibility-start failed: $RESP"
-  req "tdslm-start-gstr3b" POST /api/v1/workflows '{"type":"GSTR3B","periodKey":"2026-05"}'
-  expect_status 200 || vsa_fail "GSTR3B start failed: $RESP"
-  local gid; gid=$(echo "$RESP" | jq -r .id)
-  local url="http://localhost:${VSA_API_PORT}/api/v1/workflows/$gid/upload" out
-  out=$(curl -s -X POST -H "Authorization: Bearer $VSA_JWT" \
-        -F "file=@$dd/tdslm-baseline-daybook.json" \
-        -F "coverageFrom=2026-04-01" -F "coverageTo=2026-05-31" \
-        -o "$dd/last-body" -w '%{http_code}' "$url")
-  STATUS="$out"; RESP=$(cat "$dd/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$gid/upload"; VSA_STEP="tdslm-baseline-daybook-upload"
-  expect_status 200 || vsa_fail "baseline daybook upload failed: $RESP"
-  req "tdslm-baseline-confirm" POST /api/v1/compliance/baseline/confirm '{}'
-  expect_status 200 || vsa_fail "baseline confirm failed: $RESP"
-
-  # TDS payment workflow: created and uploaded fine, but the mapping gate
-  # blocks its analysis while payables are unmapped.
-  req "tdslm-start-payment" POST /api/v1/workflows '{"type":"TDS_PAYMENT","periodKey":"2026-06"}'
-  expect_status 200 || vsa_fail "TDS payment start failed: $RESP"
-  local id; id=$(echo "$RESP" | jq -r .id)
-  tdslm_journal 20260610 "TDSLM-1" "$dd/tdslm-tds-daybook.json"
-  url="http://localhost:${VSA_API_PORT}/api/v1/workflows/$id/upload"
-  out=$(curl -s -X POST -H "Authorization: Bearer $VSA_JWT" \
-        -F "file=@$dd/tdslm-tds-daybook.json" \
-        -F "coverageFrom=2026-04-01" -F "coverageTo=2026-06-30" \
-        -o "$dd/last-body" -w '%{http_code}' "$url")
-  STATUS="$out"; RESP=$(cat "$dd/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$id/upload"; VSA_STEP="tdslm-tds-daybook-upload"
-  expect_status 200 || vsa_fail "TDS daybook upload failed: $RESP"
-
-  # Blocked: the stage stays DATA_UPLOADED even after the automatic
-  # post-upload analysis attempt has had time to fail...
-  local i stage=""
-  for i in 1 2 3 4 5 6 7 8; do
-    sleep 0.5
-    req "tdslm-stage-stays-$i" GET "/api/v1/workflows/$id"
-    stage=$(echo "$RESP" | jq -r '.workflow.stage // .stage // empty')
-    [ "$stage" = "DATA_UPLOADED" ] || vsa_fail "stage left DATA_UPLOADED while unmapped (got '$stage')"
-  done
-  VSA_STEP="tdslm-stage-stays-uploaded"; ok=false
-  [ "$stage" = "DATA_UPLOADED" ] && ok=true || ok=false
-  vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" GET "/api/v1/workflows/$id" "$STATUS" "stage stayed DATA_UPLOADED while unmapped" "$ok"
-  [ "$ok" = true ] || vsa_fail "stage left DATA_UPLOADED while unmapped"
-  # ...and an explicit analyze is accepted (200) but cannot move the stage.
-  req "tdslm-analyze-blocked" POST "/api/v1/workflows/$id/analyze"
-  expect_status 200 || vsa_fail "blocked analyze should still be a 200: $RESP"
-  expect_json '.stage == "DATA_UPLOADED"'
-
-  # The blockers are TDS_MAPPING findings, one per unmapped payable ledger;
-  # the unmapped receivable is only a view warning, never a finding.
-  req "tdslm-findings-blocked" GET "/api/v1/workflows/$id/findings"
-  expect_status 200 || vsa_fail "findings list failed: $RESP"
-  expect_json '.blockingCount == 3'
-  expect_json 'all(.findings[]; .source == "TDS_MAPPING" and .findingType == "TDS_LEDGER_UNMAPPED" and .blocking)'
-  VSA_STEP="tdslm-finding-message"; ok=false
-  echo "$RESP" | jq -e --arg m "TDS ledger 'TDS Payable - 194C A/c' is not mapped. Map it under Settings → Compliance → TDS ledgers." \
-    'any(.findings[]; .message == $m)' >/dev/null && ok=true || ok=false
-  vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" GET "$VSA_PATH" "$STATUS" "194C unmapped message" "$ok"
-  [ "$ok" = true ] || vsa_fail "expected the 194C unmapped finding: $RESP"
-  expect_json 'all(.findings[]; .ledgerName != "TDS (FY:24-25) A/c")'
-  req "tdslm-advance-blocked" POST "/api/v1/workflows/$id/advance"
-  expect_status 409 || vsa_fail "advance while unmapped should be a 409: $RESP"
-  expect_contains "only a workflow in FINDINGS_REVIEW"
-
   # Save the two mapped payable duty ledgers (sections from their names):
   # the blocker list shrinks to the one remaining candidate.
   req "tdslm-put-payables" PUT /api/v1/tds/ledger-mapping \
@@ -211,6 +141,24 @@ run_scenario() {
   vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" GET "$VSA_PATH" "$STATUS" "194C row savedBy the accountant" "$ok"
   [ "$ok" = true ] || vsa_fail "savedBy is not the accountant uname: $RESP"
 
+  local dd="$VSA_EVIDENCE_RUN"
+  tdslm_journal 20260510 "TDSLM-BASE-1" "$dd/tdslm-baseline-daybook.json"
+  req "tdslm-responsibility-start" PUT /api/v1/compliance/responsibility-start \
+    '{"type":"GSTR1","firstPeriodStart":"2026-05-01"}'
+  expect_status "200|201" || vsa_fail "responsibility-start failed: $RESP"
+  req "tdslm-start-gstr3b" POST /api/v1/workflows '{"type":"GSTR3B","periodKey":"2026-05"}'
+  expect_status 200 || vsa_fail "GSTR3B start failed: $RESP"
+  local gid; gid=$(echo "$RESP" | jq -r .id)
+  # While a payable is still unmapped the day-book upload is refused (422).
+  local rurl="http://localhost:${VSA_API_PORT}/api/v1/workflows/$gid/upload" rout
+  rout=$(curl -s -X POST -H "Authorization: Bearer $VSA_JWT" \
+        -F "file=@$VSA_EVIDENCE_RUN/tdslm-baseline-daybook.json" \
+        -F "coverageFrom=2026-04-01" -F "coverageTo=2026-05-31" \
+        -o "$VSA_EVIDENCE_RUN/last-body" -w '%{http_code}' "$rurl")
+  STATUS="$rout"; RESP=$(cat "$VSA_EVIDENCE_RUN/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$gid/upload"; VSA_STEP="tdslm-daybook-upload-refused"
+  expect_status 422 || vsa_fail "day-book upload while unmapped should be a 422: $RESP"
+  expect_contains "TDS ledger mapping"
+
   # NOT_TDS saves the remaining duty ledger: it stops being a candidate, the
   # gate completes and the automatic re-analysis moves the workflow on.
   req "tdslm-put-not-tds" PUT /api/v1/tds/ledger-mapping \
@@ -229,8 +177,34 @@ run_scenario() {
   vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" GET "$VSA_PATH" "$STATUS" "receivable warns while payables are clean" "$ok"
   [ "$ok" = true ] || vsa_fail "receivable warning should persist while unmapped: $RESP"
 
+  # Baseline dance (bootstrap choreography): the day-book upload lays the
+  # confirmed GSTR1 baseline the later advance needs.
+  local url="http://localhost:${VSA_API_PORT}/api/v1/workflows/$gid/upload" out
+  out=$(curl -s -X POST -H "Authorization: Bearer $VSA_JWT" \
+        -F "file=@$dd/tdslm-baseline-daybook.json" \
+        -F "coverageFrom=2026-04-01" -F "coverageTo=2026-05-31" \
+        -o "$dd/last-body" -w '%{http_code}' "$url")
+  STATUS="$out"; RESP=$(cat "$dd/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$gid/upload"; VSA_STEP="tdslm-baseline-daybook-upload"
+  expect_status 200 || vsa_fail "baseline daybook upload failed: $RESP"
+  req "tdslm-baseline-confirm" POST /api/v1/compliance/baseline/confirm '{}'
+  expect_status 200 || vsa_fail "baseline confirm failed: $RESP"
+
+  # TDS payment workflow: uploaded once the mapping gate is complete.
+  req "tdslm-start-payment" POST /api/v1/workflows '{"type":"TDS_PAYMENT","periodKey":"2026-06"}'
+  expect_status 200 || vsa_fail "TDS payment start failed: $RESP"
+  local id; id=$(echo "$RESP" | jq -r .id)
+  tdslm_journal 20260610 "TDSLM-1" "$dd/tdslm-tds-daybook.json"
+  url="http://localhost:${VSA_API_PORT}/api/v1/workflows/$id/upload"
+  out=$(curl -s -X POST -H "Authorization: Bearer $VSA_JWT" \
+        -F "file=@$dd/tdslm-tds-daybook.json" \
+        -F "coverageFrom=2026-04-01" -F "coverageTo=2026-06-30" \
+        -o "$dd/last-body" -w '%{http_code}' "$url")
+  STATUS="$out"; RESP=$(cat "$dd/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$id/upload"; VSA_STEP="tdslm-tds-daybook-upload"
+  expect_status 200 || vsa_fail "TDS daybook upload failed: $RESP"
+
   # Gate complete: re-analysis runs automatically; poll to FINDINGS_REVIEW
   # (30 x 0.5s, explicit analyze retry as a fallback).
+  local i stage=""
   local tries=0
   while [ $tries -lt 30 ]; do
     tries=$((tries+1)); sleep 0.5
