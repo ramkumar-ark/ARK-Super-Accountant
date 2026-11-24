@@ -116,7 +116,7 @@ class TdsLedgerMappingIT {
         s.setParentGroup(parentGroup);
         s.setGroupChain(groupChain);
         s.setTdsApplicable(tdsApplicable);
-        s.setCategory(LedgerCategory.EXPENSE);
+        s.setCategory(LedgerCategory.OTHER);
         snapshotRepository.save(s);
     }
 
@@ -171,7 +171,7 @@ class TdsLedgerMappingIT {
                 .andExpect(jsonPath("$.ledgers[?(@.ledgerName == 'TDS Receivable 206A')].suggestedSection")
                         .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.nullValue())))
                 .andExpect(jsonPath("$.ledgers[?(@.ledgerName == 'TDS Receivable 206A')].area").value("RECEIVABLE"))
-                .andExpect(jsonPath("$.ledgers[?(@.ledgerName == 'Rent')].suggestedRole").value("TDS_PAYABLE"));
+                .andExpect(jsonPath("$.ledgers[?(@.ledgerName == 'Rent')].suggestedRole").value("NOT_TDS"));
     }
 
     @Test

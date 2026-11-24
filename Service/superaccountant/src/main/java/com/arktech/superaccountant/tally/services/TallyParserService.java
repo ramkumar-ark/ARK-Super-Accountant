@@ -112,6 +112,8 @@ public class TallyParserService {
 
             String parentGroup = textOrNull(ledgerNode, "parent");
             Boolean gstApplicable = parseBooleanFlag(ledgerNode, "taxtype", "GST");
+            String taxType = textOrNull(ledgerNode, "taxtype");
+            String tdsNatureOfPayment = textOrNull(ledgerNode, "tdsratename");
             Boolean tdsApplicable = resolveBooleanField(ledgerNode, "istdsapplicable", "yes",
                     "istdsapplicable", null);
             String gstApplicabilityType = resolveGstApplicabilityType(ledgerNode);
@@ -135,6 +137,8 @@ public class TallyParserService {
                     .parentGroup(parentGroup)
                     .gstApplicable(gstApplicable)
                     .tdsApplicable(tdsApplicable)
+                    .taxType(taxType)
+                    .tdsNatureOfPayment(tdsNatureOfPayment)
                     .gstApplicabilityType(gstApplicabilityType)
                     .gstin(gstin)
                     .gstRegistrationType(gstRegistrationType)

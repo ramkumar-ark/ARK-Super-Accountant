@@ -59,8 +59,11 @@ public final class TdsMappingTestData {
     public static String mappingItemsJson(Set<String> sectionCodes) {
         List<String> items = new ArrayList<>();
         for (Seed seed : narayananSeeds()) {
-            TdsLedgerSuggester.Suggestion suggestion = TdsLedgerSuggester.suggest(seed.name(),
-                    seed.parentGroup(), seed.groupChain(), seed.tdsApplicable(), sectionCodes);
+            UploadLedgerSnapshot snapshot = new UploadLedgerSnapshot();
+            snapshot.setLedgerName(seed.name());
+            snapshot.setParentGroup(seed.parentGroup());
+            snapshot.setGroupChain(seed.groupChain());
+            TdsLedgerSuggester.Suggestion suggestion = TdsLedgerSuggester.suggest(snapshot, sectionCodes);
             String section = suggestion.section() == null
                     ? ""
                     : ",\"section\":\"" + suggestion.section() + "\"";
@@ -79,13 +82,10 @@ public final class TdsMappingTestData {
                 .map(TdsSectionConfig::getSectionCode)
                 .collect(Collectors.toSet());
         for (UploadLedgerSnapshot snapshot : snapshotRepository.findByUploadJobId(mastersJobId)) {
-            if (!TdsLedgerSuggester.isCandidate(snapshot.getLedgerName(), snapshot.getParentGroup(),
-                    snapshot.getGroupChain(), snapshot.getTdsApplicable())) {
+            if (!TdsLedgerSuggester.isCandidate(snapshot)) {
                 continue;
             }
-            TdsLedgerSuggester.Suggestion suggestion = TdsLedgerSuggester.suggest(
-                    snapshot.getLedgerName(), snapshot.getParentGroup(), snapshot.getGroupChain(),
-                    snapshot.getTdsApplicable(), sectionCodes);
+            TdsLedgerSuggester.Suggestion suggestion = TdsLedgerSuggester.suggest(snapshot, sectionCodes);
             TdsLedgerMapping mapping = new TdsLedgerMapping();
             mapping.setOrganizationId(organizationId);
             mapping.setLedgerName(snapshot.getLedgerName());

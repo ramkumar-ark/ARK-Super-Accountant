@@ -68,9 +68,7 @@ public class TdsLedgerMappingService {
         for (Map.Entry<String, UploadLedgerSnapshot> entry : candidates.entrySet()) {
             UploadLedgerSnapshot snapshot = entry.getValue();
             TdsLedgerMapping saved = mappings.get(entry.getKey());
-            TdsLedgerSuggester.Suggestion suggestion = TdsLedgerSuggester.suggest(snapshot.getLedgerName(),
-                    snapshot.getParentGroup(), snapshot.getGroupChain(), snapshot.getTdsApplicable(),
-                    sectionCodes);
+            TdsLedgerSuggester.Suggestion suggestion = TdsLedgerSuggester.suggest(snapshot, sectionCodes);
             TdsLedgerRole role = saved != null ? saved.getRole() : suggestion.role();
             boolean receivable = role == TdsLedgerRole.TDS_RECEIVABLE
                     || (role == TdsLedgerRole.NOT_TDS && suggestion.role() == TdsLedgerRole.TDS_RECEIVABLE);
@@ -109,8 +107,7 @@ public class TdsLedgerMappingService {
         Set<String> sectionCodes = sectionCodes();
         return candidateSnapshots(organizationId).values().stream()
                 .filter(s -> !mappings.containsKey(ledgerKey(s.getLedgerName())))
-                .filter(s -> TdsLedgerSuggester.suggest(s.getLedgerName(), s.getParentGroup(),
-                        s.getGroupChain(), s.getTdsApplicable(), sectionCodes).role() == TdsLedgerRole.TDS_RECEIVABLE)
+                .filter(s -> TdsLedgerSuggester.suggest(s, sectionCodes).role() == TdsLedgerRole.TDS_RECEIVABLE)
                 .map(UploadLedgerSnapshot::getLedgerName)
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .collect(Collectors.toList());

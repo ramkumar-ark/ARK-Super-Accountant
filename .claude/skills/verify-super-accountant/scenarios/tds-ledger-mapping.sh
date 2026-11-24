@@ -41,7 +41,7 @@ tdslm_ack_blocking() {
     req "tdslm-ack-findings" POST "/api/v1/workflows/$id/findings/bulk-action" \
       "{\"action\":\"ACKNOWLEDGE\",\"findingIds\":$ids}"
     if [ "$STATUS" != "200" ]; then
-      for f in $(echo "$RESP" | jq -r '.blocking ?? [] | .[].id // empty' 2>/dev/null) \
+      for f in $(echo "$RESP" | jq -r '(.blocking // []) | .[].id // empty' 2>/dev/null) \
                $(echo "$RESP" | jq -r '.failures[]?.findingId // empty' 2>/dev/null); do
         [ -n "$f" ] || continue
         req "tdslm-resolve-finding" POST "/api/v1/workflows/$id/findings/$f/action" \

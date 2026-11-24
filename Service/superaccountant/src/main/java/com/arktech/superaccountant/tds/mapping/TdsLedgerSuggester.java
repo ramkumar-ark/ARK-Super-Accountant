@@ -19,34 +19,34 @@ public final class TdsLedgerSuggester {
     public static boolean isCandidate(UploadLedgerSnapshot snapshot) {
         LedgerCategory category = snapshot.getCategory();
         if (Boolean.TRUE.equals(snapshot.getGstApplicable())
+                || "GST".equalsIgnoreCase(snapshot.getTaxType())
                 || category == LedgerCategory.GST
                 || category == LedgerCategory.EXPENSE
                 || category == LedgerCategory.PURCHASE) {
             return false;
         }
-        return isCandidate(snapshot.getLedgerName(), snapshot.getParentGroup(),
-                snapshot.getGroupChain(), snapshot.getTdsApplicable());
-    }
-
-    static boolean isCandidate(String ledgerName, String parentGroup, String groupChain, Boolean tdsApplicable) {
-        if (hasTdsToken(ledgerName)) {
+        if (isTdsType(snapshot)) {
             return true;
         }
-        if (groupChainMatchesTds(groupChain)) {
-            return true;
+        if (snapshot.getTaxType() != null) {
+            return false;
         }
-        return Boolean.TRUE.equals(tdsApplicable);
+        return hasTdsToken(snapshot.getLedgerName()) || groupChainMatchesTds(snapshot.getGroupChain());
     }
 
-    public static Suggestion suggest(String ledgerName, String parentGroup, String groupChain,
-                                     Boolean tdsApplicable, Set<String> knownSectionCodes) {
-        if ((ledgerName == null || ledgerName.isBlank())
-                && !groupChainMatchesTds(groupChain)
-                && !Boolean.TRUE.equals(tdsApplicable)) {
-            return new Suggestion(null, null);
+    public static Suggestion suggest(UploadLedgerSnapshot snapshot, Set<String> knownSectionCodes) {
+        String ledgerName = snapshot.getLedgerName();
+        String groupChain = snapshot.getGroupChain();
+        boolean tdsType = isTdsType(snapshot);
+        if (!tdsType && !hasTdsToken(ledgerName) && !hasTdsGroup(groupChain)) {
+            return new Suggestion(dutiesAndTaxes(groupChain) ? TdsLedgerRole.NOT_TDS : null, null);
         }
-        return new Suggestion(suggestRole(ledgerName, parentGroup, groupChain, tdsApplicable),
-                suggestSection(ledgerName, knownSectionCodes));
+        return new Suggestion(suggestRole(ledgerName, groupChain),
+                suggestSection(ledgerName, snapshot.getTdsNatureOfPayment(), knownSectionCodes));
+    }
+
+    private static boolean isTdsType(UploadLedgerSnapshot snapshot) {
+        return "TDS".equalsIgnoreCase(snapshot.getTaxType());
     }
 
     private static boolean hasTdsToken(String ledgerName) {
@@ -75,21 +75,14 @@ public final class TdsLedgerSuggester {
         return false;
     }
 
-    private static TdsLedgerRole suggestRole(String ledgerName, String parentGroup, String groupChain,
-                                             Boolean tdsApplicable) {
-        if (!hasTdsToken(ledgerName) && !hasTdsGroup(groupChain)) {
-            return dutiesAndTaxes(groupChain) ? TdsLedgerRole.NOT_TDS : null;
-        }
+    private static TdsLedgerRole suggestRole(String ledgerName, String groupChain) {
         String upper = ledgerName == null ? "" : ledgerName.toUpperCase(Locale.ROOT);
         boolean hasPayable = upper.contains("PAYABLE");
         boolean hasReceivable = upper.contains("RECEIVABLE");
-        if (hasPayable && hasReceivable) {
-            return null;
-        }
-        if (hasReceivable) {
+        if (hasReceivable && !hasPayable) {
             return TdsLedgerRole.TDS_RECEIVABLE;
         }
-        if (hasPayable) {
+        if (hasPayable && !hasReceivable) {
             return TdsLedgerRole.TDS_PAYABLE;
         }
         if (groupChain != null) {
@@ -97,30 +90,61 @@ public final class TdsLedgerSuggester {
             if (lower.contains("loans & advances") || lower.contains("current assets")) {
                 return TdsLedgerRole.TDS_RECEIVABLE;
             }
-        }
-        if (groupChainMatchesTds(groupChain)) {
-            return TdsLedgerRole.TDS_PAYABLE;
-        }
-        if (Boolean.TRUE.equals(tdsApplicable)) {
-            return TdsLedgerRole.TDS_PAYABLE;
+            if (groupChainMatchesTds(groupChain) || lower.contains("current liabilities")) {
+                return TdsLedgerRole.TDS_PAYABLE;
+            }
         }
         return null;
     }
 
-    private static String suggestSection(String ledgerName, Set<String> knownSectionCodes) {
-        if (ledgerName == null || ledgerName.isBlank() || knownSectionCodes == null || knownSectionCodes.isEmpty()) {
+    private static String suggestSection(String ledgerName, String natureOfPayment, Set<String> knownSectionCodes) {
+        if (knownSectionCodes == null || knownSectionCodes.isEmpty()) {
             return null;
         }
-        String upper = ledgerName.toUpperCase(Locale.ROOT);
-        int[] matches = {0};
-        String[] found = {null};
-        for (String rawToken : upper.split("[^A-Z0-9_-]+")) {
-            String token = rawToken.replace('-', '_');
-            if (knownSectionCodes.contains(token)) {
-                matches[0]++;
-                found[0] = token;
+        if (natureOfPayment != null && !natureOfPayment.isBlank()) {
+            if (natureOfPayment.trim().equalsIgnoreCase("any")) {
+                return null;
+            }
+            String fromNature = sectionFromNature(natureOfPayment, knownSectionCodes);
+            if (fromNature != null) {
+                return fromNature;
             }
         }
-        return matches[0] == 1 ? found[0] : null;
+        return sectionFromTokens(ledgerName, knownSectionCodes);
+    }
+
+    private static String sectionFromNature(String natureOfPayment, Set<String> knownSectionCodes) {
+        String direct = sectionFromTokens(natureOfPayment, knownSectionCodes);
+        if (direct != null) {
+            return direct;
+        }
+        String lower = natureOfPayment.toLowerCase(Locale.ROOT);
+        String code = null;
+        if (lower.contains("contractor")) {
+            code = "194C";
+        } else if (lower.contains("commission") || lower.contains("brokerage")) {
+            code = "194H";
+        } else if (lower.contains("professional")) {
+            code = "194J_B";
+        } else if (lower.contains("technical")) {
+            code = "194J_A";
+        }
+        return code != null && knownSectionCodes.contains(code) ? code : null;
+    }
+
+    private static String sectionFromTokens(String text, Set<String> knownSectionCodes) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        int matches = 0;
+        String found = null;
+        for (String rawToken : text.toUpperCase(Locale.ROOT).split("[^A-Z0-9_-]+")) {
+            String token = rawToken.replace('-', '_');
+            if (knownSectionCodes.contains(token)) {
+                matches++;
+                found = token;
+            }
+        }
+        return matches == 1 ? found : null;
     }
 }

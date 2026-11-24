@@ -58,7 +58,7 @@ export function TdsLedgerMappingSection() {
   // required nor saved.
   const savableRows = anyTdsOn ? rows : receivableRows
   const everyRowHasRole = savableRows.every((r) => r.role !== null)
-  const canSave = canEdit && everyRowHasRole
+  const canSave = canEdit && savableRows.length > 0 && everyRowHasRole
 
   const mutation = useMutation({
     mutationFn: () =>

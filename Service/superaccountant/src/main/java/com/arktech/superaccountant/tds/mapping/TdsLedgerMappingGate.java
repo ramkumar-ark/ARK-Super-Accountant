@@ -96,9 +96,7 @@ public class TdsLedgerMappingGate {
             if (mappings.containsKey(key)) {
                 continue;
             }
-            TdsLedgerRole suggested = TdsLedgerSuggester.suggest(snapshot.getLedgerName(),
-                    snapshot.getParentGroup(), snapshot.getGroupChain(), snapshot.getTdsApplicable(),
-                    Set.of()).role();
+            TdsLedgerRole suggested = TdsLedgerSuggester.suggest(snapshot, Set.of()).role();
             unmapped.put(snapshot.getLedgerName(), suggested == TdsLedgerRole.TDS_RECEIVABLE
                     ? TdsLedgerArea.RECEIVABLE
                     : TdsLedgerArea.PAYABLE);
