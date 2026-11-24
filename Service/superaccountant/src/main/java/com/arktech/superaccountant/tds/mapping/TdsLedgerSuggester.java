@@ -21,9 +21,6 @@ public final class TdsLedgerSuggester {
         if (groupChainMatchesTds(groupChain)) {
             return true;
         }
-        if (parentGroupMatchesTds(parentGroup)) {
-            return true;
-        }
         return Boolean.TRUE.equals(tdsApplicable);
     }
 
@@ -31,7 +28,6 @@ public final class TdsLedgerSuggester {
                                      Boolean tdsApplicable, Set<String> knownSectionCodes) {
         if ((ledgerName == null || ledgerName.isBlank())
                 && !groupChainMatchesTds(groupChain)
-                && !parentGroupMatchesTds(parentGroup)
                 && !Boolean.TRUE.equals(tdsApplicable)) {
             return new Suggestion(null, null);
         }
@@ -60,10 +56,6 @@ public final class TdsLedgerSuggester {
         return false;
     }
 
-    private static boolean parentGroupMatchesTds(String parentGroup) {
-        return parentGroup != null && groupChainMatchesTds(parentGroup);
-    }
-
     private static TdsLedgerRole suggestRole(String ledgerName, String parentGroup, String groupChain,
                                              Boolean tdsApplicable) {
         String upper = ledgerName == null ? "" : ledgerName.toUpperCase(Locale.ROOT);
@@ -84,7 +76,7 @@ public final class TdsLedgerSuggester {
                 return TdsLedgerRole.TDS_RECEIVABLE;
             }
         }
-        if (groupChainMatchesTds(groupChain) || parentGroupMatchesTds(parentGroup)) {
+        if (groupChainMatchesTds(groupChain)) {
             return TdsLedgerRole.TDS_PAYABLE;
         }
         if (Boolean.TRUE.equals(tdsApplicable)) {
