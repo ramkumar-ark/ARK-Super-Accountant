@@ -24,7 +24,7 @@ workflow advance for the organization until it is mapped; an unmapped TDS receiv
 ledger only warns. For TDS-applicable organizations an unmapped payable also refuses
 day-book uploads (422) until the mapping is saved. Candidates exclude GST-taxtype
 ledgers and EXPENSE, PURCHASE and GST-category ledgers. Suggestions are computed from the ledger name, its parent group and
-group chain, and the `istdsapplicable` ledger flag — nothing else — so the user can
+group chain, Tally tax type, and the nature-of-payment section code — nothing else — so the user can
 accept or correct them before a row is saved (who saved it and when are recorded).
 
 Alternatives considered and rejected: a legacy name/category fallback (re-introduces the
