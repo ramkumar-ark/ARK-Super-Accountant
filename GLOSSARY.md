@@ -132,3 +132,27 @@ test: 194M (contract/commission/professional payments above ₹50 lakh to one pa
 advisories for a non-deductor, filed through challan-cum-statement forms (26QD/26QC/26QB/
 26QE; Form 141 from 1 April 2026), and never make the organization a 26Q deductor.
 _Avoid_: saying "TDS not applicable" for 194M/194-IB obligations
+
+## TDS ledger mapping
+
+A per-organization record saying what a ledger in the books is, for TDS purposes: its
+name and key, a role (payable, receivable or not TDS), and for a payable ledger an
+optional single section it covers. The mapping is authoritative once saved — nothing is
+guessed at analysis time — and an unmapped payable ledger blocks TDS analysis until the
+organization maps it.
+_Avoid_: TDS ledger auto-detection, ledger guessing
+
+## TDS payable ledger
+
+The ledger where deducted TDS accumulates before it is deposited, mapped with the
+payable role. It may cover one section code, or be combined (no section), in which case
+the section is worked out from each voucher at analysis time. An unmapped one blocks
+TDS analysis and workflow advance.
+_Avoid_: TDS liability ledger, TDS out ledger
+
+## TDS receivable ledger
+
+The ledger where TDS deducted by others on the organization's receipts accumulates,
+mapped with the receivable role. It carries no section. An unmapped one only warns; it
+never blocks analysis.
+_Avoid_: TDS asset ledger, TDS credit ledger
