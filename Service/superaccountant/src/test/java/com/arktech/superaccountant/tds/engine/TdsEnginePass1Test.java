@@ -192,18 +192,30 @@ class TdsEnginePass1Test {
     void combinedPayable_neverWrongSection() {
         Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
                 stdSnaps("ABCPE1234F");
-        snaps.put(TdsEngine.key("Site Expenses"),
-                snap("Site Expenses", LedgerCategory.EXPENSE, true, "194C", null));
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("XYZ Traders"),
+                snap("XYZ Traders", LedgerCategory.CREDITOR, null, null, "XYZPE1234F"));
         snaps.put(TdsEngine.key("TDS Payable"),
                 snap("TDS Payable", LedgerCategory.TDS, true, null, null));
-        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
-                {"Subcontractor Charges", "60000"}, {"Site Expenses", "40000"},
+        Map<String, com.arktech.superaccountant.tds.mapping.TdsLedgerMapping> mappingsBy =
+                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null));
+        var combined = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
                 {"ABC Contractors", "-99000"},
                 {"TDS Payable", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(v), snaps,
-                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null))));
+        var shortLeg = voucher("V2", LocalDate.of(2026, 5, 20), "XYZ Traders", new Object[][]{
+                {"Subcontractor Charges", "100000"}, {"XYZ Traders", "-99500"},
+                {"TDS Payable", "-500"}});
+        var result = engine.analyze(inputQ1(List.of(combined, shortLeg), snaps, mappingsBy));
         assertTrue(result.findings().stream()
                 .noneMatch(f -> f.getFindingType() == TdsFindingType.WRONG_SECTION));
+        TdsFinding shortFinding = result.findings().stream()
+                .filter(f -> f.getFindingType() == TdsFindingType.SHORT_DEDUCTED)
+                .findFirst().orElseThrow();
+        assertEquals(shortLeg.getId(), shortFinding.getVoucherId());
+        assertEquals(new BigDecimal("1000.00"), shortFinding.getExpectedAmount());
+        assertEquals(new BigDecimal("500.00"), shortFinding.getActualAmount());
     }
 
     @Test
