@@ -1,0 +1,13 @@
+{"tallymessage":[
+  {"group":{"name":"Duties & Taxes","parent":""}},
+  {"group":{"name":"TDS","parent":"Duties & Taxes"}},
+  {"group":{"name":"Loans & Advances (Asset)","parent":""}},
+  {"group":{"name":"Indirect Expenses","parent":""}},
+  {"group":{"name":"Sundry Creditors","parent":""}},
+  {"ledger":{"name":"TDS Payable - 194C A/c","guid":"SYN-TDSLM-PAY-194C","parent":"TDS"}},
+  {"ledger":{"name":"TDS Payable - 194Q A/c","guid":"SYN-TDSLM-PAY-194Q","parent":"TDS"}},
+  {"ledger":{"name":"TDS Payable - 192B A/c","guid":"SYN-TDSLM-PAY-192B","parent":"TDS"}},
+  {"ledger":{"name":"TDS (FY:24-25) A/c","guid":"SYN-TDSLM-FY2425","parent":"Loans & Advances (Asset)"}},
+  {"ledger":{"name":"Ledger Mapping Contractor Expense","guid":"SYN-TDSLM-EXP","parent":"Indirect Expenses"}},
+  {"ledger":{"name":"Ledger Mapping Contractor Party","guid":"SYN-TDSLM-PARTY","parent":"Sundry Creditors","incometaxnumber":"ABCPX1234F"}}
+]}
