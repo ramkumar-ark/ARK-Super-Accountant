@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.gst.mapping;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -118,6 +119,41 @@ class TaxMappingGatesIT {
         return uploadJobRepository.save(job);
     }
 
+    private UploadJob parsedMastersJob(String fileName) {
+        UploadJob job = mastersJob(fileName);
+        job.setTotalLedgersParsed(18);
+        job.setUploadedBy("it");
+        return uploadJobRepository.save(job);
+    }
+
+    private void plainSnapshot(UploadJob job, String name) {
+        UploadLedgerSnapshot s = new UploadLedgerSnapshot();
+        s.setUploadJobId(job.getId());
+        s.setOrganizationId(orgId);
+        s.setLedgerName(name);
+        snapshotRepository.save(s);
+    }
+
+    private String startWorkflow() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/v1/workflows").with(user(accountant))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"GSTR1\",\"periodKey\":\"2025-06\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+    }
+
+    private void uploadDayBook(String workflowId, String json) throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/api/v1/workflows/" + workflowId + "/upload")
+                        .file(new org.springframework.mock.web.MockMultipartFile(
+                                "file", "daybook.json", "application/json", json.getBytes()))
+                        .param("coverageFrom", "2025-04-01")
+                        .param("coverageTo", "2025-07-31")
+                        .with(user(accountant)))
+                .andExpect(status().isOk());
+    }
+
     private void gstSnapshot(UploadJob job, String name) {
         UploadLedgerSnapshot s = new UploadLedgerSnapshot();
         s.setUploadJobId(job.getId());
@@ -152,6 +188,35 @@ class TaxMappingGatesIT {
         job.setCoverageTo(LocalDate.of(2025, 7, 31));
         job.setTotalVouchersParsed(0);
         dayBookUploadJobRepository.saveAndFlush(job);
+    }
+
+    @Test
+    void daybookUploadRefusedUntilMappingSaved() throws Exception {
+        UploadJob job1 = parsedMastersJob("masters-1.json");
+        TaxMappingTestData.standardLedgerNames().forEach(name -> gstSnapshot(job1, name));
+        plainSnapshot(job1, "Bank Account");
+        String workflowId = startWorkflow();
+        String daybook = "{\"tallymessage\":[{\"vouchertypename\":\"Journal\",\"vouchernumber\":\"G1\","
+                + "\"date\":\"20250610\",\"partyledgername\":\"Bank Account\","
+                + "\"allledgerentries\":[{\"ledgername\":\"Bank Account\",\"amount\":\"-900\"},"
+                + "{\"ledgername\":\"Output CGST\",\"amount\":\"900\"}],\"ledgerentries\":[]}]}";
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/api/v1/workflows/" + workflowId + "/upload")
+                        .file(new org.springframework.mock.web.MockMultipartFile(
+                                "file", "daybook.json", "application/json", daybook.getBytes()))
+                        .param("coverageFrom", "2025-04-01")
+                        .param("coverageTo", "2025-07-31")
+                        .with(user(accountant)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error")
+                        .value(org.hamcrest.Matchers.containsString("GST tax-ledger mapping")));
+        assertThat(dayBookUploadJobRepository.findAllByOrganizationIdAndStatusOrderByCreatedAtDesc(
+                orgId, UploadJobStatus.COMPLETED)).isEmpty();
+
+        completeMapping();
+
+        uploadDayBook(workflowId, daybook);
     }
 
     @Test

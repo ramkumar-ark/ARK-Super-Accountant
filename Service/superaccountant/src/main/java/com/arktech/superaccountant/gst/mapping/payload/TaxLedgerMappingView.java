@@ -11,7 +11,8 @@ public record TaxLedgerMappingView(
         boolean complete,
         UUID mastersJobId,
         List<String> blockers,
-        List<Row> ledgers
+        List<Row> ledgers,
+        boolean gstApplicable
 ) {
 
     public record Row(

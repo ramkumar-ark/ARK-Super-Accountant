@@ -42,6 +42,7 @@ export interface TaxLedgerMappingView {
   mastersJobId: string | null
   blockers: string[]
   ledgers: TaxLedgerMappingRow[]
+  gstApplicable: boolean
 }
 
 export interface TaxLedgerMappingItem {
@@ -49,6 +50,8 @@ export interface TaxLedgerMappingItem {
   role: TaxLedgerRole
   head: GstHead | null
 }
+
+export const TAX_LEDGER_MAPPING_QUERY_KEY = ['tax-ledger-mapping'] as const
 
 export function getTaxLedgerMapping(): Promise<TaxLedgerMappingView> {
   return api.get('/v1/gst/tax-ledger-mapping').then((r) => r.data)

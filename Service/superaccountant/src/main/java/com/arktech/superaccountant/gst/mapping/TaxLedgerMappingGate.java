@@ -60,6 +60,17 @@ public class TaxLedgerMappingGate {
         return blockerMessage(organizationId).isEmpty();
     }
 
+    public boolean isGstApplicable(UUID organizationId) {
+        return hasGstin(organizationId);
+    }
+
+    public Optional<String> daybookBlockerMessage(UUID organizationId) {
+        if (!hasGstin(organizationId)) {
+            return Optional.empty();
+        }
+        return blockerMessage(organizationId);
+    }
+
     public void requireComplete(UUID organizationId) {
         blockerMessage(organizationId)
                 .ifPresent(message -> { throw new TaxLedgerMappingIncompleteException(message); });

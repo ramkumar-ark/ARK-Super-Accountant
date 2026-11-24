@@ -157,3 +157,13 @@ The ledger where TDS deducted by others on the organization's receipts accumulat
 mapped with the receivable role. It carries no section. An unmapped one only warns; it
 never blocks analysis.
 _Avoid_: TDS asset ledger, TDS credit ledger
+
+## GST tax-ledger mapping
+
+A per-organization record saying what a GST-categorized ledger in the books is: its
+name and key, a role (output, input, portal cash/liability/credit balance, GST TDS,
+or not a tax ledger) and a head (IGST, CGST, SGST or CESS). The mapping is
+authoritative once saved. For a GSTIN organization an incomplete mapping refuses
+day-book uploads (422) until it is saved, on top of the analysis-time gate;
+organizations without a GSTIN are unaffected by the upload refusal.
+_Avoid_: GST ledger auto-detection, tax head guessing
