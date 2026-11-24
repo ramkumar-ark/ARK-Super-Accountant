@@ -44,7 +44,11 @@ public class TdsAnalysisInputFactory {
     @org.springframework.beans.factory.annotation.Autowired
     private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate mappingGate;
+
     public TdsAnalysisInput build(AnalysisContext ctx) {
+        mappingGate.requireComplete(ctx.organizationId());
         if (ctx.mastersJobId() == null) {
             throw new IllegalStateException("No completed masters upload to analyse against");
         }

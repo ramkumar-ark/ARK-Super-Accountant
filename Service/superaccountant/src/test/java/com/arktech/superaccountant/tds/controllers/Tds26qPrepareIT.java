@@ -29,6 +29,8 @@ import com.arktech.superaccountant.workflow.analysis.WorkflowAnalysisService;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
 import com.arktech.superaccountant.tds.models.Tds26qDetail;
 import com.arktech.superaccountant.tds.models.TdsChallan;
 import com.arktech.superaccountant.tds.models.TdsChallanStatus;
@@ -36,6 +38,7 @@ import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.repository.Tds26qDetailRepository;
 import com.arktech.superaccountant.tds.repository.TdsChallanRepository;
 import com.arktech.superaccountant.tds.repository.TdsDeducteeEntryRepository;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,6 +97,8 @@ class Tds26qPrepareIT {
     @Autowired TdsDeducteeEntryRepository entryRepository;
     @Autowired TdsChallanRepository challanRepository;
     @Autowired Tds26qDetailRepository detail26qRepository;
+    @Autowired TdsLedgerMappingRepository mappingRepository;
+    @Autowired TdsSectionConfigRepository sectionConfigRepository;
     @Autowired MockMvc mockMvc;
 
     UUID orgId;
@@ -142,6 +147,8 @@ class Tds26qPrepareIT {
         snapshot(mastersJobId, "Subcontractor Charges", LedgerCategory.EXPENSE, true, "194C", null);
         snapshot(mastersJobId, "ABC Contractors", LedgerCategory.CREDITOR, null, null, null);
         snapshot(mastersJobId, "TDS Payable 194C", LedgerCategory.TDS, true, "194C", null);
+        TdsMappingTestData.mapAll(orgId, mastersJobId, snapshotRepository, mappingRepository,
+                sectionConfigRepository);
 
         DayBookUploadJob dayBookJob = new DayBookUploadJob();
         dayBookJob.setOrganizationId(orgId);

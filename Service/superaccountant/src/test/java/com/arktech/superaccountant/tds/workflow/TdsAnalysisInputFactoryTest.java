@@ -41,6 +41,7 @@ class TdsAnalysisInputFactoryTest {
     private OrganizationRepository organizationRepository;
     private TdsPanOverrideRepository panOverrideRepository;
     private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
+    private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate mappingGate;
     private TdsAnalysisInputFactory factory;
 
     private final AnalysisContext ctx = new AnalysisContext(
@@ -56,6 +57,7 @@ class TdsAnalysisInputFactoryTest {
         organizationRepository = mock(OrganizationRepository.class);
         panOverrideRepository = mock(TdsPanOverrideRepository.class);
         debtorTanRepository = mock(com.arktech.superaccountant.tds.repository.DebtorTanRepository.class);
+        mappingGate = mock(com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate.class);
         factory = new TdsAnalysisInputFactory();
         inject("parsedVoucherRepository", parsedVoucherRepository);
         inject("snapshotRepository", snapshotRepository);
@@ -63,6 +65,7 @@ class TdsAnalysisInputFactoryTest {
         inject("organizationRepository", organizationRepository);
         inject("panOverrideRepository", panOverrideRepository);
         inject("debtorTanRepository", debtorTanRepository);
+        inject("mappingGate", mappingGate);
 
         Organization org = new Organization();
         org.setName("Org");

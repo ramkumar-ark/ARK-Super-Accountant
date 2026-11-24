@@ -22,6 +22,7 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -87,6 +88,10 @@ class DaybookEndToEndFlowIT {
     @Autowired
     com.arktech.superaccountant.masters.services.FindingOverrideMasterService mastersService;
     @Autowired
+    com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository tdsLedgerMappingRepository;
+    @Autowired
+    com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository tdsSectionConfigRepository;
+    @Autowired
     MockMvc mockMvc;
     ObjectMapper objectMapper = new ObjectMapper();
     @Autowired
@@ -142,6 +147,8 @@ class DaybookEndToEndFlowIT {
                 GstApplicabilityType.NOT_APPLICABLE, null, true, "194C");
         snapshot("ABC Contractors", LedgerCategory.CREDITOR, null, null, null, null, null);
         snapshot("TDS Payable 194C", LedgerCategory.TDS, null, null, null, null, "194C");
+        TdsMappingTestData.mapAll(orgId, mastersJob.getId(), snapshotRepository,
+                tdsLedgerMappingRepository, tdsSectionConfigRepository);
 
         daybookJob = daybookJob("daybook.json");
 
