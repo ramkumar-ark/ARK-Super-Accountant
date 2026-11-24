@@ -19,7 +19,7 @@ class TdsLedgerSuggesterTest {
         assertTrue(TdsLedgerSuggester.isCandidate("TDS Payable - 194C A/c", null, "tds|duties & taxes", null));
         assertTrue(TdsLedgerSuggester.isCandidate("TDS (FY:24-25) A/c", null, "loans & advances (asset)", null));
         assertFalse(TdsLedgerSuggester.isCandidate("Sales Ledger", null, "sales accounts", null));
-        assertTrue(TdsLedgerSuggester.isCandidate("Ledger Without TDS Word", "Misc Expenses", "misc expenses (indirect expenses)", true));
+        assertTrue(TdsLedgerSuggester.isCandidate("Party Ledger", "Misc Expenses", "misc expenses (indirect expenses)", true));
         assertFalse(TdsLedgerSuggester.isCandidate("Sales Ledger", "Duties & Taxes", "sales accounts", false));
     }
 
