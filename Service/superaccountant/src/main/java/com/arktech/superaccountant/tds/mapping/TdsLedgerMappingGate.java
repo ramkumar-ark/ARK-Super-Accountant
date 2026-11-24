@@ -89,8 +89,7 @@ public class TdsLedgerMappingGate {
         Map<String, TdsLedgerArea> unmapped = new java.util.LinkedHashMap<>();
         Map<String, TdsLedgerMapping> mappings = mappingService.mappingsByKey(organizationId);
         for (UploadLedgerSnapshot snapshot : snapshotRepository.findByUploadJobId(jobId.get())) {
-            if (!TdsLedgerSuggester.isCandidate(snapshot.getLedgerName(), snapshot.getParentGroup(),
-                    snapshot.getGroupChain(), snapshot.getTdsApplicable())) {
+            if (!TdsLedgerSuggester.isCandidate(snapshot)) {
                 continue;
             }
             String key = TdsLedgerMappingService.ledgerKey(snapshot.getLedgerName());

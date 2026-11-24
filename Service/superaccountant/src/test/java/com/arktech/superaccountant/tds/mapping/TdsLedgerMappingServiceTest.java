@@ -130,9 +130,9 @@ class TdsLedgerMappingServiceTest {
         assertEquals(TdsLedgerArea.RECEIVABLE, receivableRow.area());
 
         TdsLedgerMappingView.Row rentRow = view.ledgers().get(0);
-        assertEquals(TdsLedgerRole.TDS_PAYABLE, rentRow.suggestedRole());
+        assertEquals(TdsLedgerRole.NOT_TDS, rentRow.suggestedRole());
         assertEquals(TdsLedgerArea.PAYABLE, rentRow.area());
-        assertEquals(TdsLedgerRole.TDS_PAYABLE, rentRow.role());
+        assertEquals(TdsLedgerRole.NOT_TDS, rentRow.role());
         assertTrue(rentRow.saved() == false);
     }
 

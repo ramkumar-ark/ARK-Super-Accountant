@@ -202,20 +202,68 @@ class TdsEnginePass1Test {
                 mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null));
         var combined = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
-                {"ABC Contractors", "-99000"},
-                {"TDS Payable", "-1000"}});
+                {"ABC Contractors", "-95400"},
+                {"TDS Payable", "-4600"}});
         var shortLeg = voucher("V2", LocalDate.of(2026, 5, 20), "XYZ Traders", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"XYZ Traders", "-99500"},
                 {"TDS Payable", "-500"}});
         var result = engine.analyze(inputQ1(List.of(combined, shortLeg), snaps, mappingsBy));
         assertTrue(result.findings().stream()
                 .noneMatch(f -> f.getFindingType() == TdsFindingType.WRONG_SECTION));
+        assertTrue(result.findings().stream().noneMatch(f -> combined.getId().equals(f.getVoucherId())));
+        assertEquals(new BigDecimal("600.00"), deductedFor(result, combined, "194C"));
+        assertEquals(new BigDecimal("4000.00"), deductedFor(result, combined, "194J_B"));
         TdsFinding shortFinding = result.findings().stream()
                 .filter(f -> f.getFindingType() == TdsFindingType.SHORT_DEDUCTED)
                 .findFirst().orElseThrow();
         assertEquals(shortLeg.getId(), shortFinding.getVoucherId());
         assertEquals(new BigDecimal("1000.00"), shortFinding.getExpectedAmount());
         assertEquals(new BigDecimal("500.00"), shortFinding.getActualAmount());
+    }
+
+    @Test
+    void combinedPayable_underDeductionIsSplitByExpectedAndNeverNotDeducted() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("TDS Payable"),
+                snap("TDS Payable", LedgerCategory.TDS, true, null, null));
+        var combined = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
+                {"ABC Contractors", "-99000"},
+                {"TDS Payable", "-1000"}});
+        var result = engine.analyze(inputQ1(List.of(combined), snaps,
+                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null))));
+        assertEquals(new BigDecimal("130.43"), deductedFor(result, combined, "194C"));
+        assertEquals(new BigDecimal("869.57"), deductedFor(result, combined, "194J_B"));
+        assertTrue(result.findings().stream().noneMatch(f ->
+                f.getFindingType() == TdsFindingType.NOT_DEDUCTED
+                        || f.getFindingType() == TdsFindingType.THRESHOLD_CROSSED
+                        || f.getFindingType() == TdsFindingType.WRONG_SECTION));
+    }
+
+    @Test
+    void reversalLegOnMappedExpenseLedgerIsNotTdsDeduction() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("TDS Contract Expense"),
+                snap("TDS Contract Expense", LedgerCategory.EXPENSE, true, "194C", null));
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "100000"}, {"TDS Contract Expense", "-1000"},
+                {"ABC Contractors", "-99000"}});
+        var result = engine.analyze(inputQ1(List.of(v), snaps,
+                mappings(mapping("TDS Contract Expense", TdsLedgerRole.TDS_PAYABLE, null))));
+        assertTrue(result.entries().isEmpty());
+    }
+
+    private static BigDecimal deductedFor(TdsAnalysisResult result,
+            com.arktech.superaccountant.daybook.models.ParsedVoucher voucher, String section) {
+        return result.entries().stream()
+                .filter(e -> section.equals(e.getSection())
+                        && e.getSourceVoucherIds().contains(voucher.getId().toString()))
+                .map(TdsDeducteeEntry::getTdsDeducted)
+                .findFirst().orElseThrow();
     }
 
     @Test

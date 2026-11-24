@@ -186,8 +186,7 @@ public class TdsLedgerMappingService {
         }
         Map<String, UploadLedgerSnapshot> candidates = new LinkedHashMap<>();
         for (UploadLedgerSnapshot snapshot : snapshotRepository.findByUploadJobId(jobId.get())) {
-            if (TdsLedgerSuggester.isCandidate(snapshot.getLedgerName(), snapshot.getParentGroup(),
-                    snapshot.getGroupChain(), snapshot.getTdsApplicable())) {
+            if (TdsLedgerSuggester.isCandidate(snapshot)) {
                 candidates.putIfAbsent(ledgerKey(snapshot.getLedgerName()), snapshot);
             }
         }

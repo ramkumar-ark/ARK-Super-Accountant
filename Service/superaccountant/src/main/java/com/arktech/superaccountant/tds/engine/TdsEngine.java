@@ -105,6 +105,8 @@ public class TdsEngine {
                         baseBySection.merge(section, e.getAmount(), BigDecimal::add);
                     }
                 } else if (e.getAmount().signum() != 0
+                        && category != LedgerCategory.EXPENSE
+                        && category != LedgerCategory.PURCHASE
                         && payableMapping(input, e.getLedgerName()) != null) {
                     tdsEntries.add(e);
                 }
@@ -130,15 +132,15 @@ public class TdsEngine {
                 continue;
             }
             Map<String, BigDecimal> tdsBySection = new LinkedHashMap<>();
+            BigDecimal combinedTds = BigDecimal.ZERO;
             for (ParsedVoucherEntry e : tdsEntries) {
                 TdsLedgerMapping mapping = payableMapping(input, e.getLedgerName());
                 String tdsSection = mapping.getSection() == null
                         ? null : mapping.getSection().trim();
                 if (tdsSection != null && baseBySection.containsKey(tdsSection)) {
                     tdsBySection.merge(tdsSection, e.getAmount().abs(), BigDecimal::add);
-                } else if (tdsSection == null && baseBySection.size() == 1) {
-                    tdsBySection.merge(baseBySection.keySet().iterator().next(),
-                            e.getAmount().abs(), BigDecimal::add);
+                } else if (tdsSection == null) {
+                    combinedTds = combinedTds.add(e.getAmount().abs());
                 } else if (tdsSection != null && isInPeriod(v.getVoucherDate(), input)) {
                     findings.add(finding(input, v, TdsFindingType.WRONG_SECTION, FindingSeverity.HIGH,
                             tdsSection,
@@ -169,6 +171,9 @@ public class TdsEngine {
             String partyKey = key(partyName);
             if (partyKey == null) {
                 continue;
+            }
+            if (combinedTds.signum() != 0) {
+                attributeCombinedTds(tdsBySection, combinedTds, baseBySection, partyKey, input);
             }
             for (Map.Entry<String, BigDecimal> baseEntry : baseBySection.entrySet()) {
                 String section = baseEntry.getKey();
@@ -239,6 +244,43 @@ public class TdsEngine {
                     }
                 }
             }
+        }
+    }
+
+    private void attributeCombinedTds(Map<String, BigDecimal> tdsBySection, BigDecimal combinedTds,
+                                      Map<String, BigDecimal> baseBySection, String partyKey,
+                                      TdsAnalysisInput input) {
+        Map<String, BigDecimal> weights = new LinkedHashMap<>();
+        BigDecimal expectedTotal = BigDecimal.ZERO;
+        BigDecimal baseTotal = BigDecimal.ZERO;
+        for (Map.Entry<String, BigDecimal> baseEntry : baseBySection.entrySet()) {
+            TdsSectionConfig cfg = input.configsBySection().get(baseEntry.getKey());
+            if (cfg == null) {
+                continue;
+            }
+            BigDecimal expected = baseEntry.getValue().multiply(rateFor(partyKey, cfg, input))
+                    .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+            weights.put(baseEntry.getKey(), expected);
+            expectedTotal = expectedTotal.add(expected);
+            baseTotal = baseTotal.add(baseEntry.getValue());
+        }
+        if (weights.isEmpty()) {
+            return;
+        }
+        boolean byExpected = expectedTotal.signum() != 0;
+        BigDecimal total = byExpected ? expectedTotal : baseTotal;
+        BigDecimal remaining = combinedTds;
+        int index = 0;
+        for (Map.Entry<String, BigDecimal> weight : weights.entrySet()) {
+            BigDecimal share;
+            if (++index == weights.size()) {
+                share = remaining;
+            } else {
+                BigDecimal w = byExpected ? weight.getValue() : baseBySection.get(weight.getKey());
+                share = combinedTds.multiply(w).divide(total, 2, RoundingMode.HALF_UP);
+                remaining = remaining.subtract(share);
+            }
+            tdsBySection.merge(weight.getKey(), share, BigDecimal::add);
         }
     }
 

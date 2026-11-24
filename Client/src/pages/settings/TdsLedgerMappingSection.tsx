@@ -54,14 +54,16 @@ export function TdsLedgerMappingSection() {
   const receivableRows = rows.filter((r) => r.area === 'RECEIVABLE')
 
   // Section is optional for TDS payable (null = combined / infer per voucher),
-  // so only a role is required; hidden payable rows still need one for the save.
-  const everyRowHasRole = rows.every((r) => r.role !== null)
+  // so only a role is required; payable rows hidden for non-deductors are neither
+  // required nor saved.
+  const savableRows = anyTdsOn ? rows : receivableRows
+  const everyRowHasRole = savableRows.every((r) => r.role !== null)
   const canSave = canEdit && everyRowHasRole
 
   const mutation = useMutation({
     mutationFn: () =>
       saveTdsLedgerMapping(
-        rows.map((r) => ({
+        savableRows.map((r) => ({
           ledgerName: r.ledgerName,
           role: r.role as TdsLedgerRole,
           section: r.role === 'TDS_PAYABLE' ? r.section : null,

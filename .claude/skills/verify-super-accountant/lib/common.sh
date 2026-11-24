@@ -214,30 +214,15 @@ ensure_masters() {
   req "tax-ledger-mapping" PUT /api/v1/gst/tax-ledger-mapping "{\"items\":$items}"
   expect_status "200|201" || vsa_fail "tax ledger mapping failed: $RESP"
 
-  # Save TDS ledger mappings too: the bootstrap org is a company-PAN deductor
-  # whose synthetic masters hold 27 TDS candidates (every Duties & Taxes
-  # ledger through the group chain, plus TDS-token names). The two TDS
-  # Payable duty ledgers stay combined payables (null section: the engine
-  # infers the per-voucher section, as the pre-mapping snapshot nulls did);
-  # every other candidate is explicitly NOT_TDS so TDS workflows pass the
-  # mapping gate.
-  local tfirst=1 pair name trole label tds_items='['
-  for pair in "TDS Payable 194C|TDS_PAYABLE" "TDS Payable 194M|TDS_PAYABLE" \
-              "TDS Contract Expense|NOT_TDS" "TDS Contract Expense 194M|NOT_TDS" \
-              "TDS Professional Expense|NOT_TDS" "TDS Payee Individual|NOT_TDS" \
-              "TDS Payee Company|NOT_TDS" "TDS Payee No PAN|NOT_TDS" \
-              "TDS Payee Resident Individual 194M|NOT_TDS"; do
-    name=${pair%%|*}; trole=${pair#*|}
-    [ $tfirst = 1 ] && tfirst=0 || tds_items="$tds_items,"
-    tds_items="$tds_items{\"ledgerName\":\"$name\",\"role\":\"$trole\"}"
-  done
-  for r in OUTPUT:Output INPUT:Input CASH_BALANCE:Cash LIABILITY_BALANCE:Liability CREDIT_BALANCE:"Credit Balance" GST_TDS:"GST TDS"; do
-    label=${r#*:}
-    for h in CGST SGST IGST; do
-      tds_items="$tds_items,{\"ledgerName\":\"$label $h\",\"role\":\"NOT_TDS\"}"
-    done
-  done
-  tds_items="$tds_items]"
+  # Save TDS ledger mappings too: the bootstrap org is a company-PAN deductor.
+  # Candidates are the masters' TDS ledgers (GST and expense ledgers are never
+  # candidates). The two TDS Payable duty ledgers stay combined payables (null
+  # section: the engine infers the per-voucher section); every other candidate
+  # is explicitly NOT_TDS so TDS workflows pass the mapping gate.
+  req "tds-ledger-mapping-view" GET /api/v1/tds/ledger-mapping
+  expect_status "200" || vsa_fail "TDS ledger mapping view failed: $RESP"
+  local tds_items
+  tds_items=$(echo "$RESP" | jq -c '[.ledgers[] | {ledgerName, role: (if (.ledgerName | startswith("TDS Payable")) then "TDS_PAYABLE" else "NOT_TDS" end)}]')
   req "tds-ledger-mapping" PUT /api/v1/tds/ledger-mapping "{\"items\":$tds_items}"
   expect_status "200|201" || vsa_fail "TDS ledger mapping failed: $RESP"
   state_set masters_done 1

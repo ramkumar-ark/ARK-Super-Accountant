@@ -1,8 +1,11 @@
 package com.arktech.superaccountant.tds.mapping;
 
+import com.arktech.superaccountant.masters.models.LedgerCategory;
+import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
+import static com.arktech.superaccountant.tds.mapping.TdsLedgerRole.NOT_TDS;
 import static com.arktech.superaccountant.tds.mapping.TdsLedgerRole.TDS_PAYABLE;
 import static com.arktech.superaccountant.tds.mapping.TdsLedgerRole.TDS_RECEIVABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,5 +50,43 @@ class TdsLedgerSuggesterTest {
                 TdsLedgerSuggester.suggest("TDS Payable and Receivable", null, "tds|duties & taxes", null, KNOWN_SECTION_CODES));
         assertEquals(new TdsLedgerSuggester.Suggestion(null, null),
                 TdsLedgerSuggester.suggest("TDS A/c", "Misc Expenses", "misc expenses", false, KNOWN_SECTION_CODES));
+    }
+
+    @Test
+    void parenthesisedSectionCodeIsRecognised() {
+        assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, "194C"),
+                TdsLedgerSuggester.suggest("TDS Payable (194C)", "Duties & Taxes", "duties & taxes", null, KNOWN_SECTION_CODES));
+        assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, "194H"),
+                TdsLedgerSuggester.suggest("TDS Payable (194H)", "Duties & Taxes", "duties & taxes", null, KNOWN_SECTION_CODES));
+    }
+
+    @Test
+    void dutiesAndTaxesLedgersWithoutTdsTokenAreNotTds() {
+        assertEquals(NOT_TDS,
+                TdsLedgerSuggester.suggest("PF Payable", "Duties & Taxes", "duties & taxes", null, KNOWN_SECTION_CODES).role());
+        assertEquals(NOT_TDS,
+                TdsLedgerSuggester.suggest("Professional Tax", "Duties & Taxes", "duties & taxes", null, KNOWN_SECTION_CODES).role());
+        assertEquals(NOT_TDS,
+                TdsLedgerSuggester.suggest("Output CGST", "Duties & Taxes", "duties & taxes", null, KNOWN_SECTION_CODES).role());
+    }
+
+    @Test
+    void gstAndExpenseSnapshotsAreNeverCandidates() {
+        assertFalse(TdsLedgerSuggester.isCandidate(snapshot("Output CGST", "duties & taxes", LedgerCategory.GST, true, false)));
+        assertFalse(TdsLedgerSuggester.isCandidate(snapshot("Input IGST", "duties & taxes", LedgerCategory.OTHER, null, true)));
+        assertFalse(TdsLedgerSuggester.isCandidate(snapshot("TDS Contract Expense", "indirect expenses", LedgerCategory.EXPENSE, true, null)));
+        assertFalse(TdsLedgerSuggester.isCandidate(snapshot("TDS Purchase", "purchase accounts", LedgerCategory.PURCHASE, true, null)));
+        assertTrue(TdsLedgerSuggester.isCandidate(snapshot("TDS Payable - 194C A/c", "tds|duties & taxes", LedgerCategory.TDS, null, null)));
+    }
+
+    private static UploadLedgerSnapshot snapshot(String name, String chain, LedgerCategory category,
+                                                 Boolean tdsApplicable, Boolean gstApplicable) {
+        UploadLedgerSnapshot s = new UploadLedgerSnapshot();
+        s.setLedgerName(name);
+        s.setGroupChain(chain);
+        s.setCategory(category);
+        s.setTdsApplicable(tdsApplicable);
+        s.setGstApplicable(gstApplicable);
+        return s;
     }
 }

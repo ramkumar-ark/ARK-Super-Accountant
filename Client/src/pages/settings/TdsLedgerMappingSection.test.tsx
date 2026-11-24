@@ -140,6 +140,20 @@ describe('TdsLedgerMappingSection', () => {
     ).toBeInTheDocument()
   })
 
+  it('nonDeductorSavesOnlyReceivableRowsEvenWhenHiddenPayableUnresolved', async () => {
+    renderSection('ROLE_ACCOUNTANT', false)
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalled()
+    })
+    expect(mockPut).toHaveBeenCalledWith('/v1/tds/ledger-mapping', {
+      items: [{ ledgerName: 'TDS Receivable - Customers', role: 'TDS_RECEIVABLE', section: null }],
+    })
+  })
+
   it('accountantSavesAllRows', async () => {
     renderSection('ROLE_ACCOUNTANT')
 

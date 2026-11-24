@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Upload } from 'lucide-react'
 import { apiErrorMessage } from '@/lib/apiError'
+import {
+  TDS_LEDGER_MAPPING_QUERY_KEY,
+  getTdsLedgerMapping,
+} from '@/lib/tdsLedgerMappingApi'
 import {
   invalidateWorkflow,
   uploadToWorkflow,
@@ -42,6 +46,12 @@ export function WorkflowUploadStep({
   useEffect(() => {
     setCoverageTo(requiredTo)
   }, [requiredTo])
+
+  const { data: mappingView } = useQuery({
+    queryKey: TDS_LEDGER_MAPPING_QUERY_KEY,
+    queryFn: getTdsLedgerMapping,
+  })
+  const mappingBlocked = !!mappingView && !mappingView.complete && mappingView.blockers.length > 0
 
   const latestCompleted = uploads.find((row) => row.status === 'COMPLETED')
 
@@ -139,6 +149,7 @@ export function WorkflowUploadStep({
           type="file"
           accept=".json,application/json"
           data-testid="workflow-file-input"
+          disabled={mappingBlocked}
           onChange={handleFileChange}
           className="text-sm text-[var(--color-text-secondary)]"
         />
@@ -148,7 +159,7 @@ export function WorkflowUploadStep({
         <button
           type="button"
           onClick={handleUpload}
-          disabled={!file || uploading}
+          disabled={!file || uploading || mappingBlocked}
           className="inline-flex h-10 items-center gap-2 rounded-[var(--radius-md)] bg-[var(--color-primary)] px-4 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
@@ -166,6 +177,16 @@ export function WorkflowUploadStep({
           </button>
         )}
       </div>
+
+      {mappingBlocked && (
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
+          Day-book upload is disabled until the TDS ledger mapping is saved. {mappingView?.blockers[0]}{' '}
+          <a href="/settings/compliance" className="underline">
+            Open the TDS ledger mapping section
+          </a>
+          .
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="text-sm text-[var(--color-danger)]">

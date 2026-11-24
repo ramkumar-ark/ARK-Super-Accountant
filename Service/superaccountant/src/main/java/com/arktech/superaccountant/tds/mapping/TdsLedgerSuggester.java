@@ -1,5 +1,7 @@
 package com.arktech.superaccountant.tds.mapping;
 
+import com.arktech.superaccountant.masters.models.LedgerCategory;
+import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -14,7 +16,19 @@ public final class TdsLedgerSuggester {
     public record Suggestion(TdsLedgerRole role, String section) {
     }
 
-    public static boolean isCandidate(String ledgerName, String parentGroup, String groupChain, Boolean tdsApplicable) {
+    public static boolean isCandidate(UploadLedgerSnapshot snapshot) {
+        LedgerCategory category = snapshot.getCategory();
+        if (Boolean.TRUE.equals(snapshot.getGstApplicable())
+                || category == LedgerCategory.GST
+                || category == LedgerCategory.EXPENSE
+                || category == LedgerCategory.PURCHASE) {
+            return false;
+        }
+        return isCandidate(snapshot.getLedgerName(), snapshot.getParentGroup(),
+                snapshot.getGroupChain(), snapshot.getTdsApplicable());
+    }
+
+    static boolean isCandidate(String ledgerName, String parentGroup, String groupChain, Boolean tdsApplicable) {
         if (hasTdsToken(ledgerName)) {
             return true;
         }
@@ -40,14 +54,19 @@ public final class TdsLedgerSuggester {
                 && TDS_TOKEN.matcher(ledgerName.toUpperCase(Locale.ROOT)).find();
     }
 
+    private static boolean dutiesAndTaxes(String groupChain) {
+        return groupChain != null && groupChain.toLowerCase(Locale.ROOT).contains("duties & taxes");
+    }
+
     private static boolean groupChainMatchesTds(String groupChain) {
+        return dutiesAndTaxes(groupChain) || hasTdsGroup(groupChain);
+    }
+
+    private static boolean hasTdsGroup(String groupChain) {
         if (groupChain == null) {
             return false;
         }
         String lower = groupChain.toLowerCase(Locale.ROOT);
-        if (lower.contains("duties & taxes")) {
-            return true;
-        }
         for (String segment : lower.split("\\|")) {
             if (segment.trim().equals("tds")) {
                 return true;
@@ -58,6 +77,9 @@ public final class TdsLedgerSuggester {
 
     private static TdsLedgerRole suggestRole(String ledgerName, String parentGroup, String groupChain,
                                              Boolean tdsApplicable) {
+        if (!hasTdsToken(ledgerName) && !hasTdsGroup(groupChain)) {
+            return dutiesAndTaxes(groupChain) ? TdsLedgerRole.NOT_TDS : null;
+        }
         String upper = ledgerName == null ? "" : ledgerName.toUpperCase(Locale.ROOT);
         boolean hasPayable = upper.contains("PAYABLE");
         boolean hasReceivable = upper.contains("RECEIVABLE");
@@ -92,7 +114,7 @@ public final class TdsLedgerSuggester {
         String upper = ledgerName.toUpperCase(Locale.ROOT);
         int[] matches = {0};
         String[] found = {null};
-        for (String rawToken : upper.split("[ /]+")) {
+        for (String rawToken : upper.split("[^A-Z0-9_-]+")) {
             String token = rawToken.replace('-', '_');
             if (knownSectionCodes.contains(token)) {
                 matches[0]++;
