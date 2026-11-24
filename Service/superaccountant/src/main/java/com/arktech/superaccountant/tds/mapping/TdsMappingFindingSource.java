@@ -59,14 +59,7 @@ public class TdsMappingFindingSource implements WorkflowFindingSource {
 
     @Override
     public long blockingCount(Workflow w) {
-        if (!appliesTo(w)) {
-            return 0;
-        }
-        if (gate.blockerMessage(w.getOrganizationId())
-                .map(m -> m.startsWith("No masters upload")).orElse(false)) {
-            return 1;
-        }
-        return gate.unmappedPayableLedgers(w.getOrganizationId()).size();
+        return list(w).size();
     }
 
     @Override
@@ -76,13 +69,17 @@ public class TdsMappingFindingSource implements WorkflowFindingSource {
         if (!appliesTo(w)) {
             return List.of();
         }
-        List<WorkflowFindingView> out = new ArrayList<>();
-        for (String ledgerName : gate.unmappedPayableLedgers(w.getOrganizationId())) {
-            out.add(view(ledgerName, w.getOrganizationId()));
+        UUID orgId = w.getOrganizationId();
+        Optional<String> blocker = gate.blockerMessage(orgId);
+        if (blocker.isEmpty()) {
+            return List.of();
         }
-        if (out.isEmpty() && gate.blockerMessage(w.getOrganizationId())
-                .map(m -> m.startsWith("No masters upload")).orElse(false)) {
-            out.add(view(null, w.getOrganizationId()));
+        if (blocker.get().startsWith("No masters upload")) {
+            return List.of(view(null, orgId));
+        }
+        List<WorkflowFindingView> out = new ArrayList<>();
+        for (String ledgerName : gate.unmappedPayableLedgers(orgId)) {
+            out.add(view(ledgerName, orgId));
         }
         return out;
     }
