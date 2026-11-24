@@ -28,9 +28,6 @@ public final class TdsLedgerSuggester {
         if (isTdsType(snapshot)) {
             return true;
         }
-        if (snapshot.getTaxType() != null) {
-            return false;
-        }
         return hasTdsToken(snapshot.getLedgerName()) || groupChainMatchesTds(snapshot.getGroupChain());
     }
 
@@ -101,35 +98,8 @@ public final class TdsLedgerSuggester {
         if (knownSectionCodes == null || knownSectionCodes.isEmpty()) {
             return null;
         }
-        if (natureOfPayment != null && !natureOfPayment.isBlank()) {
-            if (natureOfPayment.trim().equalsIgnoreCase("any")) {
-                return null;
-            }
-            String fromNature = sectionFromNature(natureOfPayment, knownSectionCodes);
-            if (fromNature != null) {
-                return fromNature;
-            }
-        }
-        return sectionFromTokens(ledgerName, knownSectionCodes);
-    }
-
-    private static String sectionFromNature(String natureOfPayment, Set<String> knownSectionCodes) {
-        String direct = sectionFromTokens(natureOfPayment, knownSectionCodes);
-        if (direct != null) {
-            return direct;
-        }
-        String lower = natureOfPayment.toLowerCase(Locale.ROOT);
-        String code = null;
-        if (lower.contains("contractor")) {
-            code = "194C";
-        } else if (lower.contains("commission") || lower.contains("brokerage")) {
-            code = "194H";
-        } else if (lower.contains("professional")) {
-            code = "194J_B";
-        } else if (lower.contains("technical")) {
-            code = "194J_A";
-        }
-        return code != null && knownSectionCodes.contains(code) ? code : null;
+        String fromNature = sectionFromTokens(natureOfPayment, knownSectionCodes);
+        return fromNature != null ? fromNature : sectionFromTokens(ledgerName, knownSectionCodes);
     }
 
     private static String sectionFromTokens(String text, Set<String> knownSectionCodes) {

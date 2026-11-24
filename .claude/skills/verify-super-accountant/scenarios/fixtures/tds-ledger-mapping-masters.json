@@ -7,7 +7,7 @@
   {"ledger":{"name":"TDS Payable - 194C A/c","guid":"SYN-TDSLM-PAY-194C","parent":"TDS","taxtype":"TDS"}},
   {"ledger":{"name":"TDS Payable - 194Q A/c","guid":"SYN-TDSLM-PAY-194Q","parent":"TDS","taxtype":"TDS"}},
   {"ledger":{"name":"TDS Payable - 192B A/c","guid":"SYN-TDSLM-PAY-192B","parent":"TDS","taxtype":"TDS"}},
-  {"ledger":{"name":"TDS (FY:24-25) A/c","guid":"SYN-TDSLM-FY2425","parent":"Loans & Advances (Asset)","taxtype":"TDS"}},
+  {"ledger":{"name":"TDS (FY:24-25) A/c","guid":"SYN-TDSLM-FY2425","parent":"Loans & Advances (Asset)","taxtype":"Others"}},
   {"ledger":{"name":"Ledger Mapping Contractor Expense","guid":"SYN-TDSLM-EXP","parent":"Indirect Expenses","taxtype":"Others"}},
   {"ledger":{"name":"Ledger Mapping Output CGST","guid":"SYN-TDSLM-CGST","parent":"Duties & Taxes","taxtype":"GST"}},
   {"ledger":{"name":"Ledger Mapping Contractor Party","guid":"SYN-TDSLM-PARTY","parent":"Sundry Creditors","incometaxnumber":"ABCPX1234F"}}

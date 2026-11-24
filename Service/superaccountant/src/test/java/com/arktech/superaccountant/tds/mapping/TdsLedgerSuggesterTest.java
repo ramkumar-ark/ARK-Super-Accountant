@@ -28,8 +28,18 @@ class TdsLedgerSuggesterTest {
     @Test
     void taxTypeTdsLedgerUnderCustomGroupIsCandidate() {
         assertTrue(TdsLedgerSuggester.isCandidate(snap("Withholding", "my custom group", "TDS", null)));
-        assertFalse(TdsLedgerSuggester.isCandidate(snap("Withholding TDS", "duties & taxes", "Others", null)));
         assertFalse(TdsLedgerSuggester.isCandidate(snap("Output CGST", "duties & taxes", "GST", null)));
+    }
+
+    @Test
+    void taxTypeOthersDoesNotVetoNameOrGroupRecognition() {
+        UploadLedgerSnapshot payable = snap("TDS Payable - 194C A/c", "tds", "Others", null);
+        assertTrue(TdsLedgerSuggester.isCandidate(payable));
+        assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, "194C"), suggest(payable));
+        UploadLedgerSnapshot receivable = snap("TDS (FY:24-25) A/c", "loans & advances (asset)", "Others", null);
+        assertTrue(TdsLedgerSuggester.isCandidate(receivable));
+        assertEquals(TDS_RECEIVABLE, suggest(receivable).role());
+        assertFalse(TdsLedgerSuggester.isCandidate(snap("Sales", "sales accounts", "Others", null)));
     }
 
     @Test
@@ -61,13 +71,15 @@ class TdsLedgerSuggesterTest {
     }
 
     @Test
-    void natureOfPaymentDrivesSection() {
-        assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, null),
-                suggest(snap("TDS Payable 194C", "duties & taxes", "TDS", "Any")));
+    void sectionComesFromExplicitCodesInNatureOrName() {
         assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, "194C"),
-                suggest(snap("TDS Duty", "duties & taxes", "TDS", "Payment to Contractors - Individual/HUF")));
+                suggest(snap("TDS Payable 194C", "duties & taxes", "TDS", "Any")));
+        assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, null),
+                suggest(snap("TDS Payable", "duties & taxes", "TDS", "Any")));
         assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, "194H"),
                 suggest(snap("TDS Duty", "duties & taxes", "TDS", "194H")));
+        assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, null),
+                suggest(snap("TDS Duty", "duties & taxes", "TDS", "Payment to Contractors - Individual/HUF")));
         assertEquals(new TdsLedgerSuggester.Suggestion(TDS_PAYABLE, "194C"),
                 suggest(snap("TDS Payable 194C", "duties & taxes", "TDS", null)));
     }
