@@ -30,7 +30,7 @@ public class VoucherScopeClassifier {
 
         for (VoucherPayload.Entry entry : voucher.entries()) {
             if (entry.ledger() != null
-                    && tdsLedgerKeys.contains(entry.ledger().trim().toLowerCase())) {
+                    && tdsLedgerKeys.contains(entry.ledger().trim().toLowerCase(Locale.ROOT))) {
                 tds = true;
             }
             UploadLedgerSnapshot ledger = ledgersByName.get(entry.ledger());

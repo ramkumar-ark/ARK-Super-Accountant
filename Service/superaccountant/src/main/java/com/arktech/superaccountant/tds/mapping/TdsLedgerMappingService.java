@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -200,6 +201,6 @@ public class TdsLedgerMappingService {
     }
 
     static String ledgerKey(String ledgerName) {
-        return ledgerName == null ? null : ledgerName.trim().toLowerCase();
+        return ledgerName == null ? null : ledgerName.trim().toLowerCase(Locale.ROOT);
     }
 }

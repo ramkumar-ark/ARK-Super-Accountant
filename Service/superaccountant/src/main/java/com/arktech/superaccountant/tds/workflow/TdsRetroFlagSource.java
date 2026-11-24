@@ -7,11 +7,14 @@ import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.tds.engine.RetroFlag;
 import com.arktech.superaccountant.tds.engine.TdsAnalysisInput;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate;
 import com.arktech.superaccountant.workflow.analysis.AnalysisContext;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.seam.MastersJobGate;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import com.arktech.superaccountant.workflow.snapshot.RetroFlagSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -23,9 +26,14 @@ import java.util.UUID;
  * Re-runs the TDS engine over a completed day-book upload and reports earlier
  * vouchers that became deductible because a later voucher crossed the annual
  * threshold. The comparison layer decides whether the earlier month is frozen.
+ * While the organization's TDS ledger mapping is incomplete the TDS analysis
+ * gate is closed, so there is nothing to re-run: retro flags are skipped (an
+ * empty list) so the rest of the tamper comparison still runs.
  */
 @Component
 public class TdsRetroFlagSource implements RetroFlagSource {
+
+    private static final Logger log = LoggerFactory.getLogger(TdsRetroFlagSource.class);
 
     private static final UUID NO_WORKFLOW = new UUID(0L, 0L);
 
@@ -35,6 +43,8 @@ public class TdsRetroFlagSource implements RetroFlagSource {
     private OrganizationRepository organizationRepository;
     @Autowired
     private MastersJobGate mastersJobGate;
+    @Autowired
+    private TdsLedgerMappingGate mappingGate;
     @Autowired
     private TdsAnalysisInputFactory inputFactory;
     @Autowired
@@ -49,6 +59,11 @@ public class TdsRetroFlagSource implements RetroFlagSource {
         Organization org = organizationRepository.findById(organizationId).orElse(null);
         UUID mastersJobId = mastersJobGate.latestCompletedMastersJob(organizationId).orElse(null);
         if (org == null || mastersJobId == null) {
+            return List.of();
+        }
+        if (!mappingGate.isComplete(organizationId)) {
+            log.info("Skipping TDS retro flags for upload {}: TDS analysis is blocked by unmapped ledgers",
+                    uploadJobId);
             return List.of();
         }
         LocalDate fyStart = PeriodCalendar.fyStart(
