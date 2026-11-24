@@ -186,6 +186,11 @@ run_scenario() {
         -o "$dd/last-body" -w '%{http_code}' "$url")
   STATUS="$out"; RESP=$(cat "$dd/last-body"); VSA_METHOD=POST; VSA_PATH="/api/v1/workflows/$gid/upload"; VSA_STEP="tdslm-baseline-daybook-upload"
   expect_status 200 || vsa_fail "baseline daybook upload failed: $RESP"
+  # The fixture's GST duty ledger is never a TDS candidate; it still needs its
+  # GST tax-ledger mapping before the baseline can be confirmed.
+  req "tdslm-gst-mapping" PUT /api/v1/gst/tax-ledger-mapping \
+    '{"items":[{"ledgerName":"Ledger Mapping Output CGST","role":"OUTPUT","head":"CGST"}]}'
+  expect_status "200|201" || vsa_fail "GST tax ledger mapping failed: $RESP"
   req "tdslm-baseline-confirm" POST /api/v1/compliance/baseline/confirm '{}'
   expect_status 200 || vsa_fail "baseline confirm failed: $RESP"
 
