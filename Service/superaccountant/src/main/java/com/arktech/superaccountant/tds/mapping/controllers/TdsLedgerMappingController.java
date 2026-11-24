@@ -30,10 +30,11 @@ public class TdsLedgerMappingController {
     }
 
     @GetMapping
-    public ResponseEntity<TdsLedgerMappingView> view(Authentication authentication) {
+    public ResponseEntity<?> view(Authentication authentication) {
         UUID organizationId = organizationId(authentication);
         if (organizationId == null) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "User is not linked to an organization."));
         }
         return ResponseEntity.ok(mappingService.view(organizationId, mappingGate));
     }

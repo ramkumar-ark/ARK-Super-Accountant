@@ -292,4 +292,22 @@ class TdsLedgerMappingIT {
         assertThat(events.stream(TdsLedgerMappingSavedEvent.class)
                 .anyMatch(e -> e.organizationId().equals(orgId))).isTrue();
     }
+
+    @Test
+    void noOrgUserGetsBadRequestWithMessage() throws Exception {
+        UserDetailsImpl noOrg = principal("noorg", ERole.ROLE_ACCOUNTANT, null);
+
+        mockMvc.perform(get("/api/v1/tds/ledger-mapping").with(user(noOrg)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("User is not linked to an organization."));
+
+        mockMvc.perform(put("/api/v1/tds/ledger-mapping")
+                        .with(user(noOrg))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"items":[{"ledgerName":"Rent","role":"NOT_TDS"}]}
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("User is not linked to an organization."));
+    }
 }
