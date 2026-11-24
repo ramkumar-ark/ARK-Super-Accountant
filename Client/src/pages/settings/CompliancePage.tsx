@@ -4,6 +4,7 @@ import { FilerProfileSection } from './FilerProfileSection'
 import { DeductorSection } from './DeductorSection'
 import { TdsApplicabilitySection } from './TdsApplicabilitySection'
 import { TaxLedgerMappingSection } from './TaxLedgerMappingSection'
+import { TdsLedgerMappingSection } from './TdsLedgerMappingSection'
 import { ResponsibilityStartSection } from './ResponsibilityStartSection'
 import { BaselineSection } from './BaselineSection'
 import { FinancialYearsSection } from './FinancialYearsSection'
@@ -19,6 +20,7 @@ export function CompliancePage() {
           <DeductorSection />
           <TdsApplicabilitySection />
           <TaxLedgerMappingSection />
+          <TdsLedgerMappingSection />
           <ResponsibilityStartSection />
           <BaselineSection />
           <FinancialYearsSection />
