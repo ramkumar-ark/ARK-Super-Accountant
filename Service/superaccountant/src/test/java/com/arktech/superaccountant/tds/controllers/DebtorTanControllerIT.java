@@ -11,6 +11,9 @@ import com.arktech.superaccountant.daybook.models.DayBookUploadJob;
 import com.arktech.superaccountant.daybook.repository.DayBookUploadJobRepository;
 import com.arktech.superaccountant.daybook.repository.ParsedVoucherRepository;
 import com.arktech.superaccountant.login.security.services.UserDetailsImpl;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.tdsapplicability.TdsApplicabilityService;
 import com.arktech.superaccountant.tdsapplicability.models.TdsApplicabilityBasis;
 import com.arktech.superaccountant.masters.models.Organization;
@@ -65,6 +68,8 @@ class DebtorTanControllerIT {
     @Autowired DayBookUploadJobRepository dayBookUploadJobRepository;
     @Autowired ParsedVoucherRepository parsedVoucherRepository;
     @Autowired TdsApplicabilityService tdsApplicabilityService;
+    @Autowired TdsLedgerMappingRepository tdsLedgerMappingRepository;
+    @Autowired TdsSectionConfigRepository tdsSectionConfigRepository;
 
     UUID orgId;
     UserDetailsImpl owner;
@@ -191,6 +196,8 @@ class DebtorTanControllerIT {
         UUID mastersJobId = uploadJobRepository.save(mastersJob).getId();
         snapshotFor(mastersJobId, qOrgId, "TDS Receivable 194J", "guid-9", "Current Liabilities");
         snapshotFor(mastersJobId, qOrgId, "Acme Corp", "guid-8", "Sundry Debtors|Current Assets");
+        TdsMappingTestData.mapAll(qOrgId, mastersJobId, snapshotRepository,
+                tdsLedgerMappingRepository, tdsSectionConfigRepository);
 
         DayBookUploadJob dayBookJob = new DayBookUploadJob();
         dayBookJob.setOrganizationId(qOrgId);
@@ -238,6 +245,8 @@ class DebtorTanControllerIT {
         UUID mastersJobId = uploadJobRepository.save(mastersJob).getId();
         snapshotFor(mastersJobId, qOrgId, "TDS Receivable 194J", "guid-9", "Current Liabilities");
         snapshotFor(mastersJobId, qOrgId, "Acme Corp", "guid-8", "Sundry Debtors|Current Assets");
+        TdsMappingTestData.mapAll(qOrgId, mastersJobId, snapshotRepository,
+                tdsLedgerMappingRepository, tdsSectionConfigRepository);
 
         DayBookUploadJob oldJob = new DayBookUploadJob();
         oldJob.setOrganizationId(qOrgId);

@@ -24,6 +24,7 @@ public final class DebtorTdsReceivableScanner {
 
     public static List<DebtorTanGap> scan(List<ParsedVoucher> vouchers,
                                           Set<String> debtorKeys,
+                                          Set<String> receivableLedgerKeys,
                                           Map<String, ?> debtorTansByKey) {
         List<DebtorTanGap> gaps = new ArrayList<>();
         Set<String> seen = new HashSet<>();
@@ -37,7 +38,8 @@ public final class DebtorTdsReceivableScanner {
                 if (e == null || e.getLedgerName() == null || e.getAmount() == null) {
                     continue;
                 }
-                if (e.getAmount().signum() > 0 && TdsEngine.key(e.getLedgerName()).contains("tds receivable")) {
+                if (e.getAmount().signum() > 0
+                        && receivableLedgerKeys.contains(TdsEngine.key(e.getLedgerName()))) {
                     receivableEntries.add(e);
                 }
                 if (e.getAmount().signum() < 0 && debtorKeys.contains(TdsEngine.key(e.getLedgerName()))) {

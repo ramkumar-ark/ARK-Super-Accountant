@@ -78,6 +78,7 @@ public class TdsEngine {
                                    List<TdsFinding> findings, List<TdsDeducteeEntry> entries) {
         Set<String> panFindingKeys = new HashSet<>();
         Set<String> debtorKeys = debtorKeys(input);
+        Set<String> receivableKeys = receivableLedgerKeys(input);
         for (ParsedVoucher v : input.vouchers()) {
             if (v == null || v.isCancelled() || v.getVoucherDate() == null
                     || v.getEntries() == null
@@ -110,7 +111,7 @@ public class TdsEngine {
             }
             if (isInPeriod(v.getVoucherDate(), input)) {
                 for (DebtorTdsReceivableScanner.DebtorTanGap gap : DebtorTdsReceivableScanner.scan(
-                        List.of(v), debtorKeys, input.debtorTansByName())) {
+                        List.of(v), debtorKeys, receivableKeys, input.debtorTansByName())) {
                     BigDecimal deducted = gap.deducted();
                     TdsFinding f = finding(input, v,
                             TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN,
@@ -586,6 +587,16 @@ public class TdsEngine {
         for (UploadLedgerSnapshot snapshot : input.snapshotsByName().values()) {
             if (snapshot != null && isDebtorSnapshot(snapshot)) {
                 keys.add(TdsEngine.key(snapshot.getLedgerName()));
+            }
+        }
+        return keys;
+    }
+
+    private static Set<String> receivableLedgerKeys(TdsAnalysisInput input) {
+        Set<String> keys = new HashSet<>();
+        for (TdsLedgerMapping mapping : input.mappingsByKey().values()) {
+            if (mapping != null && mapping.getRole() == TdsLedgerRole.TDS_RECEIVABLE) {
+                keys.add(mapping.getLedgerKey());
             }
         }
         return keys;
