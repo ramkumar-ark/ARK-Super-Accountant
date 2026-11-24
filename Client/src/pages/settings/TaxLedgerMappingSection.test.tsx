@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TaxLedgerMappingSection } from './TaxLedgerMappingSection'
+import { BaselineSection } from './BaselineSection'
 
 vi.mock('@/store/authStore')
 vi.mock('@/lib/api', () => ({
@@ -128,6 +129,59 @@ describe('TaxLedgerMappingSection', () => {
         { ledgerName: 'Output CGST', role: 'OUTPUT', head: 'CGST' },
         { ledgerName: 'Compensation Cess', role: 'INPUT', head: 'CESS' },
       ],
+    })
+  })
+
+  it('savingMappingInvalidatesBaselineStatus', async () => {
+    let baselineFetches = 0
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/compliance/baseline') {
+        baselineFetches += 1
+        return Promise.resolve({
+          data: {
+            confirmed: false,
+            rangeStart: '2023-04-01',
+            rangeEnd: '2024-03-31',
+            types: [],
+            blockers: [],
+            importedFiledData: 'No',
+            discrepancyCount: null,
+          },
+        })
+      }
+      if (url === '/v1/gst/tax-ledger-mapping') return Promise.resolve({ data: mappingView })
+      return Promise.resolve({ data: {} })
+    })
+
+    mockUseAuthStore.mockReturnValue({
+      user: {
+        id: 1,
+        username: 'alice',
+        email: 'alice@test.com',
+        role: 'ROLE_ACCOUNTANT',
+        organizationId: 'org-abc',
+      },
+    } as ReturnType<typeof useAuthStore>)
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BaselineSection />
+        <TaxLedgerMappingSection />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('Baseline')).toBeInTheDocument()
+    expect(baselineFetches).toBe(1)
+
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Role for Compensation Cess'), 'INPUT')
+    await user.selectOptions(screen.getByLabelText('Head for Compensation Cess'), 'CESS')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => {
+      expect(baselineFetches).toBe(2)
     })
   })
 
