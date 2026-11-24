@@ -25,6 +25,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,7 @@ class DayBookIntakeServiceTest {
     @Mock ParsedVoucherRepository parsedVoucherRepository;
     @Mock DayBookMasterValidationService dayBookMasterValidationService;
     @Mock MastersGateService mastersGateService;
+    @Mock com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate tdsLedgerMappingGate;
 
     @InjectMocks
     DayBookIntakeService intakeService;
@@ -70,5 +73,24 @@ class DayBookIntakeServiceTest {
         assertThat(result.job().getMaxVoucherDate()).isEqualTo(LocalDate.of(2025, 4, 1));
         // Null-date voucher must not count as outside coverage
         assertThat(result.job().getErrorMessage()).isNull();
+    }
+
+    @Test
+    void intake_refusedWhileTdsMappingIncomplete() {
+        UUID orgId = UUID.randomUUID();
+        when(mastersGateService.mastersValidated(orgId)).thenReturn(true);
+        when(tdsLedgerMappingGate.blockerMessage(orgId))
+                .thenReturn(java.util.Optional.of("2 TDS ledgers not mapped: Rent, TDS Payable 194C"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> intakeService.intake(
+                        new MockMultipartFile("file", "daybook.json", "application/json", "{}".getBytes()),
+                        LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30), orgId, "op1", null))
+                .isInstanceOfSatisfying(com.arktech.superaccountant.daybook.services.DayBookIntakeException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(422);
+                    assertThat(e.getBody().toString())
+                            .contains("TDS ledger mapping")
+                            .contains("2 TDS ledgers not mapped");
+                });
+        verify(dayBookUploadJobRepository, never()).save(any(DayBookUploadJob.class));
     }
 }

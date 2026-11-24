@@ -43,6 +43,14 @@ public class UploadLedgerSnapshot {
     @Column(name = "tds_applicable")
     private Boolean tdsApplicable;
 
+    /** Raw Tally "type of duty/tax" (TDS / GST / Others); null when the export carries none. */
+    @Column(name = "tally_tax_type")
+    private String taxType;
+
+    /** Raw Tally nature of payment (tdsratename): a specific value, "Any", or null when absent. */
+    @Column(name = "tds_nature_of_payment")
+    private String tdsNatureOfPayment;
+
     @Column(name = "gstin")
     private String gstin;
 

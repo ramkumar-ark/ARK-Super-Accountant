@@ -92,7 +92,8 @@ class TdsPaymentAnalyzerTest {
                         {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99500"},
                         {"TDS Payable 194C", "-500"}});
         return TdsEngineFixtures.input(List.of(v),
-                TdsEngineFixtures.stdSnaps("ABCPE1234F"), APRIL_START, APRIL_END);
+                TdsEngineFixtures.stdSnaps("ABCPE1234F"), TdsEngineFixtures.stdMappings(),
+                APRIL_START, APRIL_END);
     }
 
     @Test

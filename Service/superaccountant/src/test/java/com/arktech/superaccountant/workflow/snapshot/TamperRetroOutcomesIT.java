@@ -21,6 +21,9 @@ import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowEvent;
 import com.arktech.superaccountant.workflow.models.WorkflowEventKind;
@@ -87,6 +90,10 @@ class TamperRetroOutcomesIT {
     private SnapshotService snapshotService;
     @Autowired
     private OrganizationRepository organizationRepository;
+    @Autowired
+    private TdsLedgerMappingRepository tdsLedgerMappingRepository;
+    @Autowired
+    private TdsSectionConfigRepository tdsSectionConfigRepository;
     @Autowired
     private UserOrganizationRepository userOrganizationRepository;
     @Autowired
@@ -321,6 +328,8 @@ class TamperRetroOutcomesIT {
         ledger(orgId, mastersJob.getId(), "Professional Fees", LedgerCategory.EXPENSE, "194J_B", true, null);
         ledger(orgId, mastersJob.getId(), "Contractor ABC", LedgerCategory.CREDITOR, null, false, "ABCPA1234C");
         ledger(orgId, mastersJob.getId(), "TDS Payable", LedgerCategory.TDS, null, false, null);
+        TdsMappingTestData.mapAll(orgId, mastersJob.getId(), uploadLedgerSnapshotRepository,
+                tdsLedgerMappingRepository, tdsSectionConfigRepository);
     }
 
     private void ledger(UUID orgId, UUID mastersJobId, String name, LedgerCategory category,

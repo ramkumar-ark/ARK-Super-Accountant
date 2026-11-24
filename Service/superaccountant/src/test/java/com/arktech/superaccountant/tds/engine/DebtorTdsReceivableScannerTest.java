@@ -1,7 +1,6 @@
 package com.arktech.superaccountant.tds.engine;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
-import com.arktech.superaccountant.masters.models.LedgerCategory;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -17,13 +16,13 @@ class DebtorTdsReceivableScannerTest {
     private final LocalDate date = LocalDate.of(2026, 5, 10);
 
     @Test
-    void flagsDebtorWithReceivableAndNoTan() {
+    void flagsDebtorWithMappedReceivableAndNoTan() {
         ParsedVoucher voucher = TdsEngineFixtures.voucher("J-1", date, "Acme Corp", new Object[][]{
                 {"TDS Receivable 194J", "1000.00"},
                 {"Acme Corp", "-1000.00"}});
 
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
-                List.of(voucher), Set.of("acme corp"), Map.of());
+                List.of(voucher), Set.of("acme corp"), Set.of("tds receivable 194j"), Map.of());
 
         assertThat(gaps).hasSize(1);
         DebtorTdsReceivableScanner.DebtorTanGap gap = gaps.get(0);
@@ -42,7 +41,8 @@ class DebtorTdsReceivableScannerTest {
                 {"Acme Corp", "-1000.00"}});
 
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
-                List.of(voucher), Set.of("acme corp"), Map.of("acme corp", "BLRA12345C"));
+                List.of(voucher), Set.of("acme corp"), Set.of("tds receivable 194j"),
+                Map.of("acme corp", "BLRA12345C"));
 
         assertThat(gaps).isEmpty();
     }
@@ -55,9 +55,35 @@ class DebtorTdsReceivableScannerTest {
                 {"Acme Corp", "-1500.00"}});
 
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
-                List.of(voucher), Set.of("acme corp"), Map.of());
+                List.of(voucher), Set.of("acme corp"),
+                Set.of("tds receivable 194j", "tds receivable 194c"), Map.of());
 
         assertThat(gaps).hasSize(1);
         assertThat(gaps.get(0).deducted()).isEqualByComparingTo(new BigDecimal("1000.00"));
+    }
+
+    @Test
+    void receivableLedgerWithoutMappingRowIsNotFlagged() {
+        ParsedVoucher voucher = TdsEngineFixtures.voucher("J-1", date, "Acme Corp", new Object[][]{
+                {"TDS Receivable", "1000.00"},
+                {"Acme Corp", "-1000.00"}});
+
+        List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
+                List.of(voucher), Set.of("acme corp"), Set.of(), Map.of());
+
+        assertThat(gaps).isEmpty();
+    }
+
+    @Test
+    void flagsMappedLedgerWhoseNameIsNotTdsReceivable() {
+        ParsedVoucher voucher = TdsEngineFixtures.voucher("J-1", date, "Acme Corp", new Object[][]{
+                {"Statutory Deductions 206A", "1000.00"},
+                {"Acme Corp", "-1000.00"}});
+
+        List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
+                List.of(voucher), Set.of("acme corp"), Set.of("statutory deductions 206a"), Map.of());
+
+        assertThat(gaps).hasSize(1);
+        assertThat(gaps.get(0).receivableLedgerName()).isEqualTo("Statutory Deductions 206A");
     }
 }

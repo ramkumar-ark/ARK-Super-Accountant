@@ -33,6 +33,8 @@ Run from the worktree root (slug defaults to the worktree directory name). `up` 
 - `evidence/run-<ts>/summary.json` — `{passed_steps, failed_steps, scenarios_failed, scenarios_run, product_version_sha}`
 - `evidence/run-<ts>/http.log`, per-scenario `.out` transcripts
 
+The registered run list lives in `scripts/drive` (the `SCENARIOS=(...)` array — that is what `drive all` executes); `masters-tds-labels` and `tally-writeback` stay standalone because they replace the bootstrap org's latest masters upload. To add a scenario: create `scenarios/<name>.sh` (expose `run_scenario`), add `<name>` to the array, and update `feature-map.md`.
+
 Cite `summary.json` + `scenarios.jsonl` paths in PR verdicts and live-validation reports.
 
 ## Feature map and maintenance

@@ -16,6 +16,7 @@ import java.util.Map;
 
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.inputQ1;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.snap;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.stdMappings;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.stdSnaps;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.voucher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -62,7 +63,7 @@ class TdsEnginePass3Test {
     void advanceAboveThreshold_flaggedWithInferredSection() {
         var apr = bill("V1", LocalDate.of(2026, 4, 10), "50000");
         var may = payment("V2", LocalDate.of(2026, 5, 10), "90000", false);
-        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null)));
+        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null), stdMappings()));
         assertEquals(1, advances(result).size());
         TdsFinding f = advances(result).get(0);
         assertEquals(FindingSeverity.MEDIUM, f.getSeverity());
@@ -75,21 +76,21 @@ class TdsEnginePass3Test {
     void advanceBelowThresholds_notFlagged() {
         var apr = bill("V1", LocalDate.of(2026, 4, 10), "50000");
         var may = payment("V2", LocalDate.of(2026, 5, 10), "60000", false);
-        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null)));
+        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null), stdMappings()));
         assertTrue(advances(result).isEmpty());
     }
 
     @Test
     void openingCreditBalance_suppressesFalseAdvance() {
         var may = payment("V1", LocalDate.of(2026, 5, 10), "40000", false);
-        var result = engine.analyze(inputQ1(List.of(may), snapsWith(new BigDecimal("-50000"))));
+        var result = engine.analyze(inputQ1(List.of(may), snapsWith(new BigDecimal("-50000")), stdMappings()));
         assertTrue(advances(result).isEmpty());
     }
 
     @Test
     void noBillHistory_askUserFinding() {
         var may = payment("V1", LocalDate.of(2026, 5, 10), "60000", false);
-        var result = engine.analyze(inputQ1(List.of(may), snapsWith(null)));
+        var result = engine.analyze(inputQ1(List.of(may), snapsWith(null), stdMappings()));
         assertEquals(1, advances(result).size());
         TdsFinding f = advances(result).get(0);
         assertNull(f.getSection());
@@ -100,7 +101,7 @@ class TdsEnginePass3Test {
     void advanceOpenAtAprilEndSettledInMay_stillFlagged() {
         var apr = payment("V1", LocalDate.of(2026, 4, 10), "40000", false);
         var may = bill("V2", LocalDate.of(2026, 5, 10), "40000");
-        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null)));
+        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null), stdMappings()));
         assertEquals(1, advances(result).size());
         assertEquals(apr.getId(), advances(result).get(0).getVoucherId());
     }
@@ -109,14 +110,14 @@ class TdsEnginePass3Test {
     void advanceWithTdsEntry_notFlagged() {
         var apr = bill("V1", LocalDate.of(2026, 4, 10), "50000");
         var may = payment("V2", LocalDate.of(2026, 5, 10), "90000", true);
-        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null)));
+        var result = engine.analyze(inputQ1(List.of(apr, may), snapsWith(null), stdMappings()));
         assertTrue(advances(result).isEmpty());
     }
 
     @Test
     void earlierPeriodPayment_notReflagged() {
         var apr = payment("V1", LocalDate.of(2026, 4, 10), "40000", false);
-        var result = engine.analyze(TdsEngineFixtures.input(List.of(apr), snapsWith(null),
+        var result = engine.analyze(TdsEngineFixtures.input(List.of(apr), snapsWith(null), stdMappings(),
                 LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30)));
         assertTrue(advances(result).isEmpty());
     }
@@ -125,7 +126,7 @@ class TdsEnginePass3Test {
     void paymentAfterPeriodEnd_notCountedInBalance() {
         var jun = bill("V1", LocalDate.of(2026, 6, 10), "50000");
         var jul = payment("V2", LocalDate.of(2026, 7, 10), "90000", false);
-        var result = engine.analyze(inputQ1(List.of(jun, jul), snapsWith(null)));
+        var result = engine.analyze(inputQ1(List.of(jun, jul), snapsWith(null), stdMappings()));
         assertTrue(advances(result).isEmpty());
     }
 }

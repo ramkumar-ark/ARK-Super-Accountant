@@ -5,6 +5,8 @@ import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerRole;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
 import org.junit.jupiter.api.Test;
@@ -87,6 +89,17 @@ class TdsDebtorTanFindingTest {
         assertThat(debtorTanFindings(result)).hasSize(1);
     }
 
+    @Test
+    void staysSilentWhenTheReceivableLedgerHasNoMappingRow() {
+        TdsAnalysisResult result = engine.analyze(input(Map.of(),
+                List.of(voucher("J-1", new String[][]{
+                        {"TDS Receivable 194J", "1000.00"},
+                        {"Acme Corp", "-1000.00"}})),
+                "Sundry Debtors|Current Assets", Map.of()));
+
+        assertThat(debtorTanFindings(result)).isEmpty();
+    }
+
     private static List<TdsFinding> debtorTanFindings(TdsAnalysisResult result) {
         return result.findings().stream()
                 .filter(f -> f.getFindingType() == TdsFindingType.DEBTOR_TDS_RECEIVABLE_MISSING_TAN)
@@ -107,6 +120,11 @@ class TdsDebtorTanFindingTest {
 
     private TdsAnalysisInput input(Map<String, String> debtorTans, List<ParsedVoucher> vouchers,
                                    String debtorGroupChain) {
+        return input(debtorTans, vouchers, debtorGroupChain, receivableMappings());
+    }
+
+    private TdsAnalysisInput input(Map<String, String> debtorTans, List<ParsedVoucher> vouchers,
+                                   String debtorGroupChain, Map<String, TdsLedgerMapping> mappingsByKey) {
         Map<String, UploadLedgerSnapshot> snaps = new LinkedHashMap<>();
         UploadLedgerSnapshot receivable = TdsEngineFixtures.snap(
                 "TDS Receivable 194J", LedgerCategory.OTHER, null, null, null);
@@ -116,7 +134,13 @@ class TdsDebtorTanFindingTest {
         debtor.setGroupChain(debtorGroupChain);
         snaps.put(TdsEngine.key(debtor.getLedgerName()), debtor);
         return new TdsAnalysisInput(TdsEngineFixtures.ORG, TdsEngineFixtures.WF, TdsEngineFixtures.JOB,
-                vouchers, snaps, debtorTans, TdsEngineFixtures.CONFIGS, TdsEngineFixtures.FY_START,
+                vouchers, snaps, mappingsByKey, debtorTans, TdsEngineFixtures.CONFIGS, TdsEngineFixtures.FY_START,
                 LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
+    }
+
+    private static Map<String, TdsLedgerMapping> receivableMappings() {
+        return TdsEngineFixtures.mappings(
+                TdsEngineFixtures.mapping("TDS Receivable 194J", TdsLedgerRole.TDS_RECEIVABLE, null),
+                TdsEngineFixtures.mapping("TDS Receivable 194C", TdsLedgerRole.TDS_RECEIVABLE, null));
     }
 }

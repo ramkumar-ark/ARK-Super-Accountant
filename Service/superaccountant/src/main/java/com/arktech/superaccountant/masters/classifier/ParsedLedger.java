@@ -12,6 +12,8 @@ public class ParsedLedger {
     private String guid;
     private Boolean gstApplicable;
     private Boolean tdsApplicable;
+    private String taxType;
+    private String tdsNatureOfPayment;
     private LedgerCategory category;
     private String tdsSection;
     private String gstApplicabilityType;

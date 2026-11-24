@@ -143,6 +143,24 @@ class TallyMastersParserTest {
     }
 
     @Test
+    void taxTypeAndNatureOfPayment_persistedRaw() throws Exception {
+        String json = """
+                {
+                  "tallymessage": [
+                    { "group": { "name": "Duties & Taxes", "parent": "" } },
+                    { "ledger": { "name": "TDS Duty", "guid": "g1", "parent": "Duties & Taxes", "taxtype": "TDS", "tdsratename": "Any" } },
+                    { "ledger": { "name": "Plain", "guid": "g2", "parent": "Duties & Taxes" } }
+                  ]
+                }
+                """;
+        List<ParsedLedger> ledgers = service.parseMastersJson(json(json));
+        assertEquals("TDS", ledgers.get(0).getTaxType());
+        assertEquals("Any", ledgers.get(0).getTdsNatureOfPayment());
+        assertEquals(null, ledgers.get(1).getTaxType());
+        assertEquals(null, ledgers.get(1).getTdsNatureOfPayment());
+    }
+
+    @Test
     void ledgerWithDutiesAndTaxesTds_classifiedAsTds() throws Exception {
         String json = """
                 {

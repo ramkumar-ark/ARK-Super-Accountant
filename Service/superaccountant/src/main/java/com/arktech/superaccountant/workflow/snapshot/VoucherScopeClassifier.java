@@ -14,19 +14,29 @@ import java.util.stream.Collectors;
 
 /**
  * Decides which workflow types a voucher change can affect, from the voucher
- * itself and the validated ledger snapshots (read directly, not via MastersJobGate).
+ * itself, the validated ledger snapshots (read directly, not via MastersJobGate)
+ * and the organization's confirmed TDS ledger mapping keys (payable and
+ * receivable: receivable legs matter to TDS workflows too).
  */
 @Component
 public class VoucherScopeClassifier {
 
-    public Set<WorkflowType> scopes(VoucherPayload voucher, Map<String, UploadLedgerSnapshot> ledgersByName) {
+    public Set<WorkflowType> scopes(VoucherPayload voucher, Map<String, UploadLedgerSnapshot> ledgersByName,
+                                    Set<String> tdsLedgerKeys) {
         Set<WorkflowType> scopes = EnumSet.noneOf(WorkflowType.class);
         boolean salesLike = GstRuleSupport.isSalesSide(voucher.type());
         boolean purchaseLike = GstRuleSupport.isPurchaseSide(voucher.type());
         boolean tds = false;
 
         for (VoucherPayload.Entry entry : voucher.entries()) {
+            if (entry.ledger() != null
+                    && tdsLedgerKeys.contains(entry.ledger().trim().toLowerCase(Locale.ROOT))) {
+                tds = true;
+            }
             UploadLedgerSnapshot ledger = ledgersByName.get(entry.ledger());
+            if (ledger != null && ledger.getTdsSection() != null && !ledger.getTdsSection().isBlank()) {
+                tds = true;
+            }
             if (ledger == null) {
                 continue;
             }
@@ -35,10 +45,6 @@ public class VoucherScopeClassifier {
                         && ledger.getLedgerName().toUpperCase(Locale.ROOT).contains("OUTPUT");
                 salesLike |= output;
                 purchaseLike = true;
-            }
-            if (ledger.getCategory() == LedgerCategory.TDS
-                    || (ledger.getTdsSection() != null && !ledger.getTdsSection().isBlank())) {
-                tds = true;
             }
         }
 

@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.tds.engine;
 
 import com.arktech.superaccountant.masters.models.LedgerCategory;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerRole;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import com.arktech.superaccountant.tds.models.TdsFinding;
@@ -20,7 +21,10 @@ import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.ORG;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.WF;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.input;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.inputQ1;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.mapping;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.mappings;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.snap;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.stdMappings;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.stdSnaps;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.voucher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,9 +38,10 @@ class TdsEnginePass1Test {
     private final TdsEngine engine = new TdsEngine();
 
     private TdsAnalysisResult run(List<com.arktech.superaccountant.daybook.models.ParsedVoucher> vouchers,
-                                  Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps,
-                                  LocalDate periodStart, LocalDate periodEnd) {
-        return engine.analyze(input(vouchers, snaps, periodStart, periodEnd));
+                                   Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps,
+                                   Map<String, com.arktech.superaccountant.tds.mapping.TdsLedgerMapping> mappingsBy,
+                                   LocalDate periodStart, LocalDate periodEnd) {
+        return engine.analyze(input(vouchers, snaps, mappingsBy, periodStart, periodEnd));
     }
 
     @Test
@@ -44,7 +49,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000"},
                 {"TDS Payable 194C", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), stdMappings()));
         assertTrue(result.findings().isEmpty());
         assertEquals(1, result.entries().size());
         TdsDeducteeEntry e = result.entries().get(0);
@@ -62,7 +67,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99500"},
                 {"TDS Payable 194C", "-500"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), stdMappings()));
         assertEquals(1, result.findings().size());
         TdsFinding f = result.findings().get(0);
         assertEquals(TdsFindingType.SHORT_DEDUCTED, f.getFindingType());
@@ -82,7 +87,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000.50"},
                 {"TDS Payable 194C", "-999.50"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), stdMappings()));
         assertTrue(result.findings().isEmpty());
     }
 
@@ -91,7 +96,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-98000"},
                 {"TDS Payable 194C", "-2000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCCE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCCE1234F"), stdMappings()));
         assertTrue(result.findings().isEmpty());
         assertEquals(1, result.entries().size());
         assertEquals(TdsDeducteeType.COMPANY, result.entries().get(0).getDeducteeType());
@@ -102,7 +107,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000"},
                 {"TDS Payable 194C", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps(null)));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps(null), stdMappings()));
         assertEquals(2, result.findings().size());
         assertTrue(result.findings().stream().anyMatch(f -> f.getFindingType() == TdsFindingType.PAN_MISSING));
         assertTrue(result.findings().stream()
@@ -116,7 +121,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000"},
                 {"TDS Payable 194C", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("   ")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("   "), stdMappings()));
         assertTrue(result.findings().stream().anyMatch(f -> f.getFindingType() == TdsFindingType.PAN_MISSING));
         assertTrue(result.findings().stream().noneMatch(f -> f.getFindingType() == TdsFindingType.PAN_INVALID));
     }
@@ -126,7 +131,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-80000"},
                 {"TDS Payable 194C", "-20000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("BADPAN123")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("BADPAN123"), stdMappings()));
         assertTrue(result.findings().stream().anyMatch(f -> f.getFindingType() == TdsFindingType.PAN_INVALID));
         assertFalse(result.findings().isEmpty());
         TdsDeducteeEntry e = result.entries().get(0);
@@ -143,7 +148,7 @@ class TdsEnginePass1Test {
         var v2 = voucher("V2", LocalDate.of(2026, 6, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "50000"}, {"ABC Contractors", "-49500"},
                 {"TDS Payable 194C", "-500"}});
-        var result = engine.analyze(inputQ1(List.of(v1, v2), stdSnaps(null)));
+        var result = engine.analyze(inputQ1(List.of(v1, v2), stdSnaps(null), stdMappings()));
         assertEquals(1, result.findings().stream()
                 .filter(f -> f.getFindingType() == TdsFindingType.PAN_MISSING).count());
     }
@@ -156,8 +161,149 @@ class TdsEnginePass1Test {
         Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps = stdSnaps("ABCPE1234F");
         snaps.put(TdsEngine.key("TDS Payable 194J"),
                 snap("TDS Payable 194J", LedgerCategory.TDS, true, "194J_B", null));
-        var result = engine.analyze(inputQ1(List.of(v), snaps));
+        var result = engine.analyze(inputQ1(List.of(v), snaps, mappings(
+                mapping("TDS Payable 194C", TdsLedgerRole.TDS_PAYABLE, "194C"),
+                mapping("TDS Payable 194J", TdsLedgerRole.TDS_PAYABLE, "194J_B"))));
         assertTrue(result.findings().stream().anyMatch(f -> f.getFindingType() == TdsFindingType.WRONG_SECTION));
+    }
+
+    @Test
+    void unmappedPayableLedger_notRecognized() {
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "20000"}, {"ABC Contractors", "-19800"},
+                {"TDS Payable 194C", "-200"}});
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), mappings()));
+        assertTrue(result.findings().isEmpty());
+        assertTrue(result.entries().isEmpty());
+    }
+
+    @Test
+    void notTdsMapping_ignored() {
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "20000"}, {"ABC Contractors", "-19800"},
+                {"TDS Payable 194C", "-200"}});
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"),
+                mappings(mapping("TDS Payable 194C", TdsLedgerRole.NOT_TDS, null))));
+        assertTrue(result.findings().isEmpty());
+        assertTrue(result.entries().isEmpty());
+    }
+
+    @Test
+    void combinedPayable_neverWrongSection() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("XYZ Traders"),
+                snap("XYZ Traders", LedgerCategory.CREDITOR, null, null, "XYZPE1234F"));
+        snaps.put(TdsEngine.key("TDS Payable"),
+                snap("TDS Payable", LedgerCategory.TDS, true, null, null));
+        Map<String, com.arktech.superaccountant.tds.mapping.TdsLedgerMapping> mappingsBy =
+                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null));
+        var combined = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
+                {"ABC Contractors", "-95400"},
+                {"TDS Payable", "-4600"}});
+        var shortLeg = voucher("V2", LocalDate.of(2026, 5, 20), "XYZ Traders", new Object[][]{
+                {"Subcontractor Charges", "100000"}, {"XYZ Traders", "-99500"},
+                {"TDS Payable", "-500"}});
+        var result = engine.analyze(inputQ1(List.of(combined, shortLeg), snaps, mappingsBy));
+        assertTrue(result.findings().stream()
+                .noneMatch(f -> f.getFindingType() == TdsFindingType.WRONG_SECTION));
+        assertTrue(result.findings().stream().noneMatch(f -> combined.getId().equals(f.getVoucherId())));
+        assertEquals(new BigDecimal("600.00"), deductedFor(result, combined, "194C"));
+        assertEquals(new BigDecimal("4000.00"), deductedFor(result, combined, "194J_B"));
+        TdsFinding shortFinding = result.findings().stream()
+                .filter(f -> f.getFindingType() == TdsFindingType.SHORT_DEDUCTED)
+                .findFirst().orElseThrow();
+        assertEquals(shortLeg.getId(), shortFinding.getVoucherId());
+        assertEquals(new BigDecimal("1000.00"), shortFinding.getExpectedAmount());
+        assertEquals(new BigDecimal("500.00"), shortFinding.getActualAmount());
+    }
+
+    @Test
+    void combinedPayable_underDeductionIsSplitByExpectedAndNeverNotDeducted() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("TDS Payable"),
+                snap("TDS Payable", LedgerCategory.TDS, true, null, null));
+        var combined = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
+                {"ABC Contractors", "-99000"},
+                {"TDS Payable", "-1000"}});
+        var result = engine.analyze(inputQ1(List.of(combined), snaps,
+                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null))));
+        assertEquals(new BigDecimal("130.43"), deductedFor(result, combined, "194C"));
+        assertEquals(new BigDecimal("869.57"), deductedFor(result, combined, "194J_B"));
+        assertTrue(result.findings().stream().noneMatch(f ->
+                f.getFindingType() == TdsFindingType.NOT_DEDUCTED
+                        || f.getFindingType() == TdsFindingType.THRESHOLD_CROSSED
+                        || f.getFindingType() == TdsFindingType.WRONG_SECTION));
+    }
+
+    @Test
+    void combinedPayable_weightedByResidualAfterSectionMappedLeg() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("TDS Payable"),
+                snap("TDS Payable", LedgerCategory.TDS, true, null, null));
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "60000"}, {"Professional Fees", "40000"},
+                {"ABC Contractors", "-94600"},
+                {"TDS Payable 194C", "-600"}, {"TDS Payable", "-4000"}});
+        var result = engine.analyze(inputQ1(List.of(v), snaps,
+                mappings(mapping("TDS Payable", TdsLedgerRole.TDS_PAYABLE, null),
+                        mapping("TDS Payable 194C", TdsLedgerRole.TDS_PAYABLE, "194C"))));
+        assertEquals(0, new BigDecimal("600").compareTo(deductedFor(result, v, "194C")));
+        assertEquals(0, new BigDecimal("4000").compareTo(deductedFor(result, v, "194J_B")));
+        assertTrue(result.findings().stream().noneMatch(f ->
+                f.getFindingType() == TdsFindingType.EXCESS_DEDUCTED
+                        || f.getFindingType() == TdsFindingType.SHORT_DEDUCTED));
+    }
+
+    @Test
+    void reversalLegOnMappedExpenseLedgerIsNotTdsDeduction() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                stdSnaps("ABCPE1234F");
+        snaps.put(TdsEngine.key("TDS Contract Expense"),
+                snap("TDS Contract Expense", LedgerCategory.EXPENSE, true, "194C", null));
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Subcontractor Charges", "100000"}, {"TDS Contract Expense", "-1000"},
+                {"ABC Contractors", "-99000"}});
+        var result = engine.analyze(inputQ1(List.of(v), snaps,
+                mappings(mapping("TDS Contract Expense", TdsLedgerRole.TDS_PAYABLE, null))));
+        assertTrue(result.entries().isEmpty());
+    }
+
+    private static BigDecimal deductedFor(TdsAnalysisResult result,
+            com.arktech.superaccountant.daybook.models.ParsedVoucher voucher, String section) {
+        return result.entries().stream()
+                .filter(e -> section.equals(e.getSection())
+                        && e.getSourceVoucherIds().contains(voucher.getId().toString()))
+                .map(TdsDeducteeEntry::getTdsDeducted)
+                .findFirst().orElseThrow();
+    }
+
+    @Test
+    void fixedSection_wrongSectionStillFires() {
+        Map<String, com.arktech.superaccountant.masters.models.UploadLedgerSnapshot> snaps =
+                new java.util.LinkedHashMap<>();
+        snaps.put(TdsEngine.key("Professional Fees"),
+                snap("Professional Fees", LedgerCategory.EXPENSE, true, "194J_B", null));
+        snaps.put(TdsEngine.key("ABC Contractors"),
+                snap("ABC Contractors", LedgerCategory.CREDITOR, null, null, "ABCPE1234F"));
+        snaps.put(TdsEngine.key("TDS Payable 194C"),
+                snap("TDS Payable 194C", LedgerCategory.TDS, true, null, null));
+        var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
+                {"Professional Fees", "25000"}, {"ABC Contractors", "-24750"},
+                {"TDS Payable 194C", "-250"}});
+        var result = engine.analyze(inputQ1(List.of(v), snaps, stdMappings()));
+        assertEquals(1, result.findings().size());
+        assertEquals(TdsFindingType.WRONG_SECTION, result.findings().get(0).getFindingType());
     }
 
     @Test
@@ -172,7 +318,7 @@ class TdsEnginePass1Test {
                 new java.util.LinkedHashMap<>(stdSnaps("ABCPE1234F"));
         snaps.put(TdsEngine.key("Subcontractor Charges"),
                 snap("Subcontractor Charges", LedgerCategory.EXPENSE, false, "194C", null));
-        var result = engine.analyze(inputQ1(List.of(cancelled, plain), snaps));
+        var result = engine.analyze(inputQ1(List.of(cancelled, plain), snaps, stdMappings()));
         assertTrue(result.findings().isEmpty());
         assertTrue(result.entries().isEmpty());
     }
@@ -182,7 +328,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 4, 15), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99500"},
                 {"TDS Payable 194C", "-500"}});
-        var result = run(List.of(v), stdSnaps("ABCPE1234F"),
+        var result = run(List.of(v), stdSnaps("ABCPE1234F"), stdMappings(),
                 LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30));
         assertTrue(result.findings().isEmpty());
         assertTrue(result.entries().isEmpty());
@@ -193,7 +339,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 7, 5), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99500"},
                 {"TDS Payable 194C", "-500"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), stdMappings()));
         assertTrue(result.findings().isEmpty());
         assertTrue(result.entries().isEmpty());
     }
@@ -203,7 +349,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {" subcontractor CHARGES ", "100000"}, {"ABC Contractors", "-99000"},
                 {"TDS Payable 194C", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), stdMappings()));
         assertTrue(result.findings().isEmpty());
         assertEquals(1, result.entries().size());
         assertEquals(new BigDecimal("1000.00"), result.entries().get(0).getTdsDeducted());
@@ -222,7 +368,7 @@ class TdsEnginePass1Test {
         var nullDate = voucher("V3", null, "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000"},
                 {"TDS Payable 194C", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(nullCat, nullEntries, nullDate), snaps));
+        var result = engine.analyze(inputQ1(List.of(nullCat, nullEntries, nullDate), snaps, stdMappings()));
         assertTrue(result.findings().isEmpty());
         assertTrue(result.entries().isEmpty());
     }
@@ -232,7 +378,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), null, new Object[][]{
                 {"Subcontractor Charges", "100000"}, {"ABC Contractors", "-99000"},
                 {"TDS Payable 194C", "-1000"}});
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F")));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps("ABCPE1234F"), stdMappings()));
         assertTrue(result.findings().stream()
                 .noneMatch(f -> f.getFindingType() == TdsFindingType.PAN_MISSING));
         assertEquals(1, result.entries().size());
@@ -244,6 +390,7 @@ class TdsEnginePass1Test {
         var v = voucher("V1", LocalDate.of(2026, 5, 10), "ABC Contractors", new Object[][]{
                 {"Subcontractor Charges", "100000"}});
         assertThrows(IllegalArgumentException.class,
-                () -> input(List.of(v), stdSnaps("ABCPE1234F"), FY_START, LocalDate.of(2027, 4, 1)));
+                () -> input(List.of(v), stdSnaps("ABCPE1234F"), stdMappings(),
+                        FY_START, LocalDate.of(2027, 4, 1)));
     }
 }

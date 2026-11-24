@@ -11,6 +11,7 @@ import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotReposi
 import com.arktech.superaccountant.masters.tan.DebtorTanGateway;
 import com.arktech.superaccountant.tds.engine.DebtorTdsReceivableScanner;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService;
 import com.arktech.superaccountant.tds.models.DebtorTan;
 import com.arktech.superaccountant.tds.payload.request.DebtorTanRequest;
 import com.arktech.superaccountant.tds.payload.response.DebtorTanResponse;
@@ -37,17 +38,20 @@ public class DebtorTanController {
     private final MastersJobGate mastersJobGate;
     private final DayBookUploadJobRepository dayBookUploadJobRepository;
     private final ParsedVoucherRepository parsedVoucherRepository;
+    private final TdsLedgerMappingService tdsLedgerMappingService;
 
     public DebtorTanController(DebtorTanGateway debtorTanGateway,
                                UploadLedgerSnapshotRepository snapshotRepository,
                                MastersJobGate mastersJobGate,
                                DayBookUploadJobRepository dayBookUploadJobRepository,
-                               ParsedVoucherRepository parsedVoucherRepository) {
+                               ParsedVoucherRepository parsedVoucherRepository,
+                               TdsLedgerMappingService tdsLedgerMappingService) {
         this.debtorTanGateway = debtorTanGateway;
         this.snapshotRepository = snapshotRepository;
         this.mastersJobGate = mastersJobGate;
         this.dayBookUploadJobRepository = dayBookUploadJobRepository;
         this.parsedVoucherRepository = parsedVoucherRepository;
+        this.tdsLedgerMappingService = tdsLedgerMappingService;
     }
 
     @GetMapping
@@ -103,7 +107,7 @@ public class DebtorTanController {
         }
         List<DebtorTdsReceivableScanner.DebtorTanGap> gaps = DebtorTdsReceivableScanner.scan(
                 parsedVoucherRepository.findByUploadJobId(dayBookJob.get().getId()),
-                debtorKeys, tansByKey);
+                debtorKeys, tdsLedgerMappingService.receivableLedgerKeys(orgId), tansByKey);
         gaps.sort(Comparator.comparing(DebtorTdsReceivableScanner.DebtorTanGap::voucherDate,
                         Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(DebtorTdsReceivableScanner.DebtorTanGap::debtorLedgerName,

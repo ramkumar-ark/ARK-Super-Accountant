@@ -10,6 +10,7 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.review.EvidenceHash;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService;
 import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
@@ -61,6 +62,8 @@ public class TamperComparisonService {
     @Autowired
     private VoucherScopeClassifier scopeClassifier;
     @Autowired
+    private TdsLedgerMappingService tdsLedgerMappingService;
+    @Autowired
     private List<RetroFlagSource> retroFlagSources = List.of();
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -76,6 +79,7 @@ public class TamperComparisonService {
         UUID orgId = job.getOrganizationId();
 
         Map<String, UploadLedgerSnapshot> ledgersByName = ledgersByName(orgId);
+        Set<String> tdsLedgerKeys = tdsLedgerMappingService.tdsLedgerKeys(orgId);
         Map<String, FrozenVoucher> frozenByKey = new HashMap<>();
         for (FrozenVoucher row : frozenVoucherRepository.findByOrganizationIdAndReleasedAtIsNull(orgId)) {
             frozenByKey.put(row.getVoucherKey(), row);
@@ -103,7 +107,8 @@ public class TamperComparisonService {
                         uploaded.getVoucherTypeName(), uploaded.getVoucherNumber(),
                         uploaded.getPartyLedgerName());
                 change.setTouchedScopes(touched(
-                        VoucherPayload.fromJson(frozen.getPayload()), VoucherPayload.of(uploaded), ledgersByName));
+                        VoucherPayload.fromJson(frozen.getPayload()), VoucherPayload.of(uploaded),
+                        ledgersByName, tdsLedgerKeys));
             } else {
                 LocalDate date = frozen.getVoucherDate();
                 if (date == null || job.getCoverageFrom() == null || job.getCoverageTo() == null
@@ -115,7 +120,7 @@ public class TamperComparisonService {
                         frozen.getVoucherTypeName(), frozen.getVoucherNumber(), null);
                 VoucherPayload oldPayload = VoucherPayload.fromJson(frozen.getPayload());
                 change.setPartyLedgerName(oldPayload == null ? null : oldPayload.party());
-                change.setTouchedScopes(touched(oldPayload, null, ledgersByName));
+                change.setTouchedScopes(touched(oldPayload, null, ledgersByName, tdsLedgerKeys));
             }
             saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
         }
@@ -132,7 +137,7 @@ public class TamperComparisonService {
             TamperChange change = change(orgId, uploadJobId, e.getKey(), TamperChangeKind.INSERTED,
                     null, uploaded.getContentHash(), null, date,
                     uploaded.getVoucherTypeName(), uploaded.getVoucherNumber(), uploaded.getPartyLedgerName());
-            change.setTouchedScopes(touched(null, VoucherPayload.of(uploaded), ledgersByName));
+            change.setTouchedScopes(touched(null, VoucherPayload.of(uploaded), ledgersByName, tdsLedgerKeys));
             saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
         }
 
@@ -212,13 +217,13 @@ public class TamperComparisonService {
     }
 
     private String touched(VoucherPayload oldPayload, VoucherPayload newPayload,
-                           Map<String, UploadLedgerSnapshot> ledgersByName) {
+                           Map<String, UploadLedgerSnapshot> ledgersByName, Set<String> tdsLedgerKeys) {
         Set<WorkflowType> scopes = new HashSet<>();
         if (oldPayload != null) {
-            scopes.addAll(scopeClassifier.scopes(oldPayload, ledgersByName));
+            scopes.addAll(scopeClassifier.scopes(oldPayload, ledgersByName, tdsLedgerKeys));
         }
         if (newPayload != null) {
-            scopes.addAll(scopeClassifier.scopes(newPayload, ledgersByName));
+            scopes.addAll(scopeClassifier.scopes(newPayload, ledgersByName, tdsLedgerKeys));
         }
         return VoucherScopeClassifier.touchedScopesText(scopes);
     }

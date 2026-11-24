@@ -23,6 +23,33 @@ const MAPPING_VIEW = {
   ],
 }
 
+const TDS_MAPPING_VIEW = {
+  complete: false,
+  mastersJobId: null,
+  blockers: ['1 TDS ledgers not mapped: TDS Payable - Contractors'],
+  receivableWarnings: [],
+  ledgers: [
+    {
+      ledgerName: 'TDS Payable - Contractors',
+      parentGroup: 'Duties & Taxes',
+      saved: false,
+      role: null,
+      section: null,
+      suggestedRole: 'TDS_PAYABLE',
+      suggestedSection: '194C',
+      area: 'PAYABLE',
+      savedBy: null,
+      savedAt: null,
+    },
+  ],
+}
+
+function fallbackData(url: string) {
+  if (url === '/v1/gst/tax-ledger-mapping') return MAPPING_VIEW
+  if (url === '/v1/tds/ledger-mapping') return TDS_MAPPING_VIEW
+  return []
+}
+
 vi.mock('@/components/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -108,7 +135,7 @@ describe('CompliancePage — responsibility start', () => {
           },
         })
       }
-      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
+      return Promise.resolve({ data: fallbackData(url) })
     })
 
     renderPage('ROLE_ACCOUNTANT')
@@ -140,7 +167,7 @@ describe('CompliancePage — responsibility start', () => {
           ],
         })
       }
-      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
+      return Promise.resolve({ data: fallbackData(url) })
     })
     mockPut.mockRejectedValueOnce({
       response: { status: 409, data: { error: 'Responsibility start for GSTR1 is locked: a workflow already exists' } },
@@ -204,7 +231,7 @@ describe('CompliancePage — responsibility start', () => {
           ],
         })
       }
-      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
+      return Promise.resolve({ data: fallbackData(url) })
     })
     mockPut.mockResolvedValue({ data: {} })
 
@@ -244,7 +271,7 @@ describe('CompliancePage — baseline', () => {
     mockGet.mockImplementation((url: string) => {
       if (url === '/v1/compliance/baseline') return Promise.resolve({ data: status })
       if (url === '/v1/compliance/financial-years') return Promise.resolve({ data: years })
-      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
+      return Promise.resolve({ data: fallbackData(url) })
     })
   }
 
@@ -368,7 +395,7 @@ describe('CompliancePage — financial years', () => {
   function mockYears(years: Record<string, unknown>[]) {
     mockGet.mockImplementation((url: string) => {
       if (url === '/v1/compliance/financial-years') return Promise.resolve({ data: years })
-      return Promise.resolve({ data: url === '/v1/gst/tax-ledger-mapping' ? MAPPING_VIEW : [] })
+      return Promise.resolve({ data: fallbackData(url) })
     })
   }
 
@@ -448,6 +475,53 @@ describe('CompliancePage — financial years', () => {
         closeType: 'ITR_FILED',
         itrAckNo: 'ACK123',
         itrAckDate: '2025-10-15',
+      })
+    })
+  })
+})
+
+describe('CompliancePage — TDS ledger mapping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders the TDS ledger mapping section and saves it', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-abc/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            years: [
+              {
+                financialYear: 2025,
+                applicable: true,
+                basis: 'DECLARED',
+                needsAnswer: false,
+                priorYearTurnover: null,
+                turnoverNature: null,
+              },
+            ],
+          },
+        })
+      }
+      return Promise.resolve({ data: fallbackData(url) })
+    })
+    mockPut.mockResolvedValue({ data: {} })
+
+    renderPage('ROLE_ACCOUNTANT')
+
+    expect(await screen.findByText('TDS ledgers')).toBeInTheDocument()
+    expect(
+      screen.getByText('1 TDS ledgers not mapped: TDS Payable - Contractors'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('TDS Payable - Contractors')).toBeInTheDocument()
+    expect(screen.getByText('TDS receivable ledgers')).toBeInTheDocument()
+
+    const user = userEvent.setup()
+    const tdsSection = screen.getByText('TDS ledgers').closest('section') as HTMLElement
+    await user.click(within(tdsSection).getByRole('button', { name: 'Save' }))
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith('/v1/tds/ledger-mapping', {
+        items: [{ ledgerName: 'TDS Payable - Contractors', role: 'TDS_PAYABLE', section: '194C' }],
       })
     })
   })

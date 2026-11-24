@@ -20,6 +20,8 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
@@ -28,6 +30,7 @@ import com.arktech.superaccountant.tds.models.TdsPanOverride;
 import com.arktech.superaccountant.tds.repository.TdsFindingRepository;
 import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
 import com.arktech.superaccountant.tds.repository.TdsPaymentDetailRepository;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.analysis.WorkflowAnalysisService;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
@@ -87,6 +90,8 @@ class TdsFindingsReviewIT {
     @Autowired TdsFindingRepository findingRepository;
     @Autowired TdsPaymentDetailRepository paymentDetailRepository;
     @Autowired TdsPanOverrideRepository panOverrideRepository;
+    @Autowired TdsLedgerMappingRepository mappingRepository;
+    @Autowired TdsSectionConfigRepository sectionConfigRepository;
     @Autowired MockMvc mockMvc;
 
     UUID orgId;
@@ -119,6 +124,8 @@ class TdsFindingsReviewIT {
         snapshot(mastersJobId, "Subcontractor Charges", LedgerCategory.EXPENSE, true, "194C", null);
         snapshot(mastersJobId, "ABC Contractors", LedgerCategory.CREDITOR, null, null, null);
         snapshot(mastersJobId, "TDS Payable 194C", LedgerCategory.TDS, true, "194C", null);
+        TdsMappingTestData.mapAll(orgId, mastersJobId, snapshotRepository, mappingRepository,
+                sectionConfigRepository);
 
         DayBookUploadJob dayBookJob = new DayBookUploadJob();
         dayBookJob.setOrganizationId(orgId);

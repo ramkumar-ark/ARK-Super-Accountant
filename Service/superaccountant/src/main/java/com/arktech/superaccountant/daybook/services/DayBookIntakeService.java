@@ -52,6 +52,9 @@ public class DayBookIntakeService {
     private MastersGateService mastersGateService;
 
     @Autowired
+    private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate tdsLedgerMappingGate;
+
+    @Autowired
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /**
@@ -78,6 +81,11 @@ public class DayBookIntakeService {
             throw new DayBookIntakeException(422, Map.of(
                     "error", "Upload and validate masters before uploading the day book."));
         }
+
+        tdsLedgerMappingGate.blockerMessage(orgId).ifPresent(message -> {
+            throw new DayBookIntakeException(422, Map.of("error",
+                    "Save the TDS ledger mapping (Compliance settings) before uploading the day book. " + message));
+        });
 
         // Security: file extension check — prevent file extension spoofing (T-4-03)
         String originalFilename = file.getOriginalFilename();

@@ -20,6 +20,9 @@ import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.repository.UserOrganizationRepository;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -66,6 +69,10 @@ class TamperRetroFlagIT {
     private SnapshotService snapshotService;
     @Autowired
     private OrganizationRepository organizationRepository;
+    @Autowired
+    private TdsLedgerMappingRepository tdsLedgerMappingRepository;
+    @Autowired
+    private TdsSectionConfigRepository tdsSectionConfigRepository;
     @Autowired
     private UserOrganizationRepository userOrganizationRepository;
     @Autowired
@@ -118,6 +125,22 @@ class TamperRetroFlagIT {
         ledger(orgId, mastersJob.getId(), "Professional Fees", LedgerCategory.EXPENSE, "194J_B", true, null);
         ledger(orgId, mastersJob.getId(), "Contractor ABC", LedgerCategory.CREDITOR, null, false, "ABCPA1234C");
         ledger(orgId, mastersJob.getId(), "TDS Payable", LedgerCategory.TDS, null, false, null);
+        TdsMappingTestData.mapAll(orgId, mastersJob.getId(), uploadLedgerSnapshotRepository,
+                tdsLedgerMappingRepository, tdsSectionConfigRepository);
+    }
+
+    /** Same ledgers as {@link #seedTdsLedgers} plus sales ledgers, but no mapping rows saved. */
+    private void seedUnmappedTdsLedgers(UUID orgId) {
+        UploadJob mastersJob = new UploadJob();
+        mastersJob.setOrganizationId(orgId);
+        mastersJob.setFileName("masters.xlsx");
+        mastersJob.setUploadedBy("acc");
+        mastersJob.setStatus(UploadJobStatus.COMPLETED);
+        mastersJob = uploadJobRepository.save(mastersJob);
+        ledger(orgId, mastersJob.getId(), "Professional Fees", LedgerCategory.EXPENSE, "194J_B", true, null);
+        ledger(orgId, mastersJob.getId(), "Contractor ABC", LedgerCategory.CREDITOR, null, false, "ABCPA1234C");
+        ledger(orgId, mastersJob.getId(), "Sales Account", LedgerCategory.INCOME, null, false, null);
+        ledger(orgId, mastersJob.getId(), "Output CGST @9%", LedgerCategory.GST, null, false, null);
     }
 
     private void ledger(UUID orgId, UUID mastersJobId, String name, LedgerCategory category,
@@ -152,13 +175,19 @@ class TamperRetroFlagIT {
     }
 
     private ParsedVoucher seedTdsVoucher(UUID orgId, UUID jobId, String guid, String number,
-                                         LocalDate date, String contentHash, String party,
-                                         ParsedVoucherEntry... entries) {
+                                          LocalDate date, String contentHash, String party,
+                                          ParsedVoucherEntry... entries) {
+        return seedVoucher(orgId, jobId, guid, "Payment", number, date, contentHash, party, entries);
+    }
+
+    private ParsedVoucher seedVoucher(UUID orgId, UUID jobId, String guid, String type, String number,
+                                      LocalDate date, String contentHash, String party,
+                                      ParsedVoucherEntry... entries) {
         ParsedVoucher v = new ParsedVoucher();
         v.setOrganizationId(orgId);
         v.setUploadJobId(jobId);
         v.setVoucherGuid(guid);
-        v.setVoucherTypeName("Payment");
+        v.setVoucherTypeName(type);
         v.setVoucherNumber(number);
         v.setVoucherDate(date);
         v.setContentHash(contentHash);
@@ -191,6 +220,12 @@ class TamperRetroFlagIT {
 
     private Workflow frozenTdsMonth(UUID orgId, UUID jobId, LocalDate start, LocalDate end) {
         Workflow w = workflow(orgId, WorkflowType.TDS_PAYMENT, start, end, WorkflowStage.FINALIZED, jobId);
+        snapshotService.freeze(w.getId(), orgId, "acc");
+        return w;
+    }
+
+    private Workflow frozenGstr1Month(UUID orgId, UUID jobId, LocalDate start, LocalDate end) {
+        Workflow w = workflow(orgId, WorkflowType.GSTR1, start, end, WorkflowStage.FINALIZED, jobId);
         snapshotService.freeze(w.getId(), orgId, "acc");
         return w;
     }
@@ -348,5 +383,49 @@ class TamperRetroFlagIT {
                 .containsExactlyInAnyOrder(TamperChangeKind.MODIFIED, TamperChangeKind.RETRO_FLAGGED);
         assertThat(findings).allSatisfy(f ->
                 assertThat(f.getAffectedWorkflowIds()).isEqualTo(month1.getId().toString()));
+    }
+
+    @Test
+    void unmappedTdsLedgers_gstTamperDetectionSurvivesWithoutRetro() {
+        Organization org = newOrg("retro-unmapped");
+        org.setPan("ABCCS1234F");
+        org = organizationRepository.save(org);
+        seedUnmappedTdsLedgers(org.getId());
+        DayBookUploadJob job1 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30));
+        seedVoucher(org.getId(), job1.getId(), "g-sale", "Sales", "SB/001",
+                LocalDate.of(2025, 4, 15), "h-sale", "Client ABC",
+                entry("Sales Account", "10000"), entry("Output CGST @9%", "900"));
+        seedTdsVoucher(org.getId(), job1.getId(), "g-apr", "PY/APR/1",
+                LocalDate.of(2025, 4, 10), "h-apr", "Contractor ABC", entry("Professional Fees", "20000"));
+        Workflow gstr1Apr = frozenGstr1Month(org.getId(), job1.getId(),
+                LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30));
+
+        DayBookUploadJob job2 = completedJob(org.getId(), LocalDate.of(2025, 4, 1), LocalDate.of(2025, 5, 31));
+        ParsedVoucher sale2 = seedVoucher(org.getId(), job2.getId(), "g-sale", "Sales", "SB/001",
+                LocalDate.of(2025, 4, 15), "h-sale-edit", "Client ABC",
+                entry("Sales Account", "20000"), entry("Output CGST @9%", "1800"));
+        seedTdsVoucher(org.getId(), job2.getId(), "g-apr", "PY/APR/1",
+                LocalDate.of(2025, 4, 10), "h-apr", "Contractor ABC", entry("Professional Fees", "20000"));
+        seedTdsVoucher(org.getId(), job2.getId(), "g-may", "PY/MAY/1",
+                LocalDate.of(2025, 5, 10), "h-may", "Contractor ABC", entry("Professional Fees", "40000"));
+
+        tamperComparisonService.compare(job2.getId());
+
+        List<TamperFinding> findings = tamperFindingRepository.findByOrganizationId(org.getId());
+        assertThat(findings).hasSize(1);
+        TamperFinding finding = findings.get(0);
+        assertThat(finding.getChangeKind()).isEqualTo(TamperChangeKind.MODIFIED);
+        assertThat(finding.getVoucherKey()).isEqualTo(VoucherKeys.of(sale2));
+        assertThat(finding.getAffectedTypes()).isEqualTo("GSTR1");
+        assertThat(finding.getAffectedWorkflowIds()).isEqualTo(gstr1Apr.getId().toString());
+        assertThat(findings).noneMatch(f -> f.getChangeKind() == TamperChangeKind.RETRO_FLAGGED);
+
+        List<TamperChange> changes = tamperChangeRepository.findByOrganizationId(org.getId());
+        assertThat(changes).hasSize(1);
+        TamperChange change = changes.get(0);
+        assertThat(change.getChangeKind()).isEqualTo(TamperChangeKind.MODIFIED);
+        assertThat(change.getTouchedScopes()).isEqualTo("GSTR1,GSTR3B,IFF");
+        assertThat(change.isBlocking()).isTrue();
+        assertThat(change.getBlockingWorkflowIds()).isEqualTo(gstr1Apr.getId().toString());
     }
 }

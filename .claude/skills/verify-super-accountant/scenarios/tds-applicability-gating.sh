@@ -74,6 +74,16 @@ run_scenario() {
   vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" PATCH "/api/v1/uploads/$job/ledgers/$sid" 200 "snapshot tds_section kept for a non-deductor" "$ok"
   [ "$ok" = true ] || vsa_fail "snapshot tds_section not kept: got '$kept'"
 
+  # Save this org's TDS ledger mappings (the expense ledger is never a TDS
+  # candidate) so the mapping-only receivable scanner sees "TDS Receivable"
+  # and the payable gate stays complete once the year is (re)declared
+  # applicable below.
+  req "indiv-tds-ledger-mapping" PUT /api/v1/tds/ledger-mapping \
+    '{"items":[
+       {"ledgerName":"TDS Receivable","role":"TDS_RECEIVABLE"},
+       {"ledgerName":"Scenario TDS Payable 194C","role":"TDS_PAYABLE"}]}'
+  expect_status "200|201" || vsa_fail "indiv TDS ledger mapping failed: $RESP"
+
   # (d) Debtor TAN gaps are reported for a non-deductor too, from the latest
   # completed day-book upload. The GSTR3B create doubles as the not-gated
   # control; its day-book upload also lays the confirmed GSTR1 baseline the

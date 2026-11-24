@@ -140,6 +140,7 @@ run_scenario() {
   disc_items="$disc_items]"
   req "discard-tax-mapping" PUT /api/v1/gst/tax-ledger-mapping "{\"items\":$disc_items}"
   expect_status "200|201" || vsa_fail "discard tax ledger mapping failed: $RESP"
+  save_tds_mapping_from_view
 
   local dbfile="$VSA_EVIDENCE_RUN/daybook-discard-data.json"
   jq --arg pre "202606" \

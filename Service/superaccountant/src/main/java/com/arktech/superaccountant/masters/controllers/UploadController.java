@@ -187,6 +187,8 @@ public class UploadController {
             snap.setCategory(pl.getCategory());
             snap.setGstApplicable(pl.getGstApplicable());
             snap.setTdsApplicable(pl.getTdsApplicable());
+            snap.setTaxType(pl.getTaxType());
+            snap.setTdsNatureOfPayment(pl.getTdsNatureOfPayment());
             snap.setGstin(pl.getGstin());
             snap.setTallyGuid(pl.getGuid());
             snap.setTdsSection(pl.getTdsSection());

@@ -19,9 +19,12 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingRepository;
+import com.arktech.superaccountant.tds.mapping.TdsMappingTestData;
 import com.arktech.superaccountant.tds.models.DebtorTan;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
 import com.arktech.superaccountant.tds.repository.DebtorTanRepository;
+import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.analysis.WorkflowAnalysisService;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
@@ -80,6 +83,8 @@ class DebtorTanFindingReviewIT {
     @Autowired DayBookUploadJobRepository dayBookJobRepository;
     @Autowired ParsedVoucherRepository parsedVoucherRepository;
     @Autowired DebtorTanRepository debtorTanRepository;
+    @Autowired TdsLedgerMappingRepository tdsLedgerMappingRepository;
+    @Autowired TdsSectionConfigRepository tdsSectionConfigRepository;
 
     UUID orgId;
     UserDetailsImpl principal;
@@ -108,6 +113,8 @@ class DebtorTanFindingReviewIT {
         UUID mastersJobId = uploadJobRepository.save(mastersJob).getId();
         snapshot(mastersJobId, "TDS Receivable 194J", LedgerCategory.OTHER, null);
         snapshot(mastersJobId, "Acme Corp", LedgerCategory.OTHER, "Sundry Debtors|Current Assets");
+        TdsMappingTestData.mapAll(orgId, mastersJobId, snapshotRepository,
+                tdsLedgerMappingRepository, tdsSectionConfigRepository);
 
         DayBookUploadJob dayBookJob = new DayBookUploadJob();
         dayBookJob.setOrganizationId(orgId);
