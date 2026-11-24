@@ -7,6 +7,8 @@ import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.ResolveStatus;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.pan.PanFormat;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerRole;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import com.arktech.superaccountant.tds.models.TdsFinding;
@@ -62,6 +64,16 @@ public class TdsEngine {
         return TdsDeducteeType.NON_COMPANY;
     }
 
+    /**
+     * The per-organization ledger mapping is the only recognizer for duty-ledger
+     * TDS on the deduction side: a leg counts as TDS payable only when its
+     * ledger is explicitly mapped to the TDS_PAYABLE role.
+     */
+    private static TdsLedgerMapping payableMapping(TdsAnalysisInput input, String ledgerName) {
+        TdsLedgerMapping mapping = input.mappingsByKey().get(key(ledgerName));
+        return mapping != null && mapping.getRole() == TdsLedgerRole.TDS_PAYABLE ? mapping : null;
+    }
+
     private void runPerVoucherPass(TdsAnalysisInput input, List<VoucherFact> facts,
                                    List<TdsFinding> findings, List<TdsDeducteeEntry> entries) {
         Set<String> panFindingKeys = new HashSet<>();
@@ -91,7 +103,8 @@ public class TdsEngine {
                     if (section != null && !section.isBlank() && !NOT_SUBJECT.equals(section)) {
                         baseBySection.merge(section, e.getAmount(), BigDecimal::add);
                     }
-                } else if (category == LedgerCategory.TDS && e.getAmount().signum() != 0) {
+                } else if (e.getAmount().signum() != 0
+                        && payableMapping(input, e.getLedgerName()) != null) {
                     tdsEntries.add(e);
                 }
             }
@@ -117,26 +130,26 @@ public class TdsEngine {
             }
             Map<String, BigDecimal> tdsBySection = new LinkedHashMap<>();
             for (ParsedVoucherEntry e : tdsEntries) {
-                UploadLedgerSnapshot snapshot = input.snapshotsByName().get(key(e.getLedgerName()));
-                    String tdsSection = snapshot.getTdsSection() == null
-                            ? null : snapshot.getTdsSection().trim();
-                    if (tdsSection != null && baseBySection.containsKey(tdsSection)) {
-                        tdsBySection.merge(tdsSection, e.getAmount().abs(), BigDecimal::add);
-                    } else if (tdsSection == null && baseBySection.size() == 1) {
-                        tdsBySection.merge(baseBySection.keySet().iterator().next(),
-                                e.getAmount().abs(), BigDecimal::add);
-                    } else if (isInPeriod(v.getVoucherDate(), input)) {
-                        findings.add(finding(input, v, TdsFindingType.WRONG_SECTION, FindingSeverity.HIGH,
-                                tdsSection,
-                                null, e.getAmount().abs().setScale(2, RoundingMode.HALF_UP),
-                                "TDS deducted under section "
-                                        + TdsSectionRefs.forDate(tdsSection, v.getVoucherDate())
-                                        + " but voucher expenses map to "
-                                        + baseBySection.keySet().stream()
-                                                .map(code -> TdsSectionRefs.forDate(code, v.getVoucherDate()))
-                                                .toList(),
-                                "Correct the TDS ledger or the expense ledger's section in Tally."));
-                    }
+                TdsLedgerMapping mapping = payableMapping(input, e.getLedgerName());
+                String tdsSection = mapping.getSection() == null
+                        ? null : mapping.getSection().trim();
+                if (tdsSection != null && baseBySection.containsKey(tdsSection)) {
+                    tdsBySection.merge(tdsSection, e.getAmount().abs(), BigDecimal::add);
+                } else if (tdsSection == null && baseBySection.size() == 1) {
+                    tdsBySection.merge(baseBySection.keySet().iterator().next(),
+                            e.getAmount().abs(), BigDecimal::add);
+                } else if (tdsSection != null && isInPeriod(v.getVoucherDate(), input)) {
+                    findings.add(finding(input, v, TdsFindingType.WRONG_SECTION, FindingSeverity.HIGH,
+                            tdsSection,
+                            null, e.getAmount().abs().setScale(2, RoundingMode.HALF_UP),
+                            "TDS deducted under section "
+                                    + TdsSectionRefs.forDate(tdsSection, v.getVoucherDate())
+                                    + " but voucher expenses map to "
+                                    + baseBySection.keySet().stream()
+                                            .map(code -> TdsSectionRefs.forDate(code, v.getVoucherDate()))
+                                            .toList(),
+                            "Correct the TDS ledger or the expense ledger's section in Tally."));
+                }
             }
             String partyName = v.getPartyLedgerName();
             if (partyName == null || partyName.isBlank()) {
@@ -331,10 +344,7 @@ public class TdsEngine {
                 if (e == null || e.getLedgerName() == null || e.getAmount() == null) {
                     continue;
                 }
-                UploadLedgerSnapshot snapshot = input.snapshotsByName().get(key(e.getLedgerName()));
-                LedgerCategory category = snapshot != null && snapshot.getCategory() != null
-                        ? snapshot.getCategory() : LedgerCategory.OTHER;
-                if (category == LedgerCategory.TDS) {
+                if (payableMapping(input, e.getLedgerName()) != null) {
                     voucherHasTds = true;
                 }
             }

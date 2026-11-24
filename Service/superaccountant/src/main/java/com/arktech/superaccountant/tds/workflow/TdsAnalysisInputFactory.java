@@ -9,6 +9,8 @@ import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.tds.engine.TdsAnalysisInput;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
 import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
@@ -47,8 +49,12 @@ public class TdsAnalysisInputFactory {
     @org.springframework.beans.factory.annotation.Autowired
     private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate mappingGate;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private TdsLedgerMappingService mappingService;
+
     public TdsAnalysisInput build(AnalysisContext ctx) {
         mappingGate.requireComplete(ctx.organizationId());
+        Map<String, TdsLedgerMapping> mappingsByKey = mappingService.mappingsByKey(ctx.organizationId());
         if (ctx.mastersJobId() == null) {
             throw new IllegalStateException("No completed masters upload to analyse against");
         }
@@ -79,7 +85,8 @@ public class TdsAnalysisInputFactory {
         }
         applyInterestPayerThreshold(org, configsBySection, ctx.periodStart());
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
-                vouchers, snapshotsByName, debtorTansByName, configsBySection, fyStart, ctx.periodStart(), ctx.periodEnd());
+                vouchers, snapshotsByName, mappingsByKey, debtorTansByName, configsBySection,
+                fyStart, ctx.periodStart(), ctx.periodEnd());
     }
 
     /**

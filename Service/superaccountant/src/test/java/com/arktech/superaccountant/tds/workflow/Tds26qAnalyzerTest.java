@@ -84,7 +84,8 @@ class Tds26qAnalyzerTest {
 
     private TdsAnalysisInput input(List<ParsedVoucher> vouchers) {
         return TdsEngineFixtures.input(vouchers,
-                TdsEngineFixtures.stdSnaps("ABCPE1234F"), Q1_START, Q1_END);
+                TdsEngineFixtures.stdSnaps("ABCPE1234F"), TdsEngineFixtures.stdMappings(),
+                Q1_START, Q1_END);
     }
 
     @Test

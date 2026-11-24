@@ -42,6 +42,7 @@ class TdsAnalysisInputFactoryTest {
     private TdsPanOverrideRepository panOverrideRepository;
     private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
     private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate mappingGate;
+    private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService mappingService;
     private TdsAnalysisInputFactory factory;
 
     private final AnalysisContext ctx = new AnalysisContext(
@@ -58,6 +59,7 @@ class TdsAnalysisInputFactoryTest {
         panOverrideRepository = mock(TdsPanOverrideRepository.class);
         debtorTanRepository = mock(com.arktech.superaccountant.tds.repository.DebtorTanRepository.class);
         mappingGate = mock(com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate.class);
+        mappingService = mock(com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService.class);
         factory = new TdsAnalysisInputFactory();
         inject("parsedVoucherRepository", parsedVoucherRepository);
         inject("snapshotRepository", snapshotRepository);
@@ -66,6 +68,9 @@ class TdsAnalysisInputFactoryTest {
         inject("panOverrideRepository", panOverrideRepository);
         inject("debtorTanRepository", debtorTanRepository);
         inject("mappingGate", mappingGate);
+        inject("mappingService", mappingService);
+
+        when(mappingService.mappingsByKey(TdsEngineFixtures.ORG)).thenReturn(java.util.Map.of());
 
         Organization org = new Organization();
         org.setName("Org");
@@ -107,6 +112,19 @@ class TdsAnalysisInputFactoryTest {
         o.setPartyKey(TdsEngine.key("ABC Contractors"));
         o.setPan(pan);
         return o;
+    }
+
+    @Test
+    void mappings_flowedFromMappingService() {
+        com.arktech.superaccountant.tds.mapping.TdsLedgerMapping row =
+                new com.arktech.superaccountant.tds.mapping.TdsLedgerMapping();
+        row.setLedgerKey(TdsEngine.key("TDS Payable 194C"));
+        when(mappingService.mappingsByKey(TdsEngineFixtures.ORG)).thenReturn(java.util.Map.of(
+                TdsEngine.key("TDS Payable 194C"), row));
+
+        var input = factory.build(ctx);
+
+        assertSame(row, input.mappingsByKey().get(TdsEngine.key("TDS Payable 194C")));
     }
 
     @Test

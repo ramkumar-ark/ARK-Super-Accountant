@@ -116,7 +116,7 @@ class TdsDebtorTanFindingTest {
         debtor.setGroupChain(debtorGroupChain);
         snaps.put(TdsEngine.key(debtor.getLedgerName()), debtor);
         return new TdsAnalysisInput(TdsEngineFixtures.ORG, TdsEngineFixtures.WF, TdsEngineFixtures.JOB,
-                vouchers, snaps, debtorTans, TdsEngineFixtures.CONFIGS, TdsEngineFixtures.FY_START,
+                vouchers, snaps, Map.of(), debtorTans, TdsEngineFixtures.CONFIGS, TdsEngineFixtures.FY_START,
                 LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
     }
 }

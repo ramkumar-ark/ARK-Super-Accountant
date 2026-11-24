@@ -4,6 +4,8 @@ import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.daybook.models.ParsedVoucherEntry;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerRole;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
 
 import java.math.BigDecimal;
@@ -82,6 +84,23 @@ public final class TdsEngineFixtures {
         return Map.copyOf(m);
     }
 
+    public static TdsLedgerMapping mapping(String ledgerName, TdsLedgerRole role, String section) {
+        TdsLedgerMapping m = new TdsLedgerMapping();
+        m.setLedgerName(ledgerName);
+        m.setLedgerKey(TdsEngine.key(ledgerName));
+        m.setRole(role);
+        m.setSection(section);
+        return m;
+    }
+
+    public static Map<String, TdsLedgerMapping> mappings(TdsLedgerMapping... rows) {
+        Map<String, TdsLedgerMapping> m = new LinkedHashMap<>();
+        for (TdsLedgerMapping row : rows) {
+            m.put(row.getLedgerKey(), row);
+        }
+        return m;
+    }
+
     public static Map<String, UploadLedgerSnapshot> stdSnaps(String pan) {
         Map<String, UploadLedgerSnapshot> m = new LinkedHashMap<>();
         UploadLedgerSnapshot exp = snap("Subcontractor Charges", LedgerCategory.EXPENSE, true, "194C", null);
@@ -93,13 +112,19 @@ public final class TdsEngineFixtures {
         return m;
     }
 
+    public static Map<String, TdsLedgerMapping> stdMappings() {
+        return mappings(mapping("TDS Payable 194C", TdsLedgerRole.TDS_PAYABLE, "194C"));
+    }
+
     public static TdsAnalysisInput input(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps,
+                                  Map<String, TdsLedgerMapping> mappingsBy,
                                   LocalDate periodStart, LocalDate periodEnd) {
-        return new TdsAnalysisInput(ORG, WF, JOB, vouchers, snaps, Map.of(), CONFIGS,
+        return new TdsAnalysisInput(ORG, WF, JOB, vouchers, snaps, mappingsBy, Map.of(), CONFIGS,
                 FY_START, periodStart, periodEnd);
     }
 
-    public static TdsAnalysisInput inputQ1(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps) {
-        return input(vouchers, snaps, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
+    public static TdsAnalysisInput inputQ1(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps,
+                                   Map<String, TdsLedgerMapping> mappingsBy) {
+        return input(vouchers, snaps, mappingsBy, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
     }
 }

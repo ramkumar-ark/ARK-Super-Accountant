@@ -4,6 +4,8 @@ import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.masters.models.LedgerCategory;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerRole;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
 import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
@@ -18,7 +20,10 @@ import java.util.Map;
 
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.input;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.inputQ1;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.mapping;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.mappings;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.snap;
+import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.stdMappings;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.stdSnaps;
 import static com.arktech.superaccountant.tds.engine.TdsEngineFixtures.voucher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,6 +44,12 @@ class TdsEnginePass2Test {
         m.put(TdsEngine.key(creditorLedger), cred);
         m.put(TdsEngine.key(tds.getLedgerName()), tds);
         return m;
+    }
+
+    private static Map<String, TdsLedgerMapping> mappingsWith194j() {
+        return mappings(
+                mapping("TDS Payable 194C", TdsLedgerRole.TDS_PAYABLE, "194C"),
+                mapping("TDS Payable 194J_B", TdsLedgerRole.TDS_PAYABLE, "194J_B"));
     }
 
     private static ParsedVoucher bill(String no, LocalDate date, String expenseLedger, String creditorLedger,
@@ -71,7 +82,7 @@ class TdsEnginePass2Test {
     @Test
     void perTransactionLimit_notDeducted() {
         var v = bill194c("V1", LocalDate.of(2026, 5, 10), "35000", false);
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps(PAN)));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps(PAN), stdMappings()));
         assertEquals(1, findingsOf(result).size());
         TdsFinding f = findingsOf(result).get(0);
         assertEquals(TdsFindingType.NOT_DEDUCTED, f.getFindingType());
@@ -82,7 +93,7 @@ class TdsEnginePass2Test {
     @Test
     void belowBothLimits_noFinding() {
         var v = bill194c("V1", LocalDate.of(2026, 5, 10), "20000", false);
-        var result = engine.analyze(inputQ1(List.of(v), stdSnaps(PAN)));
+        var result = engine.analyze(inputQ1(List.of(v), stdSnaps(PAN), stdMappings()));
         assertTrue(findingsOf(result).isEmpty());
     }
 
@@ -92,7 +103,7 @@ class TdsEnginePass2Test {
         var may = bill("V1", LocalDate.of(2026, 5, 10), "Professional Fees", "ABC Contractors", "12000", false);
         var jun = bill("V2", LocalDate.of(2026, 6, 10), "Professional Fees", "ABC Contractors", "10000", false);
         var jul = bill("V3", LocalDate.of(2026, 7, 10), "Professional Fees", "ABC Contractors", "15000", false);
-        var result = engine.analyze(input(List.of(may, jun, jul), snaps,
+        var result = engine.analyze(input(List.of(may, jun, jul), snaps, mappingsWith194j(),
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)));
         assertEquals(1, findingsOf(result).size());
         TdsFinding f = findingsOf(result).get(0);
@@ -111,7 +122,7 @@ class TdsEnginePass2Test {
         var jul = bill("V1", LocalDate.of(2026, 7, 10), "Professional Fees", "ABC Contractors", "20000", false);
         var aug = bill("V2", LocalDate.of(2026, 8, 10), "Professional Fees", "ABC Contractors", "15000", false);
         var sep = bill("V3", LocalDate.of(2026, 9, 10), "Professional Fees", "ABC Contractors", "5000", false);
-        var result = engine.analyze(input(List.of(jul, aug, sep), snaps,
+        var result = engine.analyze(input(List.of(jul, aug, sep), snaps, mappingsWith194j(),
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30)));
         assertEquals(2, findingsOf(result).size());
         TdsFinding crossed = findingsOf(result).stream()
@@ -128,7 +139,7 @@ class TdsEnginePass2Test {
     void deductedVouchers_noThresholdFinding() {
         var a = bill194c("V1", LocalDate.of(2026, 5, 10), "40000", true);
         var b = bill194c("V2", LocalDate.of(2026, 6, 10), "70000", true);
-        var result = engine.analyze(inputQ1(List.of(a, b), stdSnaps(PAN)));
+        var result = engine.analyze(inputQ1(List.of(a, b), stdSnaps(PAN), stdMappings()));
         assertTrue(findingsOf(result).isEmpty());
     }
 
@@ -138,7 +149,7 @@ class TdsEnginePass2Test {
         var may = bill("V1", LocalDate.of(2026, 5, 10), "Professional Fees", "ABC Contractors", "20000", false);
         var jun = bill("V2", LocalDate.of(2026, 6, 10), "Professional Fees", "ABC Contractors", "15000", false);
         var aug = bill("V3", LocalDate.of(2026, 8, 10), "Professional Fees", "ABC Contractors", "5000", false);
-        var result = engine.analyze(input(List.of(may, jun, aug), snaps,
+        var result = engine.analyze(input(List.of(may, jun, aug), snaps, mappingsWith194j(),
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31)));
         assertEquals(1, findingsOf(result).size());
         TdsFinding f = findingsOf(result).get(0);
@@ -152,7 +163,7 @@ class TdsEnginePass2Test {
         Map<String, UploadLedgerSnapshot> snaps = snapsWith("Professional Fees", "ABC Contractors", PAN);
         var may = bill("V1", LocalDate.of(2026, 5, 10), "Professional Fees", "ABC Contractors", "20000", false);
         var jul = bill("V2", LocalDate.of(2026, 7, 10), "Professional Fees", "ABC Contractors", "40000", false);
-        var result = engine.analyze(input(List.of(may, jul), snaps,
+        var result = engine.analyze(input(List.of(may, jul), snaps, mappingsWith194j(),
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31)));
         assertEquals(1, result.retroFlags().size());
         RetroFlag flag = result.retroFlags().get(0);
@@ -167,7 +178,7 @@ class TdsEnginePass2Test {
     void retroFlags_emptyWhenThresholdNotCrossed() {
         Map<String, UploadLedgerSnapshot> snaps = snapsWith("Professional Fees", "ABC Contractors", PAN);
         var may = bill("V1", LocalDate.of(2026, 5, 10), "Professional Fees", "ABC Contractors", "20000", false);
-        var result = engine.analyze(input(List.of(may), snaps,
+        var result = engine.analyze(input(List.of(may), snaps, mappingsWith194j(),
                 LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 31)));
         assertTrue(result.retroFlags().isEmpty());
     }
@@ -180,7 +191,7 @@ class TdsEnginePass2Test {
         var xJul = bill("V1", LocalDate.of(2026, 7, 10), "Professional Fees", "ABC Contractors", "20000", false);
         var xAug = bill("V2", LocalDate.of(2026, 8, 10), "Professional Fees", "ABC Contractors", "15000", false);
         var yAug = bill("V3", LocalDate.of(2026, 8, 10), "Professional Fees", "XYZ Traders", "25000", false);
-        var result = engine.analyze(input(List.of(xJul, xAug, yAug), snaps,
+        var result = engine.analyze(input(List.of(xJul, xAug, yAug), snaps, mappingsWith194j(),
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30)));
         assertEquals(1, findingsOf(result).stream()
                 .filter(f -> f.getFindingType() == TdsFindingType.THRESHOLD_CROSSED).count());

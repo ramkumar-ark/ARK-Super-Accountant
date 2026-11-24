@@ -2,6 +2,7 @@ package com.arktech.superaccountant.tds.engine;
 
 import com.arktech.superaccountant.daybook.models.ParsedVoucher;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
+import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
 
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ public record TdsAnalysisInput(
         UUID uploadJobId,
         List<ParsedVoucher> vouchers,
         Map<String, UploadLedgerSnapshot> snapshotsByName,
+        Map<String, TdsLedgerMapping> mappingsByKey,
         Map<String, String> debtorTansByName,
         Map<String, TdsSectionConfig> configsBySection,
         LocalDate fyStart,
@@ -28,6 +30,7 @@ public record TdsAnalysisInput(
         Objects.requireNonNull(uploadJobId, "uploadJobId");
         Objects.requireNonNull(vouchers, "vouchers");
         Objects.requireNonNull(snapshotsByName, "snapshotsByName");
+        Objects.requireNonNull(mappingsByKey, "mappingsByKey");
         Objects.requireNonNull(debtorTansByName, "debtorTansByName");
         Objects.requireNonNull(configsBySection, "configsBySection");
         Objects.requireNonNull(fyStart, "fyStart");
