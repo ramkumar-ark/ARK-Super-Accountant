@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.tds.rpu;
 
 import com.arktech.superaccountant.masters.models.InterestPayerType;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
 
 import java.math.BigDecimal;
@@ -43,11 +44,10 @@ public final class Rpu140FormatSpec {
     }
 
     /**
-     * Raw Form 27EQ (CPC 140) payment code before payer/payee special-casing (the
-     * 194A payer variant and 194C payee split are applied later), or null when the
-     * form has no code for it (e.g. 194M files via Form 141). The statutory section
-     * backfill mirrors these codes into statutory_sections.rpu_140_code; RPU
-     * generation itself keeps reading this map until it is switched to the table.
+     * SEED SOURCE ONLY: the initial value DataMigrationService mirrors into
+     * statutory_sections.rpu_140_code. Form 140 generation reads the table instead
+     * (via {@link #sectionCode(String, String, InterestPayerType, Boolean, Map)}),
+     * so this map is no longer a runtime source of section truth.
      */
     public static String rpu140Code(String internalSectionCode) {
         return internalSectionCode == null ? null : SECTION_CODES.get(internalSectionCode);
@@ -160,15 +160,18 @@ public final class Rpu140FormatSpec {
 
     // ---------------------------------------------------------------- DD
 
-    public static List<String> deducteeDetail(RpuFormatSpec.DdData d) {
-        return deducteeDetail(d, InterestPayerType.OTHER, null);
+    public static List<String> deducteeDetail(RpuFormatSpec.DdData d,
+                                               Map<String, StatutorySection> sections) {
+        return deducteeDetail(d, sections, InterestPayerType.OTHER, null);
     }
 
     /**
-     * @param payerType      company-level 194A payer type, used only for the 194A code
-     * @param seniorCitizen  senior-citizen seam for 194A; null/false until deductee DOB exists
+     * @param sections      active statutory sections keyed by internal code (single source of truth)
+     * @param payerType     company-level 194A payer type, used only for the 194A code
+     * @param seniorCitizen senior-citizen seam for 194A; null/false until deductee DOB exists
      */
     public static List<String> deducteeDetail(RpuFormatSpec.DdData d,
+                                               Map<String, StatutorySection> sections,
                                                InterestPayerType payerType,
                                                Boolean seniorCitizen) {
         List<String> f = new ArrayList<>(45);
@@ -182,7 +185,7 @@ public final class Rpu140FormatSpec {
         f.add(RpuFormatSpec.pan(d.pan(), d.panValid()));     // 8
         f.add(RpuFormatSpec.sanitiseName(d.name()));         // 9
         addBlanks(f, 5);                                     // 10-14
-        f.add(sectionCode(d.section(), d.pan(), payerType, seniorCitizen)); // 15
+        f.add(sectionCode(d.section(), d.pan(), payerType, seniorCitizen, sections)); // 15
         addBlanks(f, 2);                                     // 16-17
         f.add(hasAmount(d.tdsDeposited()) ? "Y" : "N");      // 18
         f.add(RpuFormatSpec.date(d.paymentDate()));          // 19
@@ -207,27 +210,29 @@ public final class Rpu140FormatSpec {
 
     // ---------------------------------------------------------------- helpers
 
-    public static String sectionCode(String internal) {
-        return sectionCode(internal, null);
+    public static String sectionCode(String internal, Map<String, StatutorySection> sections) {
+        return sectionCode(internal, null, InterestPayerType.OTHER, null, sections);
+    }
+
+    public static String sectionCode(String internal, String deducteePan,
+                                     Map<String, StatutorySection> sections) {
+        return sectionCode(internal, deducteePan, InterestPayerType.OTHER, null, sections);
     }
 
     /**
-     * Form 140 tax code for a deductee. For 194C the new Act splits the code by payee type:
-     * individual/HUF (PAN 4th character P or H) is 1023, everyone else 1024. When the PAN is
-     * missing or invalid the payee type cannot be determined and this throws rather than
-     * defaulting — a valid PAN is enforced separately by the PANS_VALID finalize gate.
-     */
-    public static String sectionCode(String internal, String deducteePan) {
-        return sectionCode(internal, deducteePan, InterestPayerType.OTHER, null);
-    }
-
-    /**
-     * Form 140 tax code for a deductee. 194A depends on the company-level payer type (bank-like
-     * non-senior 1021, other payer 1022, senior-citizen seam 1020); 194C splits by payee type.
+     * Form 140 tax code for a deductee. The base payment code comes from
+     * statutory_sections.rpu_140_code; the special cases stay in code: 194A depends on the
+     * company-level payer type, and for payee-split sections (194C) the new Act splits the
+     * code by payee type — individual/HUF (PAN 4th character P or H) is 1023, everyone else
+     * the base code. When the PAN is missing or invalid the payee type cannot be determined
+     * and this throws rather than defaulting — a valid PAN is enforced separately by the
+     * PANS_VALID finalize gate.
      */
     public static String sectionCode(String internal, String deducteePan,
-                                     InterestPayerType payerType, Boolean seniorCitizen) {
-        String code = internal == null ? null : SECTION_CODES.get(internal);
+                                     InterestPayerType payerType, Boolean seniorCitizen,
+                                     Map<String, StatutorySection> sections) {
+        StatutorySection section = internal == null ? null : sections.get(internal);
+        String code = section == null ? null : section.getRpu140Code();
         if (code == null) {
             if ("194M".equals(internal)) {
                 throw new IllegalArgumentException(
@@ -239,14 +244,14 @@ public final class Rpu140FormatSpec {
         if ("194A".equals(internal)) {
             return Tds194aRules.form140Code(payerType, seniorCitizen);
         }
-        if ("194C".equals(internal)) {
+        if (Boolean.TRUE.equals(section.getRpu140PayeeSplit())) {
             if (deducteePan == null || deducteePan.length() != 10) {
                 throw new IllegalArgumentException(
                         "Cannot determine 194C payee type (individual/HUF vs others) for Form 140: "
                                 + "deductee PAN is missing or invalid");
             }
             char panType = deducteePan.charAt(3);
-            return (panType == 'P' || panType == 'H') ? "1023" : "1024";
+            return (panType == 'P' || panType == 'H') ? "1023" : code;
         }
         return code;
     }

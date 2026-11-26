@@ -1,5 +1,5 @@
 import { TdsSectionSelect } from '@/components/TdsSectionSelect'
-import { tdsSectionBothNames } from '@/lib/tdsSections'
+import { tdsSectionBothNames, useTdsSections } from '@/lib/tdsSections'
 import { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
 import { Database, Upload, SearchX, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
@@ -100,6 +100,7 @@ const VALUE_LABELS: Record<string, string> = {
 export function MastersPage() {
   const user = useAuthStore((st) => st.user)
   const { anyTdsOn } = useTdsApplicability(user?.organizationId)
+  const { data: tdsSections } = useTdsSections()
   const [activeTab, setActiveTab] = useState<
     'ledgers' | 'findings' | 'debtor-tans' | 'tally-changes' | 'settings'
   >('ledgers')
@@ -495,7 +496,7 @@ export function MastersPage() {
                                     : 'text-[var(--color-text-primary)]'
                                 }`}
                               >
-                                {tdsSectionBothNames(master.tdsSection)}
+                                {tdsSectionBothNames(master.tdsSection, tdsSections)}
                               </span>
                             ) : (
                               <span className="text-sm text-[var(--color-text-muted)]">—</span>

@@ -2,10 +2,11 @@ package com.arktech.superaccountant.tds.mapping;
 
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.statutory.models.Statute;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
+import com.arktech.superaccountant.statutory.repository.StatutorySectionRepository;
 import com.arktech.superaccountant.tds.mapping.payload.SaveTdsLedgerMappingRequest;
 import com.arktech.superaccountant.tds.mapping.payload.TdsLedgerMappingView;
-import com.arktech.superaccountant.tds.models.TdsSectionConfig;
-import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.seam.MastersJobGate;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,19 +33,19 @@ public class TdsLedgerMappingService {
 
     private final UploadLedgerSnapshotRepository snapshotRepository;
 
-    private final TdsSectionConfigRepository sectionConfigRepository;
+    private final StatutorySectionRepository statutorySectionRepository;
 
     private final ApplicationEventPublisher eventPublisher;
 
     public TdsLedgerMappingService(TdsLedgerMappingRepository repository,
             MastersJobGate mastersJobGate,
             UploadLedgerSnapshotRepository snapshotRepository,
-            TdsSectionConfigRepository sectionConfigRepository,
+            StatutorySectionRepository statutorySectionRepository,
             ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
         this.mastersJobGate = mastersJobGate;
         this.snapshotRepository = snapshotRepository;
-        this.sectionConfigRepository = sectionConfigRepository;
+        this.statutorySectionRepository = statutorySectionRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -192,9 +193,12 @@ public class TdsLedgerMappingService {
         return candidates;
     }
 
+    /** Active TDS sections from statutory_sections — the single source of section truth. */
     private Set<String> sectionCodes() {
-        return sectionConfigRepository.findAll().stream()
-                .map(TdsSectionConfig::getSectionCode)
+        return statutorySectionRepository
+                .findByStatuteOrderBySortOrderAscCodeAsc(Statute.INCOME_TAX).stream()
+                .filter(s -> Boolean.TRUE.equals(s.getActive()))
+                .map(StatutorySection::getCode)
                 .collect(Collectors.toSet());
     }
 

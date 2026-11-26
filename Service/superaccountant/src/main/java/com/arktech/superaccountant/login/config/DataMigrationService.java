@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Handles one-time data migrations that must run atomically.
@@ -46,6 +47,23 @@ public class DataMigrationService {
     private static final List<String> SORT_ORDER = List.of(
             "194A", "194C", "194H", "194I_A", "194I_B",
             "194J_A", "194J_B", "194J_C", "194M", "194Q");
+
+    /**
+     * Picker natures for the seeded sections — the exact label copy the frontend has
+     * always shown. statutory_sections.description is the single source for these;
+     * the legacy TdsSectionConfig descriptions are shorter and stay frozen.
+     */
+    private static final Map<String, String> DISPLAY_DESCRIPTIONS = Map.of(
+            "194A", "Interest other than interest on securities",
+            "194C", "Payments to contractors and sub-contractors",
+            "194H", "Commission or brokerage",
+            "194I_A", "Rent of plant, machinery or equipment",
+            "194I_B", "Rent of land, building, furniture or fittings",
+            "194J_A", "Fees for technical services, royalty for films, call centre",
+            "194J_B", "Fees for professional services, royalty, non-compete fees",
+            "194J_C", "Remuneration, fees or commission to a director (not salary)",
+            "194M", "Payments by individuals/HUF to contractors and professionals",
+            "194Q", "Purchase of goods above the threshold");
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -233,11 +251,34 @@ public class DataMigrationService {
         return created;
     }
 
+    /**
+     * statutory_sections.description is the single source of the picker natures. This
+     * keeps the seeded rows on the exact label copy the frontend has always shown
+     * (PR1 backfilled the shorter legacy descriptions). Idempotent; runs every startup.
+     *
+     * @return number of descriptions updated
+     */
+    @Transactional
+    public int updateStatutorySectionDescriptions() {
+        int updated = 0;
+        for (StatutorySection section
+                : statutorySectionRepository.findByStatute(Statute.INCOME_TAX)) {
+            String display = DISPLAY_DESCRIPTIONS.get(section.getCode());
+            if (display != null && !display.equals(section.getDescription())) {
+                section.setDescription(display);
+                statutorySectionRepository.save(section);
+                updated++;
+            }
+        }
+        return updated;
+    }
+
     private void backfillSection(TdsSectionConfig config) {
         StatutorySection section = new StatutorySection();
         section.setStatute(Statute.INCOME_TAX);
         section.setCode(config.getSectionCode());
-        section.setDescription(config.getDescription());
+        section.setDescription(DISPLAY_DESCRIPTIONS.getOrDefault(
+                config.getSectionCode(), config.getDescription()));
         section.setRpu26qCode(RpuFormatSpec.rpu26qCode(config.getSectionCode()));
         section.setRpu140Code(Rpu140FormatSpec.rpu140Code(config.getSectionCode()));
         section.setRpu140PayeeSplit("194C".equals(config.getSectionCode()));

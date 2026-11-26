@@ -135,6 +135,20 @@ function routeApi({
   exportResponse?: unknown
 } = {}) {
   mockGet.mockImplementation((url: string) => {
+    if (url === '/tds/sections') {
+      return Promise.resolve({
+        data: [
+          {
+            code: '194C',
+            description: 'Payments to contractors and sub-contractors',
+            legalReference: '393(1) [Table: Sl. No. 6(i)]',
+            rpu26qCode: '94C',
+            rpu140Code: '1024',
+            sortOrder: 2,
+          },
+        ],
+      })
+    }
     if (url === '/v1/workflows/wf-1/tds/entries') return Promise.resolve({ data: entries })
     if (url === '/v1/workflows/wf-1/tds/quarter-challans') {
       return Promise.resolve({ data: months })

@@ -1,4 +1,4 @@
-import { TDS_SECTION_OPTIONS } from '@/lib/tdsSections'
+import { buildTdsSectionOptions, useTdsSections } from '@/lib/tdsSections'
 
 interface Props {
   value: string
@@ -11,6 +11,8 @@ interface Props {
 
 /** The one TDS section dropdown, used by the single-finding override and the bulk action. */
 export function TdsSectionSelect({ value, onChange, ariaLabel, disabled, placeholder = 'Select…', className }: Props) {
+  const { data: sections } = useTdsSections()
+  const options = buildTdsSectionOptions(sections)
   return (
     <select
       aria-label={ariaLabel}
@@ -20,7 +22,7 @@ export function TdsSectionSelect({ value, onChange, ariaLabel, disabled, placeho
       className={className}
     >
       <option value="">{placeholder}</option>
-      {TDS_SECTION_OPTIONS.map((o) => (
+      {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
         </option>

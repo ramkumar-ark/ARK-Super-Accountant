@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.tds.rpu;
 
+import com.arktech.superaccountant.statutory.models.StatutorySection;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 
 import java.math.BigDecimal;
@@ -52,10 +53,10 @@ public final class RpuFormatSpec {
     }
 
     /**
-     * Raw e-TDS return (Form 26Q) section code for an internal section code, or null
-     * when 26Q has no dedicated code for it. The statutory section backfill mirrors
-     * these codes into statutory_sections.rpu_26q_code; RPU generation itself keeps
-     * reading this map until it is switched to the table.
+     * SEED SOURCE ONLY: the initial value DataMigrationService mirrors into
+     * statutory_sections.rpu_26q_code. RPU generation reads the table instead
+     * (via {@link #sectionCode(String, Map)}), so this map is no longer a runtime
+     * source of section truth.
      */
     public static String rpu26qCode(String internalSectionCode) {
         return internalSectionCode == null ? null : SECTION_CODES.get(internalSectionCode);
@@ -178,7 +179,7 @@ public final class RpuFormatSpec {
 
     // ---------------------------------------------------------------- DD
 
-    public static List<String> deducteeDetail(DdData d) {
+    public static List<String> deducteeDetail(DdData d, Map<String, StatutorySection> sections) {
         List<String> f = new ArrayList<>(54);
         f.add(String.valueOf(d.lineNumber()));
         f.add("DD");
@@ -212,7 +213,7 @@ public final class RpuFormatSpec {
         f.add(remark(d.higherRate(), d.panValid()));        // 30
         f.add("");                                          // 31
         f.add("");                                          // 32
-        f.add(sectionCode(d.section()));                    // 33
+        f.add(sectionCode(d.section(), sections));          // 33
         f.add("");                                          // 34
         addBlanks(f, 8);                                    // 35-42
         addBlanks(f, 6);                                    // 43-48
@@ -242,8 +243,14 @@ public final class RpuFormatSpec {
         return pan;
     }
 
-    public static String sectionCode(String internal) {
-        String code = internal == null ? null : SECTION_CODES.get(internal);
+    /**
+     * e-TDS return (Form 26Q) section code for an internal section code, read from
+     * statutory_sections.rpu_26q_code (the single source of section truth). Throws
+     * when the section is unknown to the table or the form has no code for it.
+     */
+    public static String sectionCode(String internal, Map<String, StatutorySection> sections) {
+        StatutorySection section = internal == null ? null : sections.get(internal);
+        String code = section == null ? null : section.getRpu26qCode();
         if (code == null) {
             throw new IllegalArgumentException("Unknown TDS section: " + internal);
         }

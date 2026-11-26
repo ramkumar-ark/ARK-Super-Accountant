@@ -266,8 +266,10 @@ Field counts: **FH = 18, BH = 72, CD = 41, DD = 54.**
 
 ## Section-code table (Annexure 2) for internal codes
 
-Internal section codes stay in `194C` style (as seeded in `DataInitializer`). Translation
-happens only in `RpuFormatSpec.sectionCode`.
+Internal section codes stay in `194C` style (as seeded in `DataInitializer`). The codes
+below are mirrored into `statutory_sections.rpu_26q_code` by the backfill; generation
+translates through that table column (RpuFormatSpec.sectionCode reads it), and this map
+is only the seed source.
 
 | Internal | RPU code | Notes |
 |---|---|---|
@@ -293,8 +295,9 @@ FVU v1.1/1.2 spec). Applied in `Rpu140FormatSpec`.
 
 ## Form 140 section-code table (Annexure 2)
 
-Translation happens only in `Rpu140FormatSpec.sectionCode`. 194C and 194A are not simple
-map lookups: 194C splits by deductee PAN type, 194A splits by the company's interest payer
+The codes below are mirrored into `statutory_sections.rpu_140_code` by the backfill and
+generation translates through that table column. 194C and 194A are not simple
+lookups: 194C splits by deductee PAN type, 194A splits by the company's interest payer
 type and (later) the deductee's senior-citizen status.
 
 | Internal | Form 140 code | s.393(1) Table ref | Situation |

@@ -15,8 +15,6 @@ import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.tds.mapping.payload.SaveTdsLedgerMappingRequest;
 import com.arktech.superaccountant.tds.mapping.payload.TdsLedgerMappingView;
-import com.arktech.superaccountant.tds.models.TdsSectionConfig;
-import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.seam.MastersJobGate;
 import java.time.Instant;
 import java.util.List;
@@ -44,7 +42,7 @@ class TdsLedgerMappingServiceTest {
     private UploadLedgerSnapshotRepository snapshotRepository;
 
     @Mock
-    private TdsSectionConfigRepository sectionConfigRepository;
+    private com.arktech.superaccountant.statutory.repository.StatutorySectionRepository statutorySectionRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -63,20 +61,25 @@ class TdsLedgerMappingServiceTest {
     @BeforeEach
     void setUp() {
         service = new TdsLedgerMappingService(repository, mastersJobGate, snapshotRepository,
-                sectionConfigRepository, eventPublisher);
+                statutorySectionRepository, eventPublisher);
         lenient().when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
-        lenient().when(sectionConfigRepository.findAll()).thenReturn(sections(SECTION_CODES));
+        lenient().when(statutorySectionRepository.findByStatuteOrderBySortOrderAscCodeAsc(
+                com.arktech.superaccountant.statutory.models.Statute.INCOME_TAX))
+                .thenReturn(sections(SECTION_CODES));
         lenient().when(repository.findByOrganizationId(org)).thenReturn(List.of());
         lenient().when(repository.findByOrganizationIdAndLedgerKey(any(), any())).thenReturn(Optional.empty());
         lenient().when(gate.isComplete(org)).thenReturn(false);
         lenient().when(gate.blockerMessage(org)).thenReturn(Optional.of("1 TDS ledgers not mapped: Rent"));
     }
 
-    private static List<TdsSectionConfig> sections(List<String> codes) {
+    private static List<com.arktech.superaccountant.statutory.models.StatutorySection> sections(List<String> codes) {
         return codes.stream().map(code -> {
-            TdsSectionConfig config = new TdsSectionConfig();
-            config.setSectionCode(code);
-            return config;
+            com.arktech.superaccountant.statutory.models.StatutorySection section =
+                    new com.arktech.superaccountant.statutory.models.StatutorySection();
+            section.setStatute(com.arktech.superaccountant.statutory.models.Statute.INCOME_TAX);
+            section.setCode(code);
+            section.setActive(true);
+            return section;
         }).toList();
     }
 

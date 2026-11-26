@@ -16,6 +16,7 @@ vi.mock('@/lib/api', () => ({
 import { useAuthStore } from '@/store/authStore'
 import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import { api } from '@/lib/api'
+import { TDS_SECTIONS_FIXTURE } from '@/test/tdsSectionsFixture'
 
 const mockUseAuthStore = vi.mocked(useAuthStore)
 const mockUseTdsApplicability = vi.mocked(useTdsApplicability)
@@ -95,6 +96,7 @@ const mappingView = {
 function mockMapping(view: Record<string, unknown>) {
   mockGet.mockImplementation((url: string) => {
     if (url === '/v1/tds/ledger-mapping') return Promise.resolve({ data: view })
+    if (url === '/tds/sections') return Promise.resolve({ data: TDS_SECTIONS_FIXTURE })
     return Promise.resolve({ data: {} })
   })
 }
@@ -182,7 +184,7 @@ describe('TdsLedgerMappingSection', () => {
 
     const contractorsSection = screen.getByLabelText('Section for TDS Payable - Contractors')
     expect(contractorsSection).toBeEnabled()
-    expect(contractorsSection).toHaveValue('194C')
+    await waitFor(() => expect(contractorsSection).toHaveValue('194C'))
     expect(
       within(contractorsSection).getByRole('option', { name: 'Combined / infer per voucher' }),
     ).toBeInTheDocument()
@@ -218,7 +220,10 @@ describe('TdsLedgerMappingSection', () => {
     renderSection('ROLE_ACCOUNTANT')
 
     const user = userEvent.setup()
-    expect(await screen.findByLabelText('Section for TDS Payable - Contractors')).toHaveValue('194C')
+    expect(await screen.findByLabelText('Section for TDS Payable - Contractors')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByLabelText('Section for TDS Payable - Contractors')).toHaveValue('194C'),
+    )
 
     await user.selectOptions(screen.getByLabelText('Role for TDS Payable - Contractors'), 'TDS_RECEIVABLE')
     const whileReceivable = screen.getByLabelText('Section for TDS Payable - Contractors')

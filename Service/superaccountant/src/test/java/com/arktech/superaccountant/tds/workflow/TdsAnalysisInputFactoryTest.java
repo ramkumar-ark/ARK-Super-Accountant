@@ -9,8 +9,11 @@ import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotReposi
 import com.arktech.superaccountant.tds.engine.TdsEngine;
 import com.arktech.superaccountant.tds.engine.TdsEngineFixtures;
 import com.arktech.superaccountant.tds.models.TdsPanOverride;
+import com.arktech.superaccountant.statutory.models.Statute;
+import com.arktech.superaccountant.statutory.models.StatutoryRuleContext;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
+import com.arktech.superaccountant.statutory.models.StatutorySectionRule;
 import com.arktech.superaccountant.tds.repository.TdsPanOverrideRepository;
-import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.analysis.AnalysisContext;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +40,6 @@ class TdsAnalysisInputFactoryTest {
 
     private ParsedVoucherRepository parsedVoucherRepository;
     private UploadLedgerSnapshotRepository snapshotRepository;
-    private TdsSectionConfigRepository configRepository;
     private OrganizationRepository organizationRepository;
     private TdsPanOverrideRepository panOverrideRepository;
     private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
@@ -56,7 +58,6 @@ class TdsAnalysisInputFactoryTest {
     void setUp() {
         parsedVoucherRepository = mock(ParsedVoucherRepository.class);
         snapshotRepository = mock(UploadLedgerSnapshotRepository.class);
-        configRepository = mock(TdsSectionConfigRepository.class);
         organizationRepository = mock(OrganizationRepository.class);
         panOverrideRepository = mock(TdsPanOverrideRepository.class);
         debtorTanRepository = mock(com.arktech.superaccountant.tds.repository.DebtorTanRepository.class);
@@ -69,7 +70,6 @@ class TdsAnalysisInputFactoryTest {
         factory = new TdsAnalysisInputFactory();
         inject("parsedVoucherRepository", parsedVoucherRepository);
         inject("snapshotRepository", snapshotRepository);
-        inject("configRepository", configRepository);
         inject("organizationRepository", organizationRepository);
         inject("panOverrideRepository", panOverrideRepository);
         inject("debtorTanRepository", debtorTanRepository);
@@ -86,13 +86,53 @@ class TdsAnalysisInputFactoryTest {
         when(organizationRepository.findById(TdsEngineFixtures.ORG))
                 .thenReturn(Optional.of(org));
         when(parsedVoucherRepository.findByUploadJobId(any())).thenReturn(List.of());
-        when(configRepository.findAll()).thenReturn(
-                List.of(TdsEngineFixtures.config("194C", "2.00", "1.00", "30000.00", "100000.00")));
         when(snapshotRepository.findByUploadJobId(MASTERS_JOB)).thenReturn(List.of());
         when(panOverrideRepository.findByOrganizationIdOrderByPartyLedgerNameAsc(
                 TdsEngineFixtures.ORG)).thenReturn(List.of());
         when(debtorTanRepository.findByOrganizationIdOrderByLedgerNameAsc(
                 TdsEngineFixtures.ORG)).thenReturn(List.of());
+    }
+
+    private final List<StatutorySection> sections = new java.util.ArrayList<>();
+    private final List<StatutorySectionRule> rules = new java.util.ArrayList<>();
+
+    /** Seeds one section with an old-regime DEFAULT row plus (when newActAnnual given) a s.393 row. */
+    private StatutorySection seedSection(String code,
+            String oldRateCompany, String oldRateNonCompany, String oldPerTxn, String oldAnnual,
+            String newRateCompany, String newRateNonCompany, String newPerTxn, String newAnnual) {
+        StatutorySection section = new StatutorySection();
+        section.setId(UUID.randomUUID());
+        section.setStatute(Statute.INCOME_TAX);
+        section.setCode(code);
+        section.setActive(true);
+        sections.add(section);
+        rules.add(rule(section, oldRateCompany, oldRateNonCompany, oldPerTxn, oldAnnual,
+                LocalDate.of(2000, 4, 1), LocalDate.of(2026, 3, 31)));
+        if (newAnnual != null) {
+            rules.add(rule(section, newRateCompany, newRateNonCompany, newPerTxn, newAnnual,
+                    LocalDate.of(2026, 4, 1), null));
+        }
+        return section;
+    }
+
+    private StatutorySectionRule rule(StatutorySection section, String rateCompany, String rateNonCompany,
+            String perTxn, String annual, LocalDate from, LocalDate to) {
+        StatutorySectionRule r = new StatutorySectionRule();
+        r.setSectionId(section.getId());
+        r.setRuleContext(StatutoryRuleContext.DEFAULT);
+        r.setRateCompany(new java.math.BigDecimal(rateCompany));
+        r.setRateNonCompany(new java.math.BigDecimal(rateNonCompany));
+        r.setThresholdPerTransaction(perTxn != null ? new java.math.BigDecimal(perTxn) : null);
+        r.setThresholdAnnual(new java.math.BigDecimal(annual));
+        r.setEffectiveFrom(from);
+        r.setEffectiveTo(to);
+        return r;
+    }
+
+    private void stubStatutory() {
+        when(statutorySectionRepository.findByStatuteOrderBySortOrderAscCodeAsc(Statute.INCOME_TAX))
+                .thenReturn(sections);
+        when(statutorySectionRuleRepository.findAll()).thenReturn(rules);
     }
 
     private void inject(String field, Object value) {
@@ -189,8 +229,8 @@ class TdsAnalysisInputFactoryTest {
     @Test
     void configResolution_194aBankPayerUsesFiftyThousandThreshold() {
         organization("BANK");
-        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194A", "10.00", "10.00", null, "10000.00", "10.00", "10.00", null, "10000.00");
+        stubStatutory();
 
         var input = factory.build(new AnalysisContext(
                 UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
@@ -199,14 +239,14 @@ class TdsAnalysisInputFactoryTest {
 
         assertEquals("50000.00",
                 input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
-        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", rules.get(0).getThresholdAnnual().toPlainString());
     }
 
     @Test
     void configResolution_194aBankPayerUsesFortyThousandBeforeFinanceAct2025() {
         organization("BANK");
-        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194A", "10.00", "10.00", null, "10000.00", "10.00", "10.00", null, "10000.00");
+        stubStatutory();
 
         var input = factory.build(new AnalysisContext(
                 UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
@@ -215,14 +255,14 @@ class TdsAnalysisInputFactoryTest {
 
         assertEquals("40000.00",
                 input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
-        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", rules.get(0).getThresholdAnnual().toPlainString());
     }
 
     @Test
     void configResolution_194aOtherPayerUsesFiveThousandBeforeFinanceAct2025() {
         organization("OTHER");
-        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194A", "10.00", "10.00", null, "10000.00", "10.00", "10.00", null, "10000.00");
+        stubStatutory();
 
         var input = factory.build(new AnalysisContext(
                 UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
@@ -231,14 +271,14 @@ class TdsAnalysisInputFactoryTest {
 
         assertEquals("5000.00",
                 input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
-        assertEquals("10000.00", c.getThresholdAnnual().toPlainString());
+        assertEquals("10000.00", rules.get(0).getThresholdAnnual().toPlainString());
     }
 
     @Test
     void configResolution_194aOtherPayerKeepsTenThousandThreshold() {
         organization("OTHER");
-        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194A", "10.00", "10.00", null, "10000.00", "10.00", "10.00", null, "10000.00");
+        stubStatutory();
 
         var input = factory.build(new AnalysisContext(
                 UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,
@@ -252,17 +292,14 @@ class TdsAnalysisInputFactoryTest {
     @Test
     void configResolution_194aBankPayerUsesFiftyThousandInNewActPeriod() {
         organization("POST_OFFICE");
-        var c = TdsEngineFixtures.config("194A", "10.00", "10.00", null, "10000.00");
-        c.setNewActRateCompany(new java.math.BigDecimal("10.00"));
-        c.setNewActRateNonCompany(new java.math.BigDecimal("10.00"));
-        c.setNewActThresholdAnnual(new java.math.BigDecimal("10000.00"));
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194A", "10.00", "10.00", null, "10000.00", "10.00", "10.00", null, "10000.00");
+        stubStatutory();
 
         var input = factory.build(ctx);
 
         assertEquals("50000.00",
                 input.configsBySection().get("194A").getThresholdAnnual().toPlainString());
-        assertEquals("10000.00", c.getNewActThresholdAnnual().toPlainString());
+        assertEquals("10000.00", rules.get(1).getThresholdAnnual().toPlainString());
     }
 
     @Test
@@ -294,23 +331,20 @@ class TdsAnalysisInputFactoryTest {
 
     @Test
     void configResolution_newActPeriodResolvesNewValues() {
-        var c = TdsEngineFixtures.config("194J_A", "2.00", "2.00", "30000.00", "30000.00");
-        c.setNewActRateCompany(new java.math.BigDecimal("2.00"));
-        c.setNewActRateNonCompany(new java.math.BigDecimal("2.00"));
-        c.setNewActThresholdAnnual(new java.math.BigDecimal("50000.00"));
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194J_A", "2.00", "2.00", "30000.00", "30000.00", "2.00", "2.00", null, "50000.00");
+        stubStatutory();
 
         var input = factory.build(ctx);
 
         var resolved = input.configsBySection().get("194J_A");
         assertEquals("50000.00", resolved.getThresholdAnnual().toPlainString());
-        assertEquals("30000.00", c.getThresholdAnnual().toPlainString());
+        assertEquals("30000.00", rules.get(0).getThresholdAnnual().toPlainString());
     }
 
     @Test
     void configResolution_legacy194IResolvesToBuildingHalf() {
-        var c = TdsEngineFixtures.config("194I_B", "10.00", "10.00", null, "240000.00");
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194I_B", "10.00", "10.00", null, "240000.00", null, null, null, null);
+        stubStatutory();
 
         var input = factory.build(ctx);
 
@@ -319,11 +353,8 @@ class TdsAnalysisInputFactoryTest {
 
     @Test
     void configResolution_oldActPeriodKeepsStoredValues() {
-        var c = TdsEngineFixtures.config("194J_A", "2.00", "2.00", "30000.00", "30000.00");
-        c.setNewActRateCompany(new java.math.BigDecimal("2.00"));
-        c.setNewActRateNonCompany(new java.math.BigDecimal("2.00"));
-        c.setNewActThresholdAnnual(new java.math.BigDecimal("50000.00"));
-        when(configRepository.findAll()).thenReturn(List.of(c));
+        seedSection("194J_A", "2.00", "2.00", "30000.00", "30000.00", "2.00", "2.00", null, "50000.00");
+        stubStatutory();
 
         var input = factory.build(new AnalysisContext(
                 UUID.randomUUID(), TdsEngineFixtures.ORG, WorkflowType.TDS_PAYMENT,

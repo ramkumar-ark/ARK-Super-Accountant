@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import { apiErrorMessage } from '@/lib/apiError'
-import { TDS_SECTION_OPTIONS } from '@/lib/tdsSections'
+import { buildTdsSectionOptions, useTdsSections } from '@/lib/tdsSections'
 import {
   TDS_LEDGER_MAPPING_QUERY_KEY,
   getTdsLedgerMapping,
@@ -14,7 +14,6 @@ import {
 } from '@/lib/tdsLedgerMappingApi'
 
 const ROLES = Object.keys(TDS_LEDGER_ROLE_LABELS) as TdsLedgerRole[]
-const SECTION_OPTIONS = TDS_SECTION_OPTIONS.filter((o) => o.value !== 'NOT_SUBJECT')
 
 type Draft = { role: TdsLedgerRole | null; section: string | null }
 type Row = TdsLedgerMappingRow & { role: TdsLedgerRole | null; section: string | null; edited: boolean }
@@ -189,6 +188,8 @@ function LedgerRow({
   canEdit: boolean
   setDraft: (ledgerName: string, base: Draft, patch: Partial<Draft>) => void
 }) {
+  const { data: tdsSections } = useTdsSections()
+  const sectionOptions = buildTdsSectionOptions(tdsSections).filter((o) => o.value !== 'NOT_SUBJECT')
   return (
     <tr className="border-b">
       <td className="py-2">{r.ledgerName}</td>
@@ -223,7 +224,7 @@ function LedgerRow({
           }
         >
           <option value="">Combined / infer per voucher</option>
-          {SECTION_OPTIONS.map((o) => (
+          {sectionOptions.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
