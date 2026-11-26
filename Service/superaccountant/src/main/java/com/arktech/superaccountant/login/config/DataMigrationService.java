@@ -208,6 +208,12 @@ public class DataMigrationService {
      * effectiveFor over the dated rows must stay byte-identical to the legacy
      * effectiveForFromColumns resolution for both regimes.
      *
+     * <p>One-way copy: after this runs, statutory_section_rules is the authoritative source for
+     * rates and thresholds. The TdsSectionConfig rate/threshold/newAct* columns and
+     * DataInitializer.NEW_ACT_VALUES are legacy, frozen and never re-synced (sections that
+     * already exist are skipped); they are slated for removal in PR2/PR3. Rate/threshold
+     * edits must go to statutory_section_rules.
+     *
      * <p>RPU generation keeps reading its own code maps this PR; the statutory table
      * becomes its source in a later PR.
      *

@@ -26,9 +26,12 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class TdsAnalysisInputFactory {
@@ -112,10 +115,14 @@ public class TdsAnalysisInputFactory {
         if (configs.isEmpty()) {
             return;
         }
+        Map<UUID, List<StatutorySectionRule>> rulesBySectionId = new HashMap<>();
+        for (StatutorySectionRule rule : statutorySectionRuleRepository.findAll()) {
+            rulesBySectionId.computeIfAbsent(rule.getSectionId(), k -> new ArrayList<>()).add(rule);
+        }
         Map<String, List<StatutorySectionRule>> rulesByCode = new LinkedHashMap<>();
         for (StatutorySection section : statutorySectionRepository.findByStatute(Statute.INCOME_TAX)) {
-            List<StatutorySectionRule> rules = statutorySectionRuleRepository.findBySectionId(section.getId());
-            if (!rules.isEmpty()) {
+            List<StatutorySectionRule> rules = rulesBySectionId.get(section.getId());
+            if (rules != null && !rules.isEmpty()) {
                 rulesByCode.put(section.getCode(), rules);
             }
         }

@@ -30,6 +30,13 @@ public class TdsSectionConfig {
 
     private String description;
 
+    /**
+     * LEGACY: the rate/threshold columns (rateCompany .. higherRateIfNoPan) and the newAct*
+     * columns below are frozen. Once a section is backfilled, statutory_section_rules is the
+     * authoritative source for rates and thresholds; these columns are only a fallback for
+     * not-yet-backfilled databases, are never re-synced, and are slated for removal in PR2/PR3.
+     * Rate/threshold edits must be made to statutory_section_rules.
+     */
     @Column(name = "rate_company", precision = 5, scale = 2, nullable = false)
     private BigDecimal rateCompany;
 
@@ -47,6 +54,7 @@ public class TdsSectionConfig {
     private BigDecimal higherRateIfNoPan = new BigDecimal("20.00");
 
     /**
+     * LEGACY (frozen, not re-synced, slated for removal in PR2/PR3; edit statutory_section_rules instead).
      * Income-tax Act 2025 (s.393) values, applicable when the earlier of credit or payment
      * falls on/after 1 April 2026. Null new-act rates mean the section has no new-act mapping
      * yet and old values continue to apply.
