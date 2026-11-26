@@ -19,7 +19,7 @@ class Rpu140GeneratorTest {
 
     private static final UUID CID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-    private final Rpu140Generator gen = new Rpu140Generator();
+    private final Rpu140Generator gen = new Rpu140Generator(RpuSectionFixtures.sectionService());
 
     private static BigDecimal bd(String v) {
         return new BigDecimal(v);

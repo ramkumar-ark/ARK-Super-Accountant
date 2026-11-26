@@ -21,7 +21,7 @@ class Rpu26qGeneratorTest {
 
     private static final UUID FIXED_CID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-    private final Rpu26qGenerator gen = new Rpu26qGenerator();
+    private final Rpu26qGenerator gen = new Rpu26qGenerator(RpuSectionFixtures.sectionService());
 
     private static BigDecimal bd(String value) {
         return new BigDecimal(value);
@@ -91,7 +91,7 @@ class Rpu26qGeneratorTest {
         assertTrue(lines[2].startsWith("3^CD^"));
         assertTrue(lines[3].startsWith("4^DD^"));
         assertTrue(lines[3].contains("ABCPE1234F"));
-        assertTrue(lines[3].contains(RpuFormatSpec.sectionCode("194C")));
+        assertTrue(lines[3].contains(RpuFormatSpec.sectionCode("194C", RpuSectionFixtures.incomeTaxSections())));
     }
 
     @Test

@@ -49,22 +49,46 @@ describe('MastersChangeList', () => {
   })
 
   it('shows TDS section changes with the old and new Act names', async () => {
-    mockGet.mockResolvedValueOnce({
-      data: {
-        changes: [
-          {
-            id: 'c2',
-            changeKind: 'MASTER_MODIFIED',
-            ledgerName: 'Subcontractor Charges',
-            attributeName: 'tdsSection',
-            oldValue: '194C',
-            newValue: '194J_B',
-            touchedScopes: ['TDS'],
-            blocking: true,
-            createdAt: '2025-05-10T10:00:00Z',
-          },
-        ],
-      },
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/tds/sections') {
+        return Promise.resolve({
+          data: [
+            {
+              code: '194C',
+              description: 'Payments to contractors and sub-contractors',
+              legalReference: '393(1) [Table: Sl. No. 6(i)]',
+              rpu26qCode: '94C',
+              rpu140Code: '1024',
+              sortOrder: 2,
+            },
+            {
+              code: '194J_B',
+              description: 'Fees for professional services, royalty, non-compete fees',
+              legalReference: '393(1) [Table: Sl. No. 6(iii).D(b)]',
+              rpu26qCode: '94J-B',
+              rpu140Code: '1029',
+              sortOrder: 7,
+            },
+          ],
+        })
+      }
+      return Promise.resolve({
+        data: {
+          changes: [
+            {
+              id: 'c2',
+              changeKind: 'MASTER_MODIFIED',
+              ledgerName: 'Subcontractor Charges',
+              attributeName: 'tdsSection',
+              oldValue: '194C',
+              newValue: '194J_B',
+              touchedScopes: ['TDS'],
+              blocking: true,
+              createdAt: '2025-05-10T10:00:00Z',
+            },
+          ],
+        },
+      })
     })
     renderList()
     await waitFor(() =>

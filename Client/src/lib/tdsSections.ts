@@ -1,48 +1,79 @@
-// TDS sections the server accepts for a TDS_SECTION_MAPPING override (single and bulk).
-// Values are what is stored; labels are what the user reads. A masters mapping applies across
-// both Acts, so each mapped section shows the old section first and the s.393 reference after it.
-// Display refs live in tdsSections393.ts — keep this file free of a second copy.
-import { TDS_393_DISPLAY } from './tdsSections393'
+// TDS section options come from the backend's statutory tables via GET /api/tds/sections —
+// the single source of section truth. Values (codes) are what is stored; labels are what
+// the user reads. A masters mapping applies across both Acts, so each mapped section shows
+// the old section first and the s.393 reference after it.
+import { useQuery } from '@tanstack/react-query'
+import { api } from './api'
 
-const SECTION_DEFS: ReadonlyArray<{ value: string; nature: string; bare?: boolean }> = [
-  { value: 'NOT_SUBJECT', nature: 'Not subject to TDS', bare: true },
-  { value: '194C', nature: 'Payments to contractors and sub-contractors' },
-  { value: '194J_A', nature: 'Fees for technical services, royalty for films, call centre' },
-  { value: '194J_B', nature: 'Fees for professional services, royalty, non-compete fees' },
-  {
-    value: '194J_C',
-    nature: 'Remuneration, fees or commission to a director (not salary)',
-  },
-  { value: '194H', nature: 'Commission or brokerage' },
-  { value: '194I_A', nature: 'Rent of plant, machinery or equipment' },
-  { value: '194I_B', nature: 'Rent of land, building, furniture or fittings' },
-  { value: '194Q', nature: 'Purchase of goods above the threshold' },
-  { value: '194A', nature: 'Interest other than interest on securities' },
-  { value: '194B', nature: 'Winnings from lottery, crossword puzzles, card games' },
-  { value: '194D', nature: 'Insurance commission' },
-  { value: '194M', nature: 'Payments by individuals/HUF to contractors and professionals' },
-  { value: 'OTHER', nature: 'Other section', bare: true },
-]
-
-function labelFor(def: { value: string; nature: string; bare?: boolean }): string {
-  if (def.bare) {
-    return def.nature
-  }
-  const newActRef = TDS_393_DISPLAY[def.value]
-  const names = newActRef ? `${def.value} / ${newActRef}` : def.value
-  return `${names} – ${def.nature}`
+export interface TdsSectionDef {
+  code: string
+  description: string
+  /** Legal reference from the dated rule rows (the s.393 reference when present). */
+  legalReference: string | null
+  rpu26qCode: string | null
+  rpu140Code: string | null
+  sortOrder: number
 }
 
-export const TDS_SECTION_OPTIONS: ReadonlyArray<{ value: string; label: string }> = SECTION_DEFS.map(
-  ({ value, nature, bare }) => ({ value, label: labelFor({ value, nature, bare }) }),
-)
+export const TDS_SECTIONS_QUERY_KEY = ['tds-sections']
+
+export function getTdsSections(): Promise<TdsSectionDef[]> {
+  return api.get('/tds/sections').then((res) => res.data)
+}
+
+export function useTdsSections() {
+  return useQuery({ queryKey: TDS_SECTIONS_QUERY_KEY, queryFn: getTdsSections })
+}
+
+export const NEW_ACT_EFFECTIVE = '2026-04-01'
+
+export function isNewActPeriod(periodStart: string | null | undefined): boolean {
+  return !!periodStart && periodStart >= NEW_ACT_EFFECTIVE
+}
+
+const NOT_SUBJECT_OPTION = { value: 'NOT_SUBJECT', label: 'Not subject to TDS' }
+const OTHER_OPTION = { value: 'OTHER', label: 'Other section' }
+
+function labelFor(s: TdsSectionDef): string {
+  const ref = s.legalReference && s.legalReference !== s.code ? `${s.code} / ${s.legalReference}` : s.code
+  return `${ref} – ${s.description}`
+}
+
+/** The picker options: backend sections in the server's order, NOT_SUBJECT first, OTHER last. */
+export function buildTdsSectionOptions(
+  sections: TdsSectionDef[] | undefined | null,
+): ReadonlyArray<{ value: string; label: string }> {
+  const options = (sections ?? []).map((s) => ({ value: s.code, label: labelFor(s) }))
+  return [NOT_SUBJECT_OPTION, ...options, OTHER_OPTION]
+}
 
 /** The combined old/new-Act label for a stored section code, for masters where no period is known. */
-export function tdsSectionBothNames(section: string | null | undefined): string {
+export function tdsSectionBothNames(
+  section: string | null | undefined,
+  sections?: TdsSectionDef[] | null,
+): string {
   if (!section) {
     return '—'
   }
   // Legacy stored 194I (pre-split rent) is the land/building half.
   const key = section === '194I' ? '194I_B' : section
-  return TDS_SECTION_OPTIONS.find((o) => o.value === key)?.label ?? section
+  return buildTdsSectionOptions(sections).find((o) => o.value === key)?.label ?? section
+}
+
+/** The reference to show for an entry of a known period: the s.393 reference on/after 1 April 2026. */
+export function tdsSectionDisplay(
+  section: string | null | undefined,
+  periodStart: string | null | undefined,
+  sections?: TdsSectionDef[] | null,
+): string {
+  const code = section ?? ''
+  // Legacy stored 194I (pre-split rent) is the land/building half.
+  const key = code === '194I' ? '194I_B' : code
+  if (isNewActPeriod(periodStart)) {
+    const def = sections?.find((s) => s.code === key)
+    if (def?.legalReference) {
+      return def.legalReference
+    }
+  }
+  return code || '—'
 }

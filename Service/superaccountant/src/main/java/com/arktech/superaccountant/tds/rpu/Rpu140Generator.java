@@ -1,6 +1,8 @@
 package com.arktech.superaccountant.tds.rpu;
 
 import com.arktech.superaccountant.masters.models.InterestPayerType;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
+import com.arktech.superaccountant.statutory.services.StatutorySectionService;
 import com.arktech.superaccountant.tds.models.TdsChallan;
 import com.arktech.superaccountant.tds.models.TdsDeducteeEntry;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,12 @@ import java.util.UUID;
 @Service
 public class Rpu140Generator {
 
+    private final StatutorySectionService statutorySectionService;
+
+    public Rpu140Generator(StatutorySectionService statutorySectionService) {
+        this.statutorySectionService = statutorySectionService;
+    }
+
     public String generate(RpuHeader header, List<TdsChallan> challans, List<TdsDeducteeEntry> entries) {
         return generate(header, challans, entries, InterestPayerType.OTHER);
     }
@@ -34,6 +42,7 @@ public class Rpu140Generator {
      */
     public String generate(RpuHeader header, List<TdsChallan> challans,
                            List<TdsDeducteeEntry> entries, InterestPayerType interestPayerType) {
+        Map<String, StatutorySection> sections = statutorySectionService.activeIncomeTaxSections();
         List<TdsChallan> orderedChallans = new ArrayList<>(challans);
         orderedChallans.sort(Comparator
                 .comparing(TdsChallan::getDepositDate, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -115,7 +124,7 @@ public class Rpu140Generator {
                         entry.getDateOfPayment(),
                         entry.getDateOfDeduction(),
                         entry.getRateApplied(),
-                        entry.isHigherRateApplied()), interestPayerType, null)));
+                        entry.isHigherRateApplied()), sections, interestPayerType, null)));
             }
             challanSerialOnFile++;
         }

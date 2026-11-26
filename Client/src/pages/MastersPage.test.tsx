@@ -15,8 +15,13 @@ vi.mock('@/lib/api', () => ({
     patch: vi.fn(),
   },
 }))
+vi.mock('@/lib/tdsSections', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/tdsSections')>()
+  return { ...actual, useTdsSections: () => ({ data: TDS_SECTIONS_FIXTURE }) }
+})
 
 import { api } from '@/lib/api'
+import { TDS_SECTIONS_FIXTURE } from '@/test/tdsSectionsFixture'
 
 const mockGet = vi.mocked(api.get)
 const mockPost = vi.mocked(api.post)

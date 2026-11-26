@@ -1,12 +1,14 @@
 package com.arktech.superaccountant.tds.rpu;
 
 import com.arktech.superaccountant.masters.models.DeductorType;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
 import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,6 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RpuFormatSpecTest {
+
+    private static Map<String, StatutorySection> sections() {
+        return RpuSectionFixtures.incomeTaxSections();
+    }
 
     private static BigDecimal bd(String value) {
         return new BigDecimal(value);
@@ -106,7 +112,8 @@ class RpuFormatSpecTest {
         List<String> f = RpuFormatSpec.deducteeDetail(new RpuFormatSpec.DdData(
                 4, 1, 1, "ABCPE1234F", true, "ABC Contractors", TdsDeducteeType.NON_COMPANY,
                 "194C", bd("100000.00"), bd("1000.00"), bd("1000.00"),
-                LocalDate.of(2026, 6, 15), LocalDate.of(2026, 6, 15), bd("1.00"), false));
+                LocalDate.of(2026, 6, 15), LocalDate.of(2026, 6, 15), bd("1.00"), false),
+                sections());
 
         assertEquals(54, f.size());
         assertEquals("4", f.get(0));
@@ -122,19 +129,19 @@ class RpuFormatSpecTest {
     @Test
     void sectionCode_mapsAllInternalCodes() {
         for (String c : List.of("194A", "194C", "194H", "194I", "194I_A", "194I_B", "194J_A", "194J_B", "194J_C", "194M", "194Q")) {
-            assertFalse(RpuFormatSpec.sectionCode(c).isBlank(), c);
+            assertFalse(RpuFormatSpec.sectionCode(c, sections()).isBlank(), c);
         }
-        assertEquals("94A", RpuFormatSpec.sectionCode("194A"));
-        assertEquals("94C", RpuFormatSpec.sectionCode("194C"));
-        assertEquals("94H", RpuFormatSpec.sectionCode("194H"));
-        assertEquals("4IA", RpuFormatSpec.sectionCode("194I_A"));
-        assertEquals("4IB", RpuFormatSpec.sectionCode("194I_B"));
-        assertEquals("4IB", RpuFormatSpec.sectionCode("194I"));
-        assertEquals("4JA", RpuFormatSpec.sectionCode("194J_A"));
-        assertEquals("4JB", RpuFormatSpec.sectionCode("194J_B"));
-        assertEquals("4JB", RpuFormatSpec.sectionCode("194J_C"));
-        assertEquals("94Q", RpuFormatSpec.sectionCode("194Q"));
-        assertThrows(IllegalArgumentException.class, () -> RpuFormatSpec.sectionCode("194Z"));
+        assertEquals("94A", RpuFormatSpec.sectionCode("194A", sections()));
+        assertEquals("94C", RpuFormatSpec.sectionCode("194C", sections()));
+        assertEquals("94H", RpuFormatSpec.sectionCode("194H", sections()));
+        assertEquals("4IA", RpuFormatSpec.sectionCode("194I_A", sections()));
+        assertEquals("4IB", RpuFormatSpec.sectionCode("194I_B", sections()));
+        assertEquals("4IB", RpuFormatSpec.sectionCode("194I", sections()));
+        assertEquals("4JA", RpuFormatSpec.sectionCode("194J_A", sections()));
+        assertEquals("4JB", RpuFormatSpec.sectionCode("194J_B", sections()));
+        assertEquals("4JB", RpuFormatSpec.sectionCode("194J_C", sections()));
+        assertEquals("94Q", RpuFormatSpec.sectionCode("194Q", sections()));
+        assertThrows(IllegalArgumentException.class, () -> RpuFormatSpec.sectionCode("194Z", sections()));
     }
 
     @Test

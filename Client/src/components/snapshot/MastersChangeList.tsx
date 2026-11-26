@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { apiErrorMessage } from '@/lib/apiError'
-import { tdsSectionBothNames } from '@/lib/tdsSections'
+import { tdsSectionBothNames, useTdsSections } from '@/lib/tdsSections'
 
 interface MasterChange {
   id: string
@@ -39,6 +39,8 @@ export function MastersChangeList({ uploadId }: { uploadId: string }) {
       return res.data as { changes: MasterChange[] }
     },
   })
+
+  const { data: tdsSections } = useTdsSections()
 
   const changes = changesQuery.data?.changes ?? []
 
@@ -80,7 +82,7 @@ export function MastersChangeList({ uploadId }: { uploadId: string }) {
                 if (!value) {
                   return '—'
                 }
-                return c.attributeName === 'tdsSection' ? tdsSectionBothNames(value) : value
+                return c.attributeName === 'tdsSection' ? tdsSectionBothNames(value, tdsSections) : value
               }
               return (
                 <tr key={c.id} className="border-t border-[var(--color-border)]">

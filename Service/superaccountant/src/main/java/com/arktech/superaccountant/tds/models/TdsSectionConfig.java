@@ -54,20 +54,28 @@ public class TdsSectionConfig {
     private BigDecimal higherRateIfNoPan = new BigDecimal("20.00");
 
     /**
-     * LEGACY (frozen, not re-synced, slated for removal in PR2/PR3; edit statutory_section_rules instead).
+     * LEGACY (frozen, not re-synced; edit statutory_section_rules instead).
      * Income-tax Act 2025 (s.393) values, applicable when the earlier of credit or payment
      * falls on/after 1 April 2026. Null new-act rates mean the section has no new-act mapping
      * yet and old values continue to apply.
+     *
+     * @deprecated since PR2 the statutory tables are the single source of section truth
+     *     (statutory_section_rules holds the dated values); these columns are only read by
+     *     the seed/backfill path and are slated for removal in PR3.
      */
+    @Deprecated
     @Column(name = "new_act_rate_company", precision = 5, scale = 2)
     private BigDecimal newActRateCompany;
 
+    @Deprecated
     @Column(name = "new_act_rate_non_company", precision = 5, scale = 2)
     private BigDecimal newActRateNonCompany;
 
+    @Deprecated
     @Column(name = "new_act_threshold_per_transaction", precision = 19, scale = 2)
     private BigDecimal newActThresholdPerTransaction;
 
+    @Deprecated
     @Column(name = "new_act_threshold_annual", precision = 19, scale = 2)
     private BigDecimal newActThresholdAnnual;
 
@@ -127,7 +135,11 @@ public class TdsSectionConfig {
      * on/after 1 April 2026 when populated, otherwise the stored values. Kept as the
      * fallback when no dated rows are attached and as the reference implementation
      * the seeded dated rows must reproduce.
+     *
+     * @deprecated since PR2 the statutory tables are the single source of section truth;
+     *     this column-based fallback remains only until PR3 removes the legacy columns.
      */
+    @Deprecated
     public TdsSectionConfig effectiveForFromColumns(LocalDate tdsDate) {
         if (!newActApplies(tdsDate) || newActRateCompany == null) {
             return this;

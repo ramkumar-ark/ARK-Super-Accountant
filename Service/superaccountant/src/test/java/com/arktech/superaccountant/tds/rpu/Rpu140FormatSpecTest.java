@@ -2,17 +2,23 @@ package com.arktech.superaccountant.tds.rpu;
 
 import com.arktech.superaccountant.masters.models.InterestPayerType;
 import com.arktech.superaccountant.masters.models.DeductorType;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Rpu140FormatSpecTest {
+
+    private static Map<String, StatutorySection> sections() {
+        return RpuSectionFixtures.incomeTaxSections();
+    }
 
     private static final RpuHeader HEADER = new RpuHeader(
             "MUMA12345A", "AAACA1234A", "Test Deductor Pvt Ltd", "12 MG Road Bangalore Karnataka",
@@ -125,7 +131,7 @@ class Rpu140FormatSpecTest {
                 4, 1, 1, "ABCDE1234F", true, "Vendor One", null, "194C",
                 new BigDecimal("50000.00"), new BigDecimal("1000.00"), new BigDecimal("1000.00"),
                 LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 10),
-                new BigDecimal("2.00"), false));
+                new BigDecimal("2.00"), false), sections());
         assertEquals(45, f.size());
         assertEquals("4", f.get(0));
         assertEquals("DD", f.get(1));
@@ -151,7 +157,7 @@ class Rpu140FormatSpecTest {
                 4, 1, 1, null, false, "Vendor", null, "194A",
                 new BigDecimal("50000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
                 LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 10),
-                new BigDecimal("20.00"), true));
+                new BigDecimal("20.00"), true), sections());
         assertEquals("PANNOTAVBL", f.get(7));
         assertEquals("C", f.get(31));        // s.397(2) higher rate reason
         assertEquals("N", f.get(17));
@@ -159,52 +165,52 @@ class Rpu140FormatSpecTest {
 
     @Test
     void form140SectionCode_mapsInternalsToFourDigitCodes() {
-        assertEquals("1022", Rpu140FormatSpec.sectionCode("194A"));
-        assertEquals("1006", Rpu140FormatSpec.sectionCode("194H"));
-        assertEquals("1008", Rpu140FormatSpec.sectionCode("194I_A"));
-        assertEquals("1009", Rpu140FormatSpec.sectionCode("194I_B"));
-        assertEquals("1009", Rpu140FormatSpec.sectionCode("194I"));
-        assertEquals("1026", Rpu140FormatSpec.sectionCode("194J_A"));
-        assertEquals("1027", Rpu140FormatSpec.sectionCode("194J_B"));
-        assertEquals("1028", Rpu140FormatSpec.sectionCode("194J_C"));
-        assertEquals("1031", Rpu140FormatSpec.sectionCode("194Q"));
+        assertEquals("1022", Rpu140FormatSpec.sectionCode("194A", sections()));
+        assertEquals("1006", Rpu140FormatSpec.sectionCode("194H", sections()));
+        assertEquals("1008", Rpu140FormatSpec.sectionCode("194I_A", sections()));
+        assertEquals("1009", Rpu140FormatSpec.sectionCode("194I_B", sections()));
+        assertEquals("1009", Rpu140FormatSpec.sectionCode("194I", sections()));
+        assertEquals("1026", Rpu140FormatSpec.sectionCode("194J_A", sections()));
+        assertEquals("1027", Rpu140FormatSpec.sectionCode("194J_B", sections()));
+        assertEquals("1028", Rpu140FormatSpec.sectionCode("194J_C", sections()));
+        assertEquals("1031", Rpu140FormatSpec.sectionCode("194Q", sections()));
 
         // 194C requires a deductee PAN: ind/HUF (4th char P/H) -> 1023, others -> 1024
-        assertEquals("1023", Rpu140FormatSpec.sectionCode("194C", "ABCP12345F"));
-        assertEquals("1023", Rpu140FormatSpec.sectionCode("194C", "ABCH12345F"));
-        assertEquals("1024", Rpu140FormatSpec.sectionCode("194C", "ABCC12345F"));
-        assertEquals("1024", Rpu140FormatSpec.sectionCode("194C", "ABCF12345F"));
-        assertEquals("1026", Rpu140FormatSpec.sectionCode("194J_A", null));
+        assertEquals("1023", Rpu140FormatSpec.sectionCode("194C", "ABCP12345F", sections()));
+        assertEquals("1023", Rpu140FormatSpec.sectionCode("194C", "ABCH12345F", sections()));
+        assertEquals("1024", Rpu140FormatSpec.sectionCode("194C", "ABCC12345F", sections()));
+        assertEquals("1024", Rpu140FormatSpec.sectionCode("194C", "ABCF12345F", sections()));
+        assertEquals("1026", Rpu140FormatSpec.sectionCode("194J_A", null, sections()));
 
         IllegalArgumentException indeterminate = assertThrows(IllegalArgumentException.class,
-                () -> Rpu140FormatSpec.sectionCode("194C", null));
+                () -> Rpu140FormatSpec.sectionCode("194C", null, sections()));
         assertTrue(indeterminate.getMessage().contains("194C payee type"));
         assertThrows(IllegalArgumentException.class,
-                () -> Rpu140FormatSpec.sectionCode("194C", "BADPAN12"));
+                () -> Rpu140FormatSpec.sectionCode("194C", "BADPAN12", sections()));
     }
 
     @Test
     void form140SectionCode_194aDependsOnCompanyPayerTypeAndSeniorSeam() {
         assertEquals("1022", Rpu140FormatSpec.sectionCode(
-                "194A", null, InterestPayerType.OTHER, null));
+                "194A", null, InterestPayerType.OTHER, null, sections()));
         assertEquals("1022", Rpu140FormatSpec.sectionCode(
-                "194A", "ABCPE1234F", InterestPayerType.OTHER, true));
+                "194A", "ABCPE1234F", InterestPayerType.OTHER, true, sections()));
         assertEquals("1021", Rpu140FormatSpec.sectionCode(
-                "194A", "ABCPE1234F", InterestPayerType.BANK, null));
+                "194A", "ABCPE1234F", InterestPayerType.BANK, null, sections()));
         assertEquals("1021", Rpu140FormatSpec.sectionCode(
-                "194A", "ABCPE1234F", InterestPayerType.CO_OPERATIVE_BANK, false));
+                "194A", "ABCPE1234F", InterestPayerType.CO_OPERATIVE_BANK, false, sections()));
         assertEquals("1021", Rpu140FormatSpec.sectionCode(
-                "194A", "ABCPE1234F", InterestPayerType.POST_OFFICE, false));
+                "194A", "ABCPE1234F", InterestPayerType.POST_OFFICE, false, sections()));
         assertEquals("1020", Rpu140FormatSpec.sectionCode(
-                "194A", "ABCPE1234F", InterestPayerType.BANK, true));
-        assertEquals("1022", Rpu140FormatSpec.sectionCode("194A"));
+                "194A", "ABCPE1234F", InterestPayerType.BANK, true, sections()));
+        assertEquals("1022", Rpu140FormatSpec.sectionCode("194A", sections()));
     }
 
     @Test
     void form140SectionCode_rejects194mWithForm141Guidance() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> Rpu140FormatSpec.sectionCode("194M"));
+                () -> Rpu140FormatSpec.sectionCode("194M", sections()));
         assertTrue(e.getMessage().contains("Form 141"));
-        assertThrows(IllegalArgumentException.class, () -> Rpu140FormatSpec.sectionCode("9999"));
+        assertThrows(IllegalArgumentException.class, () -> Rpu140FormatSpec.sectionCode("9999", sections()));
     }
 }

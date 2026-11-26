@@ -16,9 +16,9 @@ import com.arktech.superaccountant.tds.engine.TdsAnalysisInput;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
 import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
 import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService;
+import com.arktech.superaccountant.statutory.models.StatutoryRuleContext;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
-import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.workflow.analysis.AnalysisContext;
 import com.arktech.superaccountant.workflow.service.period.PeriodCalendar;
 import org.springframework.beans.BeanUtils;
@@ -41,9 +41,6 @@ public class TdsAnalysisInputFactory {
 
     @org.springframework.beans.factory.annotation.Autowired
     private UploadLedgerSnapshotRepository snapshotRepository;
-
-    @org.springframework.beans.factory.annotation.Autowired
-    private TdsSectionConfigRepository configRepository;
 
     @org.springframework.beans.factory.annotation.Autowired
     private OrganizationRepository organizationRepository;
@@ -88,12 +85,7 @@ public class TdsAnalysisInputFactory {
                 : debtorTanRepository.findByOrganizationIdOrderByLedgerNameAsc(ctx.organizationId())) {
             debtorTansByName.put(record.getLedgerKey(), record.getTan());
         }
-        Map<String, TdsSectionConfig> configsBySection = new LinkedHashMap<>();
-        List<TdsSectionConfig> configs = configRepository.findAll();
-        attachStatutoryRules(configs);
-        for (TdsSectionConfig c : configs) {
-            configsBySection.putIfAbsent(c.getSectionCode(), c.effectiveFor(ctx.periodStart()));
-        }
+        Map<String, TdsSectionConfig> configsBySection = buildSectionConfigs(ctx.periodStart());
         // Legacy stored 194I (pre-split rent) is the land/building half; keep rows that still
         // carry it resolvable even before/without the stored-value migration.
         if (!configsBySection.containsKey("194I") && configsBySection.containsKey("194I_B")) {
@@ -106,32 +98,58 @@ public class TdsAnalysisInputFactory {
     }
 
     /**
-     * Attaches the dated statutory rule rows (statutory_section_rules) to each config so
-     * {@link TdsSectionConfig#effectiveFor} resolves from data. A config with no rows in
-     * the table keeps null rules and falls back to its stored new-act columns, so a not-yet
-     * backfilled database behaves exactly as before.
+     * Single source of section truth: identity comes from statutory_sections and the
+     * values in force for the period from the covering DEFAULT rule rows in
+     * statutory_section_rules. The legacy TdsSectionConfig table is not read here.
      */
-    private void attachStatutoryRules(List<TdsSectionConfig> configs) {
-        if (configs.isEmpty()) {
-            return;
-        }
+    private Map<String, TdsSectionConfig> buildSectionConfigs(LocalDate periodStart) {
         Map<UUID, List<StatutorySectionRule>> rulesBySectionId = new HashMap<>();
         for (StatutorySectionRule rule : statutorySectionRuleRepository.findAll()) {
             rulesBySectionId.computeIfAbsent(rule.getSectionId(), k -> new ArrayList<>()).add(rule);
         }
-        Map<String, List<StatutorySectionRule>> rulesByCode = new LinkedHashMap<>();
-        for (StatutorySection section : statutorySectionRepository.findByStatute(Statute.INCOME_TAX)) {
-            List<StatutorySectionRule> rules = rulesBySectionId.get(section.getId());
-            if (rules != null && !rules.isEmpty()) {
-                rulesByCode.put(section.getCode(), rules);
+        Map<String, TdsSectionConfig> configsBySection = new LinkedHashMap<>();
+        for (StatutorySection section
+                : statutorySectionRepository.findByStatuteOrderBySortOrderAscCodeAsc(Statute.INCOME_TAX)) {
+            if (!Boolean.TRUE.equals(section.getActive())) {
+                continue;
+            }
+            configsBySection.putIfAbsent(section.getCode(),
+                    effectiveConfig(section, rulesBySectionId.get(section.getId()), periodStart));
+        }
+        return configsBySection;
+    }
+
+    /**
+     * The engine's view of one section for a period: a detached {@link TdsSectionConfig}
+     * carrying the covering DEFAULT rule row's values. When no row covers the period
+     * (before the earliest effectiveFrom), the earliest DEFAULT row is the regime in
+     * force — the same values the legacy stored columns held.
+     */
+    private TdsSectionConfig effectiveConfig(StatutorySection section,
+                                             List<StatutorySectionRule> rules,
+                                             LocalDate periodStart) {
+        TdsSectionConfig config = new TdsSectionConfig();
+        config.setSectionCode(section.getCode());
+        config.setDescription(section.getDescription());
+        if (rules == null || rules.isEmpty()) {
+            return config;
+        }
+        config.setDatedRules(rules);
+        TdsSectionConfig effective = config.effectiveFor(periodStart);
+        if (effective == config) {
+            StatutorySectionRule earliest = rules.stream()
+                    .filter(r -> StatutoryRuleContext.DEFAULT.equals(r.getRuleContext()))
+                    .min(java.util.Comparator.comparing(StatutorySectionRule::getEffectiveFrom))
+                    .orElse(null);
+            if (earliest != null) {
+                config.setRateCompany(earliest.getRateCompany());
+                config.setRateNonCompany(earliest.getRateNonCompany());
+                config.setThresholdPerTransaction(earliest.getThresholdPerTransaction());
+                config.setThresholdAnnual(earliest.getThresholdAnnual());
+                config.setHigherRateIfNoPan(earliest.getHigherRateIfNoPan());
             }
         }
-        if (rulesByCode.isEmpty()) {
-            return;
-        }
-        for (TdsSectionConfig c : configs) {
-            c.setDatedRules(rulesByCode.get(c.getSectionCode()));
-        }
+        return effective;
     }
 
     /**

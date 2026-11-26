@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
-import { TDS_SECTION_OPTIONS } from '@/lib/tdsSections'
+import { buildTdsSectionOptions, useTdsSections } from '@/lib/tdsSections'
 import { X, CheckCircle } from 'lucide-react'
 
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/
@@ -49,6 +49,8 @@ export function LedgerMappingPanel({
   const [error, setError] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const { data: tdsSections } = useTdsSections()
+  const tdsSectionOptions = buildTdsSectionOptions(tdsSections)
 
   useEffect(() => {
     closeButtonRef.current?.focus()
@@ -180,7 +182,7 @@ export function LedgerMappingPanel({
                 <option value="" disabled>
                   Select TDS section…
                 </option>
-                {TDS_SECTION_OPTIONS.map((s) => (
+                {tdsSectionOptions.map((s) => (
                   <option key={s.value} value={s.value}>
                     {s.label}
                   </option>

@@ -59,6 +59,10 @@ public class DataInitializer implements CommandLineRunner {
             System.out.println("Backfilled " + statutorySections
                     + " statutory sections with dated rule rows (statutory_sections / statutory_section_rules).");
         }
+        int updatedDescriptions = dataMigrationService.updateStatutorySectionDescriptions();
+        if (updatedDescriptions > 0) {
+            System.out.println("Updated " + updatedDescriptions + " statutory section descriptions.");
+        }
         if (preconfiguredMasterRepository.findByTemplateTrueAndTemplateSlug("standard").isEmpty()) {
             seedStandardTemplate();
         }
@@ -85,7 +89,7 @@ public class DataInitializer implements CommandLineRunner {
     // Rate/threshold edits must go to statutory_section_rules, not this map.
     // Income-tax Act 2025 s.393 values (effective 1 Apr 2026); see docs/tds-income-tax-act-2025-research.md.
     // 194M is absent: it has no Form 140 code post-2026 (Form 141), so it keeps old-Act values.
-    // Display refs live in Client tdsSections393.ts and backend TdsSectionRefs.java; Form 140 codes in Rpu140FormatSpec.SECTION_CODES.
+    // Display refs and picker natures live in statutory_sections/statutory_section_rules (served by GET /api/tds/sections); Form 140 codes in Rpu140FormatSpec.SECTION_CODES.
     private static final Map<String, NewActValues> NEW_ACT_VALUES = Map.of(
             "194A", new NewActValues("10.00", "10.00", null, "10000.00"),
             "194C", new NewActValues("2.00", "1.00", "30000.00", "100000.00"),
