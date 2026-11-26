@@ -42,6 +42,17 @@ public final class Rpu140FormatSpec {
     private Rpu140FormatSpec() {
     }
 
+    /**
+     * Raw Form 27EQ (CPC 140) payment code before payer/payee special-casing (the
+     * 194A payer variant and 194C payee split are applied later), or null when the
+     * form has no code for it (e.g. 194M files via Form 141). The statutory section
+     * backfill mirrors these codes into statutory_sections.rpu_140_code; RPU
+     * generation itself keeps reading this map until it is switched to the table.
+     */
+    public static String rpu140Code(String internalSectionCode) {
+        return internalSectionCode == null ? null : SECTION_CODES.get(internalSectionCode);
+    }
+
     // ---------------------------------------------------------------- FH
 
     public static List<String> fileHeader(RpuFormatSpec.FhData d) {

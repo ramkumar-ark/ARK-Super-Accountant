@@ -43,6 +43,8 @@ class TdsAnalysisInputFactoryTest {
     private com.arktech.superaccountant.tds.repository.DebtorTanRepository debtorTanRepository;
     private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate mappingGate;
     private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService mappingService;
+    private com.arktech.superaccountant.statutory.repository.StatutorySectionRepository statutorySectionRepository;
+    private com.arktech.superaccountant.statutory.repository.StatutorySectionRuleRepository statutorySectionRuleRepository;
     private TdsAnalysisInputFactory factory;
 
     private final AnalysisContext ctx = new AnalysisContext(
@@ -60,6 +62,10 @@ class TdsAnalysisInputFactoryTest {
         debtorTanRepository = mock(com.arktech.superaccountant.tds.repository.DebtorTanRepository.class);
         mappingGate = mock(com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate.class);
         mappingService = mock(com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService.class);
+        statutorySectionRepository = mock(
+                com.arktech.superaccountant.statutory.repository.StatutorySectionRepository.class);
+        statutorySectionRuleRepository = mock(
+                com.arktech.superaccountant.statutory.repository.StatutorySectionRuleRepository.class);
         factory = new TdsAnalysisInputFactory();
         inject("parsedVoucherRepository", parsedVoucherRepository);
         inject("snapshotRepository", snapshotRepository);
@@ -69,6 +75,8 @@ class TdsAnalysisInputFactoryTest {
         inject("debtorTanRepository", debtorTanRepository);
         inject("mappingGate", mappingGate);
         inject("mappingService", mappingService);
+        inject("statutorySectionRepository", statutorySectionRepository);
+        inject("statutorySectionRuleRepository", statutorySectionRuleRepository);
 
         when(mappingService.mappingsByKey(TdsEngineFixtures.ORG)).thenReturn(java.util.Map.of());
 

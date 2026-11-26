@@ -7,6 +7,11 @@ import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.models.UploadLedgerSnapshot;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.statutory.models.Statute;
+import com.arktech.superaccountant.statutory.models.StatutorySection;
+import com.arktech.superaccountant.statutory.models.StatutorySectionRule;
+import com.arktech.superaccountant.statutory.repository.StatutorySectionRepository;
+import com.arktech.superaccountant.statutory.repository.StatutorySectionRuleRepository;
 import com.arktech.superaccountant.tds.engine.TdsAnalysisInput;
 import com.arktech.superaccountant.tds.engine.TdsEngine;
 import com.arktech.superaccountant.tds.mapping.TdsLedgerMapping;
@@ -21,9 +26,12 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class TdsAnalysisInputFactory {
@@ -52,6 +60,12 @@ public class TdsAnalysisInputFactory {
     @org.springframework.beans.factory.annotation.Autowired
     private TdsLedgerMappingService mappingService;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private StatutorySectionRepository statutorySectionRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private StatutorySectionRuleRepository statutorySectionRuleRepository;
+
     public TdsAnalysisInput build(AnalysisContext ctx) {
         mappingGate.requireComplete(ctx.organizationId());
         Map<String, TdsLedgerMapping> mappingsByKey = mappingService.mappingsByKey(ctx.organizationId());
@@ -75,7 +89,9 @@ public class TdsAnalysisInputFactory {
             debtorTansByName.put(record.getLedgerKey(), record.getTan());
         }
         Map<String, TdsSectionConfig> configsBySection = new LinkedHashMap<>();
-        for (TdsSectionConfig c : configRepository.findAll()) {
+        List<TdsSectionConfig> configs = configRepository.findAll();
+        attachStatutoryRules(configs);
+        for (TdsSectionConfig c : configs) {
             configsBySection.putIfAbsent(c.getSectionCode(), c.effectiveFor(ctx.periodStart()));
         }
         // Legacy stored 194I (pre-split rent) is the land/building half; keep rows that still
@@ -87,6 +103,35 @@ public class TdsAnalysisInputFactory {
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, mappingsByKey, debtorTansByName, configsBySection,
                 fyStart, ctx.periodStart(), ctx.periodEnd());
+    }
+
+    /**
+     * Attaches the dated statutory rule rows (statutory_section_rules) to each config so
+     * {@link TdsSectionConfig#effectiveFor} resolves from data. A config with no rows in
+     * the table keeps null rules and falls back to its stored new-act columns, so a not-yet
+     * backfilled database behaves exactly as before.
+     */
+    private void attachStatutoryRules(List<TdsSectionConfig> configs) {
+        if (configs.isEmpty()) {
+            return;
+        }
+        Map<UUID, List<StatutorySectionRule>> rulesBySectionId = new HashMap<>();
+        for (StatutorySectionRule rule : statutorySectionRuleRepository.findAll()) {
+            rulesBySectionId.computeIfAbsent(rule.getSectionId(), k -> new ArrayList<>()).add(rule);
+        }
+        Map<String, List<StatutorySectionRule>> rulesByCode = new LinkedHashMap<>();
+        for (StatutorySection section : statutorySectionRepository.findByStatute(Statute.INCOME_TAX)) {
+            List<StatutorySectionRule> rules = rulesBySectionId.get(section.getId());
+            if (rules != null && !rules.isEmpty()) {
+                rulesByCode.put(section.getCode(), rules);
+            }
+        }
+        if (rulesByCode.isEmpty()) {
+            return;
+        }
+        for (TdsSectionConfig c : configs) {
+            c.setDatedRules(rulesByCode.get(c.getSectionCode()));
+        }
     }
 
     /**

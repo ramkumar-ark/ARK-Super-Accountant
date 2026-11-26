@@ -51,6 +51,16 @@ public final class RpuFormatSpec {
     private RpuFormatSpec() {
     }
 
+    /**
+     * Raw e-TDS return (Form 26Q) section code for an internal section code, or null
+     * when 26Q has no dedicated code for it. The statutory section backfill mirrors
+     * these codes into statutory_sections.rpu_26q_code; RPU generation itself keeps
+     * reading this map until it is switched to the table.
+     */
+    public static String rpu26qCode(String internalSectionCode) {
+        return internalSectionCode == null ? null : SECTION_CODES.get(internalSectionCode);
+    }
+
     // ---------------------------------------------------------------- FH
 
     public static List<String> fileHeader(FhData d) {
