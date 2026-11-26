@@ -32,7 +32,7 @@ export VSA_SLUG VSA_BASE VSA_LOG_DIR VSA_MARKER
 
 SCENARIOS=("$@")
 if [ "${1:-}" = "all" ] || [ ${#SCENARIOS[@]} -eq 0 ]; then
-  SCENARIOS=(sign-in tds-form140 tds-applicability-registration tds-applicability-gating tds-applicability-prompts tds-ledger-mapping workflow-lifecycle gstr1-tables gstr1-fill-ins gstr1-findings gstr1-validate gstr1-export filed-returns-import)
+  SCENARIOS=(sign-in tds-form140 tds-applicability-registration tds-applicability-gating tds-applicability-prompts tds-ledger-mapping gst-ledger-mapping workflow-lifecycle gstr1-tables gstr1-fill-ins gstr1-findings gstr1-validate gstr1-export filed-returns-import)
   # masters-tds-labels and tally-writeback are run standalone: they upload their
   # own masters jobs, which reorders "latest upload" state for the other scenarios.
 fi

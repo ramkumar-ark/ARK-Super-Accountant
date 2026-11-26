@@ -55,6 +55,9 @@ public class DayBookIntakeService {
     private com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate tdsLedgerMappingGate;
 
     @Autowired
+    private com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate taxLedgerMappingGate;
+
+    @Autowired
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /**
@@ -82,10 +85,14 @@ public class DayBookIntakeService {
                     "error", "Upload and validate masters before uploading the day book."));
         }
 
-        tdsLedgerMappingGate.blockerMessage(orgId).ifPresent(message -> {
-            throw new DayBookIntakeException(422, Map.of("error",
-                    "Save the TDS ledger mapping (Compliance settings) before uploading the day book. " + message));
-        });
+        List<String> mappingBlockers = new ArrayList<>();
+        tdsLedgerMappingGate.blockerMessage(orgId).ifPresent(message -> mappingBlockers.add(
+                "Save the TDS ledger mapping (Compliance settings) before uploading the day book. " + message));
+        taxLedgerMappingGate.daybookBlockerMessage(orgId).ifPresent(message -> mappingBlockers.add(
+                "Save the GST tax-ledger mapping (Compliance settings) before uploading the day book. " + message));
+        if (!mappingBlockers.isEmpty()) {
+            throw new DayBookIntakeException(422, Map.of("error", String.join(" ", mappingBlockers)));
+        }
 
         // Security: file extension check — prevent file extension spoofing (T-4-03)
         String originalFilename = file.getOriginalFilename();

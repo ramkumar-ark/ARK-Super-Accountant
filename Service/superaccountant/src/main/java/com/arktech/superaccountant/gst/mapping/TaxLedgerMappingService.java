@@ -37,7 +37,8 @@ public class TaxLedgerMappingService {
                 gate.isComplete(organizationId),
                 snapshotSource.latestCompletedMastersJob(organizationId).orElse(null),
                 gate.blockerMessage(organizationId).map(List::of).orElseGet(List::of),
-                rows);
+                rows,
+                gate.isGstApplicable(organizationId));
     }
 
     private List<TaxLedgerMappingView.Row> rows(UUID organizationId, Map<String, TaxLedgerMapping> mappings) {

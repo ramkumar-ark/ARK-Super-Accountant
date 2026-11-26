@@ -5,6 +5,7 @@ import { apiErrorMessage } from '@/lib/apiError'
 import {
   getTaxLedgerMapping,
   saveTaxLedgerMapping,
+  TAX_LEDGER_MAPPING_QUERY_KEY,
   TAX_LEDGER_ROLE_LABELS,
   type TaxLedgerRole,
   type GstHead,
@@ -21,7 +22,7 @@ export function TaxLedgerMappingSection() {
   const canEdit = user?.role === 'ROLE_ACCOUNTANT'
 
   const { data: view, isLoading, isError, error } = useQuery({
-    queryKey: ['tax-ledger-mapping'],
+    queryKey: TAX_LEDGER_MAPPING_QUERY_KEY,
     queryFn: getTaxLedgerMapping,
   })
 
@@ -57,7 +58,7 @@ export function TaxLedgerMappingSection() {
       ),
     onSuccess: () => {
       setDrafts({})
-      queryClient.invalidateQueries({ queryKey: ['tax-ledger-mapping'] })
+      queryClient.invalidateQueries({ queryKey: TAX_LEDGER_MAPPING_QUERY_KEY })
       queryClient.invalidateQueries({ queryKey: ['baseline-status'] })
     },
   })

@@ -147,6 +147,43 @@ class TaxLedgerMappingGateTest {
     }
 
     @Test
+    void daybookGateIgnoresMappingGapsWithoutGstin() {
+        stubOrg(false);
+        UUID jobId = UUID.randomUUID();
+        when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
+        when(findingOverrideMasterService.snapshotsByName(jobId)).thenReturn(Map.of(
+                "output cgst", gstLedger("Output CGST"),
+                "sales", incomeLedger()));
+        when(mappingService.mappingsByKey(org)).thenReturn(Map.of());
+
+        assertFalse(gate.isGstApplicable(org));
+        assertEquals(Optional.of("1 tax ledgers not mapped: Output CGST"), gate.blockerMessage(org));
+        assertEquals(Optional.empty(), gate.daybookBlockerMessage(org));
+    }
+
+    @Test
+    void daybookGateMirrorsBlockerMessageForGstinCompany() {
+        stubOrg(true);
+        UUID jobId = UUID.randomUUID();
+        when(mastersJobGate.latestCompletedMastersJob(org)).thenReturn(Optional.of(jobId));
+        when(findingOverrideMasterService.snapshotsByName(jobId)).thenReturn(Map.of(
+                "output cgst", gstLedger("Output CGST"),
+                "sales", incomeLedger()));
+        when(mappingService.mappingsByKey(org)).thenReturn(Map.of());
+
+        assertTrue(gate.isGstApplicable(org));
+        assertEquals(gate.blockerMessage(org), gate.daybookBlockerMessage(org));
+    }
+
+    @Test
+    void daybookGateEmptyWhenMappingComplete() {
+        stubOrg(true);
+        stubMapped(REQUIRED_ROLES, REQUIRED_HEADS);
+
+        assertEquals(Optional.empty(), gate.daybookBlockerMessage(org));
+    }
+
+    @Test
     void gstinCompanyBlockedUntilEveryAreaHasEveryHead() {
         stubOrg(true);
         stubMapped(List.of(TaxLedgerRole.OUTPUT, TaxLedgerRole.INPUT), REQUIRED_HEADS);

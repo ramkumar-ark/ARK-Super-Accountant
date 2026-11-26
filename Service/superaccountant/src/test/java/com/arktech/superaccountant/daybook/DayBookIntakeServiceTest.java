@@ -39,6 +39,7 @@ class DayBookIntakeServiceTest {
     @Mock DayBookMasterValidationService dayBookMasterValidationService;
     @Mock MastersGateService mastersGateService;
     @Mock com.arktech.superaccountant.tds.mapping.TdsLedgerMappingGate tdsLedgerMappingGate;
+    @Mock com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate taxLedgerMappingGate;
 
     @InjectMocks
     DayBookIntakeService intakeService;
@@ -90,6 +91,48 @@ class DayBookIntakeServiceTest {
                     assertThat(e.getBody().toString())
                             .contains("TDS ledger mapping")
                             .contains("2 TDS ledgers not mapped");
+                });
+        verify(dayBookUploadJobRepository, never()).save(any(DayBookUploadJob.class));
+    }
+
+    @Test
+    void intake_refusedWhileGstMappingIncomplete() {
+        UUID orgId = UUID.randomUUID();
+        when(mastersGateService.mastersValidated(orgId)).thenReturn(true);
+        when(taxLedgerMappingGate.daybookBlockerMessage(orgId))
+                .thenReturn(java.util.Optional.of("18 tax ledgers not mapped: Cash CGST, Cash IGST"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> intakeService.intake(
+                        new MockMultipartFile("file", "daybook.json", "application/json", "{}".getBytes()),
+                        LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30), orgId, "op1", null))
+                .isInstanceOfSatisfying(com.arktech.superaccountant.daybook.services.DayBookIntakeException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(422);
+                    assertThat(e.getBody().toString())
+                            .contains("GST tax-ledger mapping")
+                            .contains("18 tax ledgers not mapped");
+                });
+        verify(dayBookUploadJobRepository, never()).save(any(DayBookUploadJob.class));
+    }
+
+    @Test
+    void intake_refusalListsBothTdsAndGstBlockers() {
+        UUID orgId = UUID.randomUUID();
+        when(mastersGateService.mastersValidated(orgId)).thenReturn(true);
+        when(tdsLedgerMappingGate.blockerMessage(orgId))
+                .thenReturn(java.util.Optional.of("2 TDS ledgers not mapped: Rent, TDS Payable 194C"));
+        when(taxLedgerMappingGate.daybookBlockerMessage(orgId))
+                .thenReturn(java.util.Optional.of("18 tax ledgers not mapped: Cash CGST, Cash IGST"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> intakeService.intake(
+                        new MockMultipartFile("file", "daybook.json", "application/json", "{}".getBytes()),
+                        LocalDate.of(2025, 4, 1), LocalDate.of(2025, 4, 30), orgId, "op1", null))
+                .isInstanceOfSatisfying(com.arktech.superaccountant.daybook.services.DayBookIntakeException.class, e -> {
+                    assertThat(e.getStatus()).isEqualTo(422);
+                    assertThat(e.getBody().toString())
+                            .contains("Save the TDS ledger mapping (Compliance settings)")
+                            .contains("Save the GST tax-ledger mapping (Compliance settings)")
+                            .contains("2 TDS ledgers not mapped")
+                            .contains("18 tax ledgers not mapped");
                 });
         verify(dayBookUploadJobRepository, never()).save(any(DayBookUploadJob.class));
     }

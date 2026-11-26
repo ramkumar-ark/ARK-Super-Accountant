@@ -7,6 +7,10 @@ import {
   getTdsLedgerMapping,
 } from '@/lib/tdsLedgerMappingApi'
 import {
+  TAX_LEDGER_MAPPING_QUERY_KEY,
+  getTaxLedgerMapping,
+} from '@/lib/taxMappingApi'
+import {
   invalidateWorkflow,
   uploadToWorkflow,
   bindExistingUpload,
@@ -47,11 +51,20 @@ export function WorkflowUploadStep({
     setCoverageTo(requiredTo)
   }, [requiredTo])
 
-  const { data: mappingView } = useQuery({
+  const { data: tdsView } = useQuery({
     queryKey: TDS_LEDGER_MAPPING_QUERY_KEY,
     queryFn: getTdsLedgerMapping,
   })
-  const mappingBlocked = !!mappingView && !mappingView.complete && mappingView.blockers.length > 0
+  const tdsBlocked = !!tdsView && !tdsView.complete && tdsView.blockers.length > 0
+
+  const { data: gstView } = useQuery({
+    queryKey: TAX_LEDGER_MAPPING_QUERY_KEY,
+    queryFn: getTaxLedgerMapping,
+  })
+  const gstBlocked =
+    !!gstView && gstView.gstApplicable && !gstView.complete && gstView.blockers.length > 0
+
+  const mappingBlocked = tdsBlocked || gstBlocked
 
   const latestCompleted = uploads.find((row) => row.status === 'COMPLETED')
 
@@ -178,11 +191,22 @@ export function WorkflowUploadStep({
         )}
       </div>
 
-      {mappingBlocked && (
+      {tdsBlocked && (
         <p role="alert" className="text-sm text-[var(--color-danger)]">
-          Day-book upload is disabled until the TDS ledger mapping is saved. {mappingView?.blockers[0]}{' '}
+          Day-book upload is disabled until the TDS ledger mapping is saved. {tdsView?.blockers[0]}{' '}
           <a href="/settings/compliance" className="underline">
             Open the TDS ledger mapping section
+          </a>
+          .
+        </p>
+      )}
+
+      {gstBlocked && (
+        <p role="alert" className="text-sm text-[var(--color-danger)]">
+          Day-book upload is disabled until the GST tax-ledger mapping is saved.{' '}
+          {gstView?.blockers[0]}{' '}
+          <a href="/settings/compliance" className="underline">
+            Open the GST tax-ledger mapping section
           </a>
           .
         </p>
