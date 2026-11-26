@@ -54,6 +54,11 @@ public class DataInitializer implements CommandLineRunner {
         if (split194I > 0) System.out.println("Migrated " + split194I + " stored 194I values to 194I_B.");
         seedTdsSectionConfigs();
         backfillNewActSectionConfigs();
+        int statutorySections = dataMigrationService.backfillStatutorySections();
+        if (statutorySections > 0) {
+            System.out.println("Backfilled " + statutorySections
+                    + " statutory sections with dated rule rows (statutory_sections / statutory_section_rules).");
+        }
         if (preconfiguredMasterRepository.findByTemplateTrueAndTemplateSlug("standard").isEmpty()) {
             seedStandardTemplate();
         }
