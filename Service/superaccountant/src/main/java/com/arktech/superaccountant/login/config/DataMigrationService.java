@@ -289,6 +289,9 @@ public class DataMigrationService {
         int updated = 0;
         for (StatutorySection section
                 : statutorySectionRepository.findByStatute(Statute.INCOME_TAX)) {
+            if (!Boolean.TRUE.equals(section.getSeeded())) {
+                continue; // an administrator's section keeps the description it was given
+            }
             String display = DISPLAY_DESCRIPTIONS.get(section.getCode());
             if (display != null && !display.equals(section.getDescription())) {
                 section.setDescription(display);
@@ -521,9 +524,15 @@ public class DataMigrationService {
         return 2;
     }
 
+    /**
+     * The seed-written DEFAULT rows of a section. Rows an app administrator added through the
+     * statutory admin API are excluded: the boot-time corrections only ever reshape seed rows,
+     * so a restart can never rewrite an administrator's dated row.
+     */
     private List<StatutorySectionRule> defaultRules(String code) {
         return statutorySectionRepository.findByStatuteAndCode(Statute.INCOME_TAX, code)
                 .map(sec -> statutorySectionRuleRepository.findBySectionId(sec.getId()).stream()
+                        .filter(StatutorySectionRule::isSeeded)
                         .filter(r -> StatutoryRuleContext.DEFAULT.equals(r.getRuleContext()))
                         .toList())
                 .orElse(List.of());

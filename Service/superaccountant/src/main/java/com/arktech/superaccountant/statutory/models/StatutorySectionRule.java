@@ -83,6 +83,19 @@ public class StatutorySectionRule {
     @Column(name = "source_citation", length = 255)
     private String sourceCitation;
 
+    /**
+     * Username of the app administrator who added this row through the statutory admin API;
+     * null for rows written by the built-in seed/migration. Seed rows are never edited through
+     * the API and admin rows are never rewritten by the startup seed corrections.
+     */
+    @Column(name = "created_by", length = 50)
+    private String createdBy;
+
+    /** True when the built-in seed wrote this row (no administrator). */
+    public boolean isSeeded() {
+        return createdBy == null;
+    }
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 }

@@ -52,6 +52,8 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/auth/signin", "/api/auth/signup", "/api/auth/invite/**").permitAll()
                         .requestMatchers("/api/test/**").permitAll()
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/statutory/**").authenticated()
+                        .requestMatchers("/api/statutory/**").hasRole("APP_ADMIN")
                         .anyRequest().authenticated());
 
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);

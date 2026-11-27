@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { Link } from '@tanstack/react-router'
-import { LayoutDashboard, Database, BookOpen, Users, ListChecks, Settings } from 'lucide-react'
+import { LayoutDashboard, Database, BookOpen, Users, ListChecks, Settings, Scale } from 'lucide-react'
 import { Header } from './Header'
 
 interface AppShellProps {
@@ -108,6 +108,15 @@ export function AppShell({ children }: AppShellProps) {
               Compliance settings
             </Link>
           )}
+          <Link
+            to="/settings/statutory"
+            className={NAV_LINK_CLASS}
+            activeProps={{ className: NAV_LINK_ACTIVE_CLASS }}
+            onClick={closeSidebar}
+          >
+            <Scale size={20} />
+            Statutory configuration
+          </Link>
         </nav>
       </aside>
       {/* Main content area */}

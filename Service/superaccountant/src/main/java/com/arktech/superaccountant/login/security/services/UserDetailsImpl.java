@@ -1,11 +1,13 @@
 package com.arktech.superaccountant.login.security.services;
 
 import com.arktech.superaccountant.login.models.User;
+import com.arktech.superaccountant.login.security.AppAdmin;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -35,8 +37,12 @@ public class UserDetailsImpl implements UserDetails {
     }
 
     public static UserDetailsImpl build(User user, UUID activeOrganizationId) {
-        List<GrantedAuthority> authorities = List.of(
-                new SimpleGrantedAuthority(user.getRole().getName().name()));
+        // The company role stays first: callers read the first authority as "the role".
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority(user.getRole().getName().name()));
+        if (user.isAppAdmin()) {
+            authorities.add(new SimpleGrantedAuthority(AppAdmin.AUTHORITY));
+        }
 
         return new UserDetailsImpl(
                 user.getId(),

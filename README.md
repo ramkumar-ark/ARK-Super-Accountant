@@ -61,6 +61,19 @@ Open [http://localhost:5173](http://localhost:5173).
 | Operator | `operator` | Upload files, manage masters, submit finding overrides for review |
 | CA Auditor | `auditor_ca` | Read-only access; can switch between client organizations |
 
+### App administrator
+
+Statutory configuration (TDS sections and GST parameters, served under
+`/api/statutory/**` and the `/settings/statutory` screen) is global: it applies to every
+company, so no company role can change it. The capability is the `users.app_admin` flag,
+which is deliberately not settable through signup, invites or any API. Grant or revoke it
+directly on the app database (takes effect on the user's next request):
+
+```sql
+UPDATE users SET app_admin = true  WHERE username = '<name>';  -- grant
+UPDATE users SET app_admin = false WHERE username = '<name>';  -- revoke
+```
+
 ## Tech stack
 
 | Layer | Technology |
