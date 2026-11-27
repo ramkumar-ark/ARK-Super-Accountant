@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
+import { WORKFLOW_TYPE_LABEL } from '@/lib/workflowApi'
 import {
   getFinancialYears,
   closeFinancialYear,
@@ -15,9 +16,31 @@ import {
   INPUT_CLASS,
   LOADING_CLASS,
   NESTED_CARD_CLASS,
+  PILL_WARNING_CLASS,
   PRIMARY_BUTTON_CLASS,
   SECTION_CARD_CLASS,
 } from './sectionStyles'
+
+const OPEN_ITEM_PATTERN = /^(\S+)\s+([^:]+):\s+(.+)$/
+const WORKFLOW_TYPE_LABELS: Record<string, string> = WORKFLOW_TYPE_LABEL
+
+function openItemsByType(openItems: string[]) {
+  const groups = new Map<string, { label: string; open: number; started: number }>()
+  for (const item of openItems) {
+    const match = OPEN_ITEM_PATTERN.exec(item)
+    const type = match?.[1] ?? 'Other'
+    const stage = match?.[3] ?? ''
+    const group = groups.get(type) ?? {
+      label: WORKFLOW_TYPE_LABELS[type] ?? type,
+      open: 0,
+      started: 0,
+    }
+    group.open += 1
+    if (stage !== 'not started') group.started += 1
+    groups.set(type, group)
+  }
+  return [...groups.values()]
+}
 
 export function FinancialYearsSection() {
   const { user } = useAuthStore()
@@ -43,9 +66,14 @@ export function FinancialYearsSection() {
     )
   }
 
+  const openCount = (years ?? []).filter((y) => !y.closed).length
+
   return (
     <section className={SECTION_CARD_CLASS}>
-      <h2 className="text-lg font-semibold mb-3">Financial years</h2>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h2 className="text-lg font-semibold">Financial years</h2>
+        {openCount > 0 && <span className={PILL_WARNING_CLASS}>{openCount} open</span>}
+      </div>
       {mutation.isError && (
         <div role="alert" className={`${ALERT_ERROR_CLASS} mb-3`}>
           <AlertCircle size={16} className="flex-shrink-0" />
@@ -92,12 +120,16 @@ function YearCard({
   const [itrAckNo, setItrAckNo] = useState('')
   const [itrAckDate, setItrAckDate] = useState('')
   const [note, setNote] = useState('')
+  const [showPeriods, setShowPeriods] = useState(false)
 
   if (year.closed) {
     return (
-      <div className={`${NESTED_CARD_CLASS} px-4 py-3 text-sm text-[var(--color-text-secondary)]`}>
-        <span className="font-medium text-[var(--color-text-primary)]">FY {year.financialYear}</span> — closed (
-        {year.closeType === 'ITR_FILED' ? 'ITR filed' : 'Handled elsewhere'})
+      <div className="flex items-center gap-2 text-sm text-[var(--color-success)]">
+        <CheckCircle2 size={16} className="flex-shrink-0" />
+        <span>
+          FY {year.financialYear} — closed (
+          {year.closeType === 'ITR_FILED' ? 'ITR filed' : 'Handled elsewhere'})
+        </span>
       </div>
     )
   }
@@ -107,16 +139,45 @@ function YearCard({
     !canEdit ||
     pending ||
     (closeType === 'ITR_FILED' ? !itrAckNo.trim() || !itrAckDate : !note.trim())
+  const summary = openItemsByType(year.openItems)
 
   return (
     <div className={`${NESTED_CARD_CLASS} p-4 text-sm space-y-3`}>
-      <div className="font-medium">FY {year.financialYear}</div>
-      {year.openItems.length > 0 && (
-        <ul className="text-[var(--color-text-muted)] list-disc list-inside">
-          {year.openItems.map((o) => (
-            <li key={o}>{o}</li>
+      <div className="font-medium">FY {year.financialYear} — open</div>
+      {summary.length > 0 ? (
+        <div className="space-y-1">
+          {summary.map((s) => (
+            <div key={s.label} className="flex items-baseline justify-between gap-2">
+              <span className="font-medium text-[var(--color-text-primary)]">{s.label}</span>
+              <span className="text-[var(--color-text-secondary)]">
+                {s.open} open {s.open === 1 ? 'period' : 'periods'}
+                {s.started > 0 ? ` · ${s.started} started` : ''}
+              </span>
+            </div>
           ))}
-        </ul>
+        </div>
+      ) : (
+        <p className="text-[var(--color-text-muted)]">No open periods</p>
+      )}
+      {year.openItems.length > 0 && (
+        <details open={showPeriods}>
+          <summary
+            className="cursor-pointer select-none text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            onClick={(e) => {
+              e.preventDefault()
+              setShowPeriods(!showPeriods)
+            }}
+          >
+            Show open periods ({year.openItems.length})
+          </summary>
+          {showPeriods && (
+            <ul className="text-[var(--color-text-muted)] list-disc list-inside mt-1">
+              {year.openItems.map((o) => (
+                <li key={o}>{o}</li>
+              ))}
+            </ul>
+          )}
+        </details>
       )}
       {year.blockers.length > 0 && (
         <ul className="text-[var(--color-danger)] list-disc list-inside">

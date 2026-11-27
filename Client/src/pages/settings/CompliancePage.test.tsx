@@ -7,6 +7,7 @@ import { CompliancePage } from './CompliancePage'
 const MAPPING_VIEW = {
   complete: true,
   mastersJobId: null,
+  gstApplicable: true,
   blockers: [],
   ledgers: [
     {
@@ -436,12 +437,13 @@ describe('CompliancePage — financial years', () => {
     renderPage('ROLE_ACCOUNTANT')
     await openTab('Financial years')
 
+    const user = userEvent.setup()
+    await user.click(await screen.findByText('Show open periods (1)'))
     await screen.findByText('TDS_PAYMENT 2024-07: not started')
     const itrOption = screen.getByRole('option', { name: 'ITR filed' }) as HTMLOptionElement
     expect(itrOption.disabled).toBe(true)
     expect(screen.getByText('Every period must be filed')).toBeInTheDocument()
 
-    const user = userEvent.setup()
     await user.type(screen.getByLabelText('Note'), 'Prior CA')
     await user.click(screen.getByRole('button', { name: 'Close year' }))
 
@@ -454,6 +456,33 @@ describe('CompliancePage — financial years', () => {
     expect(await screen.findByLabelText('Warnings')).toHaveTextContent(
       'TDS_PAYMENT 2024-07: not started',
     )
+  })
+
+  it('shows per-return summary with collapsible open periods', async () => {
+    mockYears([
+      {
+        ...openYear,
+        openItems: [
+          'GSTR1 2024-04: not started',
+          'GSTR1 2024-05: STARTED',
+          'TDS_PAYMENT 2024-07: not started',
+        ],
+      },
+    ])
+
+    renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
+
+    expect(await screen.findByText('2 open periods · 1 started')).toBeInTheDocument()
+    expect(screen.getByText('1 open period')).toBeInTheDocument()
+    expect(screen.getByText('1 open')).toBeInTheDocument()
+    expect(screen.queryByText('GSTR1 2024-04: not started')).not.toBeInTheDocument()
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByText('Show open periods (3)'))
+    expect(await screen.findByText('GSTR1 2024-04: not started')).toBeInTheDocument()
+    expect(screen.getByText('GSTR1 2024-05: STARTED')).toBeInTheDocument()
+    expect(screen.getByText('TDS_PAYMENT 2024-07: not started')).toBeInTheDocument()
   })
 
   it('close type defaults to handled elsewhere', async () => {
@@ -542,5 +571,62 @@ describe('CompliancePage — TDS ledger mapping', () => {
         items: [{ ledgerName: 'TDS Payable - Contractors', role: 'TDS_PAYABLE', section: '194C' }],
       })
     })
+  })
+})
+
+describe('CompliancePage — tab badges', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('surfaces needs-answer, incomplete and open-year counts on tabs', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-abc/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            years: [
+              {
+                financialYear: 2025,
+                applicable: true,
+                basis: 'DECLARED',
+                needsAnswer: true,
+                priorYearTurnover: null,
+                turnoverNature: null,
+              },
+            ],
+          },
+        })
+      }
+      if (url === '/v1/compliance/financial-years') {
+        return Promise.resolve({
+          data: [
+            {
+              financialYear: 2024,
+              start: '2024-04-01',
+              end: '2025-03-31',
+              closed: false,
+              closeType: null,
+              itrAckNo: null,
+              itrAckDate: null,
+              note: null,
+              closable: false,
+              openItems: [],
+              blockers: [],
+            },
+          ],
+        })
+      }
+      return Promise.resolve({ data: fallbackData(url) })
+    })
+
+    renderPage('ROLE_ACCOUNTANT')
+
+    await screen.findByRole('tab', { name: 'TDS' })
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'TDS' }).textContent).toContain('2')
+      expect(screen.getByRole('tab', { name: 'Ledger mapping' }).textContent).toContain('✓')
+      expect(screen.getByRole('tab', { name: 'Financial years' }).textContent).toContain('1')
+    })
+    expect(screen.getByRole('tab', { name: 'GST' }).textContent).toBe('GST')
   })
 })
