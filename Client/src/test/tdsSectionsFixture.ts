@@ -73,7 +73,7 @@ export const TDS_SECTIONS_FIXTURE: TdsSectionDef[] = [
   {
     code: '194M',
     description: 'Payments by individuals/HUF to contractors and professionals',
-    legalReference: '194M',
+    legalReference: '393(1) [Table: Sl. No. 6(ii)]',
     rpu26qCode: '94M',
     rpu140Code: null,
     sortOrder: 9,
@@ -85,5 +85,29 @@ export const TDS_SECTIONS_FIXTURE: TdsSectionDef[] = [
     rpu26qCode: '94Q',
     rpu140Code: '1031',
     sortOrder: 10,
+  },
+  {
+    code: '194D',
+    description: 'Insurance commission',
+    legalReference: '393(1) [Table: Sl. No. 1(i)]',
+    rpu26qCode: '94D',
+    rpu140Code: '1005',
+    sortOrder: 11,
+  },
+  {
+    code: '193',
+    description: 'Interest on securities',
+    legalReference: '393(1) [Table: Sl. No. 5(i)]',
+    rpu26qCode: '193',
+    rpu140Code: '1019',
+    sortOrder: 12,
+  },
+  {
+    code: '194T',
+    description: 'Salary, remuneration, commission, bonus or interest to partners of a firm',
+    legalReference: '393(3) [Table: Sl. No. 7]',
+    rpu26qCode: '94T',
+    rpu140Code: '1067',
+    sortOrder: 13,
   },
 ]

@@ -284,6 +284,12 @@ is only the seed source.
 | `194J_C` | `4JB` | director remuneration/fees/commission (not salary). v7.8 Annexure 2 has **no dedicated director code**; `4JB` is the 10% professional/royalty code. |
 | `194M` | `94M` | **not in the v7.8 Annexure 2** — 194M is reported in Form 26QD, not 26Q. Mapped so the seeded internal code can never crash the generator; the export selection must exclude such entries. |
 | `194Q` | `94Q` | purchase of goods |
+| `194D` | `94D` | insurance commission (seeded in the statutory tables only; v7.8 Annexure 2) |
+| `193` | `193` | interest on securities (v7.8 Annexure 2) |
+| `194T` | `94T` | payments to partners of a firm (v7.8 Annexure 2) |
+
+`194B` (lottery/game winnings) is `94B` in v7.8 and `1058` in Form 140, but it is not seeded yet, so
+it is not offered in the picker.
 
 Unknown internal code → `IllegalArgumentException`.
 
@@ -297,7 +303,9 @@ FVU v1.1/1.2 spec). Applied in `Rpu140FormatSpec`.
 
 The codes below are mirrored into `statutory_sections.rpu_140_code` by the backfill and
 generation translates through that table column. 194C and 194A are not simple
-lookups: 194C splits by deductee PAN type, 194A splits by the company's interest payer
+lookups: 194C splits by deductee PAN type (4th character P/H = individual/HUF, everything else
+the other code; the same split drives the engine rate: 1% for individual/HUF, 2% for firms, LLPs, AOPs,
+trusts and companies), 194A splits by the company's interest payer
 type and (later) the deductee's senior-citizen status.
 
 | Internal | Form 140 code | s.393(1) Table ref | Situation |
@@ -316,6 +324,9 @@ type and (later) the deductee's senior-citizen status.
 | `194J_C` | `1028` | 6(iii).D(b) | remuneration/fees/commission to a director, other than salary (no threshold) |
 | `194M` | — | — | no Form 140 code; from 1 Apr 2026 it belongs in Form 141 Schedule C |
 | `194Q` | `1031` | 8(ii) | purchase of goods |
+| `194D` | `1005` | 1(i) | insurance commission |
+| `193` | `1019` | 5(i) | interest on securities |
+| `194T` | `1067` | 7 (s.393(3)) | payments to partners of a firm |
 
 **194A threshold derivation:** the company's `interestPayerType` (`OTHER`, `BANK`,
 `CO_OPERATIVE_BANK`, `POST_OFFICE`) decides the annual threshold:

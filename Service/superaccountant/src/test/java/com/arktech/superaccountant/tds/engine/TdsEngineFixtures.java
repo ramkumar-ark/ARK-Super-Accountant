@@ -79,7 +79,9 @@ public final class TdsEngineFixtures {
 
     private static Map<String, TdsSectionConfig> buildConfigs() {
         Map<String, TdsSectionConfig> m = new LinkedHashMap<>();
-        m.put("194C", config("194C", "2.00", "1.00", "30000.00", "100000.00"));
+        TdsSectionConfig c194 = config("194C", "2.00", "1.00", "30000.00", "100000.00");
+        c194.setPayeeSplit(true); // production: statutory_sections.rpu_140_payee_split for 194C
+        m.put("194C", c194);
         m.put("194J_B", config("194J_B", "10.00", "10.00", null, "30000.00"));
         return Map.copyOf(m);
     }

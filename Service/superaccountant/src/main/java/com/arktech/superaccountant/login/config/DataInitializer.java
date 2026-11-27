@@ -59,6 +59,14 @@ public class DataInitializer implements CommandLineRunner {
             System.out.println("Backfilled " + statutorySections
                     + " statutory sections with dated rule rows (statutory_sections / statutory_section_rules).");
         }
+        int ruleCorrections = dataMigrationService.applyFinanceAct2025RuleCorrections();
+        if (ruleCorrections > 0) {
+            System.out.println("Applied " + ruleCorrections + " Finance Act 2025 statutory rule row corrections.");
+        }
+        int newSections = dataMigrationService.seedFinanceAct2025Sections();
+        if (newSections > 0) {
+            System.out.println("Seeded " + newSections + " statutory sections (194D / 193 / 194T).");
+        }
         int updatedDescriptions = dataMigrationService.updateStatutorySectionDescriptions();
         if (updatedDescriptions > 0) {
             System.out.println("Updated " + updatedDescriptions + " statutory section descriptions.");

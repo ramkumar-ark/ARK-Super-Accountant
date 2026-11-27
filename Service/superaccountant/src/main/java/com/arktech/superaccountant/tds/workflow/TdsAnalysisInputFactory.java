@@ -134,6 +134,7 @@ public class TdsAnalysisInputFactory {
         TdsSectionConfig config = new TdsSectionConfig();
         config.setSectionCode(section.getCode());
         config.setDescription(section.getDescription());
+        config.setPayeeSplit(Boolean.TRUE.equals(section.getRpu140PayeeSplit()));
         if (rules == null || rules.isEmpty()) {
             return config;
         }
@@ -150,6 +151,8 @@ public class TdsAnalysisInputFactory {
                 config.setThresholdPerTransaction(earliest.getThresholdPerTransaction());
                 config.setThresholdAnnual(earliest.getThresholdAnnual());
                 config.setHigherRateIfNoPan(earliest.getHigherRateIfNoPan());
+                config.setThresholdMonthly(earliest.getThresholdMonthly());
+                config.setThresholdExcessOnly(Boolean.TRUE.equals(earliest.getThresholdExcessOnly()));
             }
         }
         return effective;

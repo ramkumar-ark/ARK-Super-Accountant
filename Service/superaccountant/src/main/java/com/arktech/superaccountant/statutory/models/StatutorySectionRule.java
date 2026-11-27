@@ -49,6 +49,22 @@ public class StatutorySectionRule {
     @Column(name = "threshold_annual", precision = 19, scale = 2)
     private BigDecimal thresholdAnnual;
 
+    /**
+     * Per-calendar-month threshold per payee (e.g. rent under s.393(1) Table Sl. No. 2(ii): no
+     * deduction while the rent credited or paid for a month or part of a month does not exceed
+     * Rs 50,000). When set, the engine tests the voucher's month instead of the annual aggregate.
+     */
+    @Column(name = "threshold_monthly", precision = 19, scale = 2)
+    private BigDecimal thresholdMonthly;
+
+    /**
+     * True when tax is deducted only on the part of the aggregate above the annual threshold
+     * (s.194Q / s.393(1) Table Sl. No. 8(ii)) rather than on the whole payment once the
+     * threshold is crossed. Null is treated as false.
+     */
+    @Column(name = "threshold_excess_only")
+    private Boolean thresholdExcessOnly;
+
     @Column(name = "higher_rate_if_no_pan", precision = 5, scale = 2)
     private BigDecimal higherRateIfNoPan;
 
