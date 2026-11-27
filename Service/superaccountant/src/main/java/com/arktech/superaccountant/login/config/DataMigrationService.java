@@ -9,7 +9,6 @@ import com.arktech.superaccountant.statutory.repository.StatutorySectionReposito
 import com.arktech.superaccountant.statutory.repository.StatutorySectionRuleRepository;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
-import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.tds.rpu.Rpu140FormatSpec;
 import com.arktech.superaccountant.tds.rpu.RpuFormatSpec;
@@ -64,6 +63,23 @@ public class DataMigrationService {
             "194J_C", "Remuneration, fees or commission to a director (not salary)",
             "194M", "Payments by individuals/HUF to contractors and professionals",
             "194Q", "Purchase of goods above the threshold");
+
+    /**
+     * Income-tax Act 2025 s.393 legal references, consulted only at seed time when a section row is
+     * first created on a fresh database; statutory_section_rules holds the references afterwards.
+     * "194I" maps to the s.393 rent reference for the legacy 194I alias row.
+     */
+    private static final Map<String, String> S393_LEGAL_REFERENCES = Map.of(
+            "194A", "393(1) [Table: Sl. No. 5(ii) and 5(iii)]",
+            "194C", "393(1) [Table: Sl. No. 6(i)]",
+            "194H", "393(1) [Table: Sl. No. 1(ii)]",
+            "194I", "393(1) [Table: Sl. No. 2(ii).D(b)]",
+            "194I_A", "393(1) [Table: Sl. No. 2(ii).D(a)]",
+            "194I_B", "393(1) [Table: Sl. No. 2(ii).D(b)]",
+            "194J_A", "393(1) [Table: Sl. No. 6(iii).D(a)]",
+            "194J_B", "393(1) [Table: Sl. No. 6(iii).D(b)]",
+            "194J_C", "393(1) [Table: Sl. No. 6(iii).D(b)]",
+            "194Q", "393(1) [Table: Sl. No. 8(ii)]");
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -305,7 +321,7 @@ public class DataMigrationService {
                     config.getNewActThresholdPerTransaction(), config.getNewActThresholdAnnual(),
                     config.getHigherRateIfNoPan(),
                     TdsSectionConfig.NEW_ACT_EFFECTIVE_DATE, null,
-                    TdsSectionRefs.newActRef(config.getSectionCode()),
+                    S393_LEGAL_REFERENCES.get(config.getSectionCode()),
                     "Income-tax Act 2025 s.393");
         }
         if ("194A".equals(config.getSectionCode())) {

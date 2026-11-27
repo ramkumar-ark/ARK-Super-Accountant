@@ -77,6 +77,8 @@ class TdsAnalysisInputFactoryTest {
         inject("mappingService", mappingService);
         inject("statutorySectionRepository", statutorySectionRepository);
         inject("statutorySectionRuleRepository", statutorySectionRuleRepository);
+        inject("statutorySectionService", mock(
+                com.arktech.superaccountant.statutory.services.StatutorySectionService.class));
 
         when(mappingService.mappingsByKey(TdsEngineFixtures.ORG)).thenReturn(java.util.Map.of());
 

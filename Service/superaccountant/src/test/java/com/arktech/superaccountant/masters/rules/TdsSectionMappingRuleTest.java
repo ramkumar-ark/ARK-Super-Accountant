@@ -17,6 +17,13 @@ class TdsSectionMappingRuleTest {
     @BeforeEach
     void setUp() {
         rule = new TdsSectionMappingRule();
+        var sectionService = org.mockito.Mockito.mock(
+                com.arktech.superaccountant.statutory.services.StatutorySectionService.class);
+        org.mockito.Mockito.lenient()
+                .when(sectionService.displayWithRef("194C")).thenReturn("194C / 393(1) [Table: Sl. No. 6(i)]");
+        org.mockito.Mockito.lenient()
+                .when(sectionService.displayWithRef("194J_A")).thenReturn("194J_A / 393(1) [Table: Sl. No. 6(iii).D(a)]");
+        org.springframework.test.util.ReflectionTestUtils.setField(rule, "statutorySectionService", sectionService);
     }
 
     private PreconfiguredMaster configured(String name, LedgerCategory category, String tdsSection) {

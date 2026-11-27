@@ -9,7 +9,6 @@ import com.arktech.superaccountant.statutory.repository.StatutorySectionReposito
 import com.arktech.superaccountant.statutory.repository.StatutorySectionRuleRepository;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
-import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
 import com.arktech.superaccountant.tds.rpu.Rpu140FormatSpec;
 import com.arktech.superaccountant.tds.rpu.RpuFormatSpec;
@@ -46,6 +45,18 @@ class StatutorySectionBackfillIT {
 
     private static final LocalDate OLD_TO = LocalDate.of(2026, 3, 31);
     private static final LocalDate NEW_FROM = LocalDate.of(2026, 4, 1);
+
+    /** Expected s.393 legal references, hard-coded so a seed/data change cannot self-confirm. */
+    private static final Map<String, String> EXPECTED_S393_REFS = Map.of(
+            "194A", "393(1) [Table: Sl. No. 5(ii) and 5(iii)]",
+            "194C", "393(1) [Table: Sl. No. 6(i)]",
+            "194H", "393(1) [Table: Sl. No. 1(ii)]",
+            "194I_A", "393(1) [Table: Sl. No. 2(ii).D(a)]",
+            "194I_B", "393(1) [Table: Sl. No. 2(ii).D(b)]",
+            "194J_A", "393(1) [Table: Sl. No. 6(iii).D(a)]",
+            "194J_B", "393(1) [Table: Sl. No. 6(iii).D(b)]",
+            "194J_C", "393(1) [Table: Sl. No. 6(iii).D(b)]",
+            "194Q", "393(1) [Table: Sl. No. 8(ii)]");
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
@@ -138,7 +149,7 @@ class StatutorySectionBackfillIT {
 
             StatutorySectionRule newRow = StatutorySectionRules.effectiveRule(rules, NEW_FROM, null);
             if (config.getNewActRateCompany() != null) {
-                assertEquals(TdsSectionRefs.newActRef(code), newRow.getLegalReference(),
+                assertEquals(EXPECTED_S393_REFS.get(code), newRow.getLegalReference(),
                         "new regime shows the s.393 table reference for " + code);
                 assertEquals("Income-tax Act 2025 s.393", newRow.getSourceCitation());
                 assertEquals(NEW_FROM, newRow.getEffectiveFrom());
@@ -179,9 +190,74 @@ class StatutorySectionBackfillIT {
                 StatutorySectionRules.effectiveRule(rules, NEW_FROM, "SENIOR_CITIZEN").getThresholdAnnual()));
     }
 
+    /**
+     * Seed-time tripwire: the seeded rule values for all 10 sections, both regimes, against
+     * hard-coded literals — so a seed typo cannot pass just because both sides moved together.
+     */
     @Test
-    void backfill_isIdempotent() {
-        long sectionsBefore = statutorySectionRepository.count();
+    void afterBoot_seededRuleValuesMatchTheLegacyLiterals() {
+        record Vals(String rateCompany, String rateNonCompany, String perTxn, String annual) {}
+        Map<String, Vals> oldAct = Map.of(
+                "194A", new Vals("10.00", "10.00", null, "10000.00"),
+                "194C", new Vals("2.00", "1.00", "30000.00", "100000.00"),
+                "194H", new Vals("2.00", "2.00", null, "20000.00"),
+                "194I_A", new Vals("2.00", "2.00", null, "240000.00"),
+                "194I_B", new Vals("10.00", "10.00", null, "240000.00"),
+                "194J_A", new Vals("2.00", "2.00", null, "30000.00"),
+                "194J_B", new Vals("10.00", "10.00", null, "30000.00"),
+                "194J_C", new Vals("10.00", "10.00", null, "0.00"),
+                "194M", new Vals("2.00", "2.00", null, "5000000.00"),
+                "194Q", new Vals("0.10", "0.10", null, "5000000.00"));
+        Map<String, Vals> newAct = Map.of(
+                "194A", new Vals("10.00", "10.00", null, "10000.00"),
+                "194C", new Vals("2.00", "1.00", "30000.00", "100000.00"),
+                "194H", new Vals("2.00", "2.00", null, "20000.00"),
+                "194I_A", new Vals("2.00", "2.00", null, "600000.00"),
+                "194I_B", new Vals("10.00", "10.00", null, "600000.00"),
+                "194J_A", new Vals("2.00", "2.00", null, "50000.00"),
+                "194J_B", new Vals("10.00", "10.00", null, "50000.00"),
+                "194J_C", new Vals("10.00", "10.00", null, "0.00"),
+                "194Q", new Vals("0.10", "0.10", null, "5000000.00"));
+
+        Map<String, List<StatutorySectionRule>> rulesByCode = rulesByCode();
+        assertEquals(oldAct.keySet(), rulesByCode.keySet(), "seeded sections");
+
+        for (var entry : rulesByCode.entrySet()) {
+            String code = entry.getKey();
+            List<StatutorySectionRule> rules = entry.getValue();
+            Vals oldVals = oldAct.get(code);
+            StatutorySectionRule oldRow = StatutorySectionRules.effectiveRule(rules, OLD_TO, null);
+            assertEquals(0, new BigDecimal(oldVals.rateCompany()).compareTo(oldRow.getRateCompany()),
+                    code + " old rateCompany");
+            assertEquals(0, new BigDecimal(oldVals.rateNonCompany()).compareTo(oldRow.getRateNonCompany()),
+                    code + " old rateNonCompany");
+            assertEquals(oldVals.perTxn() == null ? null : new BigDecimal(oldVals.perTxn()),
+                    oldRow.getThresholdPerTransaction(), code + " old perTxn");
+            assertEquals(0, new BigDecimal(oldVals.annual()).compareTo(oldRow.getThresholdAnnual()),
+                    code + " old annual");
+            assertEquals(0, new BigDecimal("20.00").compareTo(oldRow.getHigherRateIfNoPan()),
+                    code + " old higherRateIfNoPan");
+
+            Vals newVals = newAct.get(code);
+            if (newVals == null) {
+                continue; // 194M has no s.393 row
+            }
+            StatutorySectionRule newRow = StatutorySectionRules.effectiveRule(rules, NEW_FROM, null);
+            assertEquals(0, new BigDecimal(newVals.rateCompany()).compareTo(newRow.getRateCompany()),
+                    code + " new rateCompany");
+            assertEquals(0, new BigDecimal(newVals.rateNonCompany()).compareTo(newRow.getRateNonCompany()),
+                    code + " new rateNonCompany");
+            assertEquals(newVals.perTxn() == null ? null : new BigDecimal(newVals.perTxn()),
+                    newRow.getThresholdPerTransaction(), code + " new perTxn");
+            assertEquals(0, new BigDecimal(newVals.annual()).compareTo(newRow.getThresholdAnnual()),
+                    code + " new annual");
+            assertEquals(0, new BigDecimal("20.00").compareTo(newRow.getHigherRateIfNoPan()),
+                    code + " new higherRateIfNoPan");
+        }
+    }
+
+    @Test
+    void backfill_isIdempotent() {        long sectionsBefore = statutorySectionRepository.count();
         long rulesBefore = statutorySectionRuleRepository.count();
 
         int created = dataMigrationService.backfillStatutorySections();

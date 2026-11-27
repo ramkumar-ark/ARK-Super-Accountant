@@ -17,4 +17,6 @@ public interface StatutorySectionRepository extends JpaRepository<StatutorySecti
     Optional<StatutorySection> findByStatuteAndCode(Statute statute, String code);
 
     boolean existsByStatuteAndCode(Statute statute, String code);
+
+    boolean existsByStatuteAndCodeAndActiveTrue(Statute statute, String code);
 }

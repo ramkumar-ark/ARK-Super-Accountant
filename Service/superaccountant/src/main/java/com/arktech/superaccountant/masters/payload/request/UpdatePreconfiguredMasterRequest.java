@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.masters.payload.request;
 
 import com.arktech.superaccountant.masters.models.LedgerCategory;
+import com.arktech.superaccountant.masters.validation.ValidTdsSection;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
@@ -11,8 +12,7 @@ public class UpdatePreconfiguredMasterRequest {
     private String expectedParentGroup;
     private Boolean expectedGstApplicable;
     private Boolean expectedTdsApplicable;
-    @Pattern(regexp = "NOT_SUBJECT|194C|194J_A|194J_B|194J_C|194H|194I_A|194I_B|194Q|194A|194B|194D|194M|OTHER",
-             message = "Invalid TDS section code")
+    @ValidTdsSection
     private String tdsSection;
     @Pattern(regexp = "TAXABLE|EXEMPT|ZERO_RATED|NON_GST|RCM|NOT_APPLICABLE",
              message = "Invalid GST applicability type")

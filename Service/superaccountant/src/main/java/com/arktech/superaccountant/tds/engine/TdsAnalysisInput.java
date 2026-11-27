@@ -22,7 +22,8 @@ public record TdsAnalysisInput(
         Map<String, TdsSectionConfig> configsBySection,
         LocalDate fyStart,
         LocalDate periodStart,
-        LocalDate periodEnd) {
+        LocalDate periodEnd,
+        Map<String, String> newActRefsByCode) {
 
     public TdsAnalysisInput {
         Objects.requireNonNull(organizationId, "organizationId");
@@ -36,10 +37,35 @@ public record TdsAnalysisInput(
         Objects.requireNonNull(fyStart, "fyStart");
         Objects.requireNonNull(periodStart, "periodStart");
         Objects.requireNonNull(periodEnd, "periodEnd");
+        Objects.requireNonNull(newActRefsByCode, "newActRefsByCode");
         if (fyStart.isAfter(periodStart) || periodStart.isAfter(periodEnd)
                 || !periodEnd.isBefore(fyStart.plusYears(1))) {
             throw new IllegalArgumentException(
                     "period must satisfy fyStart <= periodStart <= periodEnd < fyStart + 1 year");
         }
+    }
+
+    public TdsAnalysisInput(
+            UUID organizationId,
+            UUID workflowId,
+            UUID uploadJobId,
+            List<ParsedVoucher> vouchers,
+            Map<String, UploadLedgerSnapshot> snapshotsByName,
+            Map<String, TdsLedgerMapping> mappingsByKey,
+            Map<String, String> debtorTansByName,
+            Map<String, TdsSectionConfig> configsBySection,
+            LocalDate fyStart,
+            LocalDate periodStart,
+            LocalDate periodEnd) {
+        this(organizationId, workflowId, uploadJobId, vouchers, snapshotsByName, mappingsByKey,
+                debtorTansByName, configsBySection, fyStart, periodStart, periodEnd, Map.of());
+    }
+
+    public String displayRef(String code, LocalDate date) {
+        if (code == null) {
+            return null;
+        }
+        String ref = newActRefsByCode.get(code);
+        return ref != null && date != null && TdsSectionConfig.newActApplies(date) ? ref : code;
     }
 }

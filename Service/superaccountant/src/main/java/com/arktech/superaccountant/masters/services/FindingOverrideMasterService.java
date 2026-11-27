@@ -5,6 +5,8 @@ import com.arktech.superaccountant.masters.repository.MasterEditLogRepository;
 import com.arktech.superaccountant.masters.repository.PreconfiguredMasterRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.masters.util.LedgerNames;
+import com.arktech.superaccountant.statutory.services.StatutorySectionService;
+import com.arktech.superaccountant.masters.validation.ValidTdsSectionValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -32,8 +34,6 @@ public class FindingOverrideMasterService {
     private static final Pattern GSTIN_PATTERN =
             Pattern.compile("[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}");
     private static final Pattern HSN_SAC_PATTERN = Pattern.compile("\\d{4,8}");
-    private static final Pattern TDS_SECTION_PATTERN =
-            Pattern.compile("NOT_SUBJECT|194C|194J_A|194J_B|194J_C|194H|194I_A|194I_B|194Q|194A|194B|194D|194M|OTHER");
 
     /** Value of a GSTIN_PRESENCE override that marks the ledger's GST as not applicable instead of entering a GSTIN. */
     public static final String GST_NOT_APPLICABLE = "NOT_APPLICABLE";
@@ -50,7 +50,7 @@ public class FindingOverrideMasterService {
      * The rule a bulk value applies to, or null when the value is not an allowed bulk value. Bulk takes one chosen TDS
      * section (or NOT_SUBJECT) for TDS findings, or NOT_APPLICABLE for GSTIN findings; never a GSTIN, HSN/SAC or GST type.
      */
-    public static String bulkRuleForValue(String value) {
+    public String bulkRuleForValue(String value) {
         if (value == null) {
             return null;
         }
@@ -58,7 +58,12 @@ public class FindingOverrideMasterService {
         if (GST_NOT_APPLICABLE.equals(v)) {
             return "GSTIN_PRESENCE";
         }
-        return TDS_SECTION_PATTERN.matcher(v).matches() ? "TDS_SECTION_MAPPING" : null;
+        return isAllowedTdsSection(v) ? "TDS_SECTION_MAPPING" : null;
+    }
+
+    private boolean isAllowedTdsSection(String v) {
+        return ValidTdsSectionValidator.NOT_SUBJECT.equals(v) || ValidTdsSectionValidator.OTHER.equals(v)
+                || statutorySectionService.isActiveIncomeTaxSection(v);
     }
 
     /** True when the corrected master value comes from the finding itself, so no typed value is needed. */
@@ -89,6 +94,9 @@ public class FindingOverrideMasterService {
 
     @Autowired
     private MasterEditLogRepository editLogRepository;
+
+    @Autowired
+    private StatutorySectionService statutorySectionService;
 
     /**
      * Submission-time checks, so a proposal that can never be applied is rejected immediately.
@@ -336,7 +344,11 @@ public class FindingOverrideMasterService {
                 }
             }
             case "HSN_SAC_CODE" -> requireMatch(HSN_SAC_PATTERN, v, "HSN/SAC code must be 4-8 digits");
-            case "TDS_SECTION_MAPPING" -> requireMatch(TDS_SECTION_PATTERN, v, "Invalid TDS section code");
+            case "TDS_SECTION_MAPPING" -> {
+                if (!isAllowedTdsSection(v)) {
+                    throw badRequest("Invalid TDS section code");
+                }
+            }
             default -> parseGstType(v);
         }
     }

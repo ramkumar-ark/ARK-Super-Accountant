@@ -11,7 +11,6 @@ import com.arktech.superaccountant.masters.repository.UploadJobRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
 import com.arktech.superaccountant.review.EvidenceHash;
 import com.arktech.superaccountant.tds.mapping.TdsLedgerMappingService;
-import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -63,6 +62,8 @@ public class TamperComparisonService {
     private VoucherScopeClassifier scopeClassifier;
     @Autowired
     private TdsLedgerMappingService tdsLedgerMappingService;
+    @Autowired
+    private com.arktech.superaccountant.statutory.services.StatutorySectionService statutorySectionService;
     @Autowired
     private List<RetroFlagSource> retroFlagSources = List.of();
 
@@ -377,7 +378,7 @@ public class TamperComparisonService {
         if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED) {
             return change.getVoucherTypeName() + " " + change.getVoucherNumber() + " dated " + date
                     + " is retro-flagged under section "
-                    + TdsSectionRefs.forDate(change.getRetroSection(), date)
+                    + statutorySectionService.displayRef(change.getRetroSection(), date)
                     + " for deductee " + change.getPartyLedgerName() + ": TDS shortfall "
                     + change.getRetroShortfall() + " now due because " + where
                     + " crossed the annual threshold";
