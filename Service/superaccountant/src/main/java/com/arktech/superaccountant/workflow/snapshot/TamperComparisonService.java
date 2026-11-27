@@ -123,7 +123,7 @@ public class TamperComparisonService {
                 change.setPartyLedgerName(oldPayload == null ? null : oldPayload.party());
                 change.setTouchedScopes(touched(oldPayload, null, ledgersByName, tdsLedgerKeys));
             }
-            saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
+            saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey, Map.of());
         }
 
         for (Map.Entry<String, ParsedVoucher> e : uploadedByKey.entrySet()) {
@@ -139,9 +139,11 @@ public class TamperComparisonService {
                     null, uploaded.getContentHash(), null, date,
                     uploaded.getVoucherTypeName(), uploaded.getVoucherNumber(), uploaded.getPartyLedgerName());
             change.setTouchedScopes(touched(null, VoucherPayload.of(uploaded), ledgersByName, tdsLedgerKeys));
-            saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
+            saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey, Map.of());
         }
 
+        Map<String, String> retroRefs = retroFlagSources.isEmpty()
+                ? Map.of() : statutorySectionService.newActRefsByCode();
         for (RetroFlagSource source : retroFlagSources) {
             for (RetroFlagSource.Flag flag : source.retroFlags(orgId, uploadJobId)) {
                 ParsedVoucher uploaded = uploadedByKey.get(flag.voucherKey());
@@ -156,7 +158,7 @@ public class TamperComparisonService {
                 change.setTouchedScopes("TDS_26Q,TDS_PAYMENT");
                 change.setRetroSection(flag.section());
                 change.setRetroShortfall(flag.shortfall());
-                saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey);
+                saveChangeAndFinding(change, activeWorkflows, orgId, job, changesByKey, retroRefs);
             }
         }
 
@@ -235,7 +237,8 @@ public class TamperComparisonService {
             EnumSet.of(ResolveStatus.APPROVED, ResolveStatus.DISCARDED);
 
     void saveChangeAndFinding(TamperChange change, List<Workflow> activeWorkflows, UUID orgId,
-                              DayBookUploadJob job, Map<String, TamperChange> changesByKey) {
+                              DayBookUploadJob job, Map<String, TamperChange> changesByKey,
+                              Map<String, String> newActRefsByCode) {
         List<Workflow> blockingWorkflows = blockingWorkflows(change, activeWorkflows);
         if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED && blockingWorkflows.isEmpty()) {
             return;
@@ -294,7 +297,7 @@ public class TamperComparisonService {
         finding.setDetectedInUploadJobId(change.getUploadJobId());
         finding.setAffectedTypes(affectedTypes(change, activeWorkflows));
         finding.setAffectedWorkflowIds(change.getBlockingWorkflowIds());
-        finding.setMessage(message(change, blockingWorkflows));
+        finding.setMessage(message(change, blockingWorkflows, newActRefsByCode));
         finding.setCreatedAt(java.time.Instant.now());
         finding.setResolveStatus(ResolveStatus.OPEN);
         tamperFindingRepository.save(finding);
@@ -369,7 +372,8 @@ public class TamperComparisonService {
         return oldDate.isBefore(newDate) ? oldDate : newDate;
     }
 
-    private String message(TamperChange change, List<Workflow> blockingWorkflows) {
+    private String message(TamperChange change, List<Workflow> blockingWorkflows,
+                           Map<String, String> newActRefsByCode) {
         String where = blockingWorkflows.stream()
                 .map(w -> w.getType().name() + " " + w.getPeriodKey())
                 .distinct()
@@ -378,7 +382,8 @@ public class TamperComparisonService {
         if (change.getChangeKind() == TamperChangeKind.RETRO_FLAGGED) {
             return change.getVoucherTypeName() + " " + change.getVoucherNumber() + " dated " + date
                     + " is retro-flagged under section "
-                    + statutorySectionService.displayRef(change.getRetroSection(), date)
+                    + com.arktech.superaccountant.statutory.services.StatutorySectionService
+                            .displayRef(newActRefsByCode, change.getRetroSection(), date)
                     + " for deductee " + change.getPartyLedgerName() + ": TDS shortfall "
                     + change.getRetroShortfall() + " now due because " + where
                     + " crossed the annual threshold";

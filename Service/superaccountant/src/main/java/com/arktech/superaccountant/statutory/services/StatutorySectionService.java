@@ -122,20 +122,20 @@ public class StatutorySectionService {
      * The reference to show for a known TDS date: the s.393 reference on/after 1 April
      * 2026, otherwise the old section code. Null dates fall back to the code.
      */
-    public String displayRef(String code, LocalDate tdsDate) {
+    public static String displayRef(Map<String, String> newActRefsByCode, String code, LocalDate tdsDate) {
         if (code == null) {
             return null;
         }
-        String ref = newActRefsByCode().get(code);
+        String ref = newActRefsByCode.get(code);
         return ref != null && tdsDate != null && TdsSectionConfig.newActApplies(tdsDate) ? ref : code;
     }
 
     /** Old section first, then the s.393 reference, for places where no period is known. */
-    public String displayWithRef(String code) {
+    public static String displayWithRef(Map<String, String> newActRefsByCode, String code) {
         if (code == null) {
             return null;
         }
-        String ref = newActRefsByCode().get(code);
+        String ref = newActRefsByCode.get(code);
         return ref == null ? code : code + " / " + ref;
     }
 

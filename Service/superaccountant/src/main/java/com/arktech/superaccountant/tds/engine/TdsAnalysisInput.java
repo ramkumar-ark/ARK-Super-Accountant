@@ -45,22 +45,6 @@ public record TdsAnalysisInput(
         }
     }
 
-    public TdsAnalysisInput(
-            UUID organizationId,
-            UUID workflowId,
-            UUID uploadJobId,
-            List<ParsedVoucher> vouchers,
-            Map<String, UploadLedgerSnapshot> snapshotsByName,
-            Map<String, TdsLedgerMapping> mappingsByKey,
-            Map<String, String> debtorTansByName,
-            Map<String, TdsSectionConfig> configsBySection,
-            LocalDate fyStart,
-            LocalDate periodStart,
-            LocalDate periodEnd) {
-        this(organizationId, workflowId, uploadJobId, vouchers, snapshotsByName, mappingsByKey,
-                debtorTansByName, configsBySection, fyStart, periodStart, periodEnd, Map.of());
-    }
-
     public String displayRef(String code, LocalDate date) {
         if (code == null) {
             return null;
