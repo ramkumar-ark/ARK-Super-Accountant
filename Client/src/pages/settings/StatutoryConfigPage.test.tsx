@@ -79,8 +79,8 @@ const SECTIONS: StatutorySectionsResponse = {
   ],
 }
 
-function renderPage(canEdit = false) {
-  const data = { ...SECTIONS, canEdit }
+function renderPage(canEdit = false, base: StatutorySectionsResponse = SECTIONS) {
+  const data = { ...base, canEdit }
   vi.mocked(getStatutorySections).mockResolvedValue(data)
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -168,7 +168,7 @@ describe('StatutoryConfigPage', () => {
 
   it('carries per-transaction threshold and excess-only through a clone', async () => {
     const user = userEvent.setup()
-    vi.mocked(getStatutorySections).mockResolvedValue({
+    renderPage(true, {
       ...SECTIONS,
       sections: SECTIONS.sections.map((sec) =>
         sec.code === '194C'
@@ -176,7 +176,6 @@ describe('StatutoryConfigPage', () => {
           : sec,
       ),
     })
-    renderPage(true)
     await screen.findByText('194C')
     await user.click(screen.getByText('Clone to new dated row'))
     await user.type(screen.getByLabelText(/Effective from/), '2027-04-01')
