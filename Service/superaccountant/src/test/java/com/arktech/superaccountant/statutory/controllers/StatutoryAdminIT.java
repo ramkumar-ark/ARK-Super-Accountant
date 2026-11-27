@@ -145,6 +145,24 @@ class StatutoryAdminIT {
     }
 
     @Test
+    void createdByVisibleToAdminOnlyOnSectionRead() throws Exception {
+        UserDetailsImpl admin = adminPrincipal("actorvis");
+        String sectionId = seededSectionId("194C");
+        mockMvc.perform(post("/api/statutory/sections/" + sectionId + "/rules").with(user(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rateCompany\":2,\"rateNonCompany\":2,\"effectiveFrom\":\"2040-04-01\","
+                                + "\"legalReference\":\"s.194C\",\"sourceCitation\":\"test\"}"))
+                .andExpect(status().is2xxSuccessful());
+        mockMvc.perform(get("/api/statutory/sections").with(user(principal("reader2", ERole.ROLE_OPERATOR))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[?(@.code == '194C')].rules[*].createdBy").isEmpty());
+        mockMvc.perform(get("/api/statutory/sections").with(user(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sections[?(@.code == '194C')].rules[*].createdBy",
+                        org.hamcrest.Matchers.hasItem("actorvis")));
+    }
+
+    @Test
     void adminReadsWithCanEdit() throws Exception {
         mockMvc.perform(get("/api/statutory/sections").with(user(adminPrincipal("admread"))))
                 .andExpect(status().isOk())

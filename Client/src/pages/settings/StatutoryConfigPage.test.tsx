@@ -166,6 +166,28 @@ describe('StatutoryConfigPage', () => {
     expect(await screen.findByText(/rows are append-only/)).toBeInTheDocument()
   })
 
+  it('carries per-transaction threshold and excess-only through a clone', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getStatutorySections).mockResolvedValue({
+      ...SECTIONS,
+      sections: SECTIONS.sections.map((sec) =>
+        sec.code === '194C'
+          ? { ...sec, rules: [{ ...RULE, thresholdPerTransaction: 30000, thresholdExcessOnly: true }] }
+          : sec,
+      ),
+    })
+    renderPage(true)
+    await screen.findByText('194C')
+    await user.click(screen.getByText('Clone to new dated row'))
+    await user.type(screen.getByLabelText(/Effective from/), '2027-04-01')
+    await user.type(screen.getByLabelText(/Source citation/), 'Finance Act 2026')
+    await user.click(screen.getByRole('button', { name: 'Add rule' }))
+    await waitFor(() => expect(createStatutoryRule).toHaveBeenCalledWith('s-194c', expect.objectContaining({
+      thresholdPerTransaction: 30000,
+      thresholdExcessOnly: true,
+    })))
+  })
+
   it('shows no delete for seeded sections and a warning when backdating', async () => {
     renderPage(true)
     await screen.findByText('194C')

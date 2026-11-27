@@ -74,7 +74,13 @@ public class StatutoryAdminService {
                 .anyMatch(a -> "ROLE_APP_ADMIN".equals(a.getAuthority()));
         List<Map<String, Object>> views = new ArrayList<>();
         for (StatutorySection section : sections) {
-            views.add(sectionView(section, ruleRepository.findBySectionId(section.getId())));
+            Map<String, Object> sectionView = sectionView(section, ruleRepository.findBySectionId(section.getId()));
+            if (!canEdit) {
+                for (Object rule : (List<?>) sectionView.get("rules")) {
+                    ((Map<?, ?>) rule).remove("createdBy");
+                }
+            }
+            views.add(sectionView);
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("canEdit", canEdit);

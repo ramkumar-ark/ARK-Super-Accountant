@@ -39,9 +39,6 @@ run_scenario() {
   req "prepare-responsibility-start" PUT /api/v1/compliance/responsibility-start \
     '{"type":"GSTR1","firstPeriodStart":"2024-04-01"}'
   expect_status "200|201" || vsa_fail "prepare responsibility-start failed: $RESP"
-  req "prepare-responsibility-start" PUT /api/v1/compliance/responsibility-start \
-    '{"type":"GSTR1","firstPeriodStart":"2024-04-01"}'
-  expect_status "200|201" || vsa_fail "prepare responsibility-start failed: $RESP"
 
   VSA_WF_JWT="$(state_get acct_token_b2clprepare)"
   local jul; jul=$(fresh_workflow GSTR1 2024-07 "$fixtures/daybook-b2cl-threshold-jul.json")

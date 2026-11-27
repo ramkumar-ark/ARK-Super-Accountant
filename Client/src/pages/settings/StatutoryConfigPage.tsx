@@ -45,8 +45,10 @@ type CloneForm = {
   rateCompany: string
   rateNonCompany: string
   higherRateIfNoPan: string
+  thresholdPerTransaction: string
   thresholdAnnual: string
   thresholdMonthly: string
+  thresholdExcessOnly: boolean | null
 }
 
 const TAB_CLASS_ACTIVE =
@@ -68,8 +70,10 @@ function toBody(form: CloneForm): CreateStatutoryRuleInput {
     rateCompany: num(form.rateCompany),
     rateNonCompany: num(form.rateNonCompany),
     higherRateIfNoPan: num(form.higherRateIfNoPan),
+    thresholdPerTransaction: num(form.thresholdPerTransaction),
     thresholdAnnual: num(form.thresholdAnnual),
     thresholdMonthly: num(form.thresholdMonthly),
+    thresholdExcessOnly: form.thresholdExcessOnly,
   }
 }
 
@@ -94,6 +98,7 @@ function clientValidate(form: CloneForm): string[] {
     }
   }
   for (const [label, v] of [
+    ['thresholdPerTransaction', form.thresholdPerTransaction],
     ['thresholdAnnual', form.thresholdAnnual],
     ['thresholdMonthly', form.thresholdMonthly],
   ] as const) {
@@ -102,7 +107,7 @@ function clientValidate(form: CloneForm): string[] {
       if (Number.isNaN(n) || n < 0) errors.push(`${label} must be at least 0`)
     }
   }
-  if (form.effectiveFrom && form.effectiveFrom < '2026-01-01') {
+  if (form.effectiveFrom && form.effectiveFrom < new Date().toISOString().slice(0, 10)) {
     errors.push('BACKDATE_WARNING')
   }
   return errors
@@ -119,6 +124,9 @@ function prefilledClone(section: StatutorySectionView, rule: StatutoryRule): Clo
     rateCompany: rule.rateCompany === null ? '' : String(rule.rateCompany),
     rateNonCompany: rule.rateNonCompany === null ? '' : String(rule.rateNonCompany),
     higherRateIfNoPan: rule.higherRateIfNoPan === null ? '' : String(rule.higherRateIfNoPan),
+    thresholdPerTransaction:
+      rule.thresholdPerTransaction === null ? '' : String(rule.thresholdPerTransaction),
+    thresholdExcessOnly: rule.thresholdExcessOnly,
     thresholdAnnual: rule.thresholdAnnual === null ? '' : String(rule.thresholdAnnual),
     thresholdMonthly: rule.thresholdMonthly === null ? '' : String(rule.thresholdMonthly),
   }
@@ -530,6 +538,24 @@ function CloneForm(props: {
           value={form.higherRateIfNoPan}
           onChange={(e) => set({ higherRateIfNoPan: e.target.value })}
         />
+      </label>
+      <label className="text-sm">
+        Per-transaction threshold
+        <input
+          aria-label="Per-transaction threshold"
+          className={INPUT_CLASS}
+          value={form.thresholdPerTransaction}
+          onChange={(e) => set({ thresholdPerTransaction: e.target.value })}
+        />
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          aria-label="Tax only the excess over threshold"
+          checked={form.thresholdExcessOnly === true}
+          onChange={(e) => set({ thresholdExcessOnly: e.target.checked })}
+        />
+        Tax only the excess over threshold
       </label>
       <label className="text-sm">
         Annual threshold
