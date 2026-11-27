@@ -90,6 +90,12 @@ function renderPage(role: string) {
   )
 }
 
+async function openTab(name: string) {
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('tab', { name }))
+  return user
+}
+
 describe('CompliancePage — responsibility start', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -139,6 +145,7 @@ describe('CompliancePage — responsibility start', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     await waitFor(() => {
       expect(screen.getByTestId('resp-TDS_PAYMENT')).toHaveTextContent('2025-07-01')
@@ -175,7 +182,7 @@ describe('CompliancePage — responsibility start', () => {
 
     renderPage('ROLE_ACCOUNTANT')
 
-    const user = userEvent.setup()
+    const user = await openTab('Periods & baseline')
     const dateInput = await screen.findByLabelText('GSTR-1 responsibility start date')
     await user.type(dateInput, '2025-06-01')
     const respSection = screen.getByText('Responsibility start').closest('section') as HTMLElement
@@ -198,9 +205,10 @@ describe('CompliancePage — responsibility start', () => {
 
     renderPage('ROLE_OPERATOR')
 
+    expect(screen.queryByRole('button', { name: 'Add profile' })).not.toBeInTheDocument()
+    await openTab('Periods & baseline')
     await screen.findByText('Responsibility start')
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add profile' })).not.toBeInTheDocument()
   })
 
   it('lists filer profile rows and adds one', async () => {
@@ -288,6 +296,7 @@ describe('CompliancePage — baseline', () => {
     mockPost.mockResolvedValue({ data: { confirmed: true } })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     await screen.findByText('Baseline 2025-04-01 to 2025-06-30')
     expect(screen.getByText('Imported filed data: not available')).toBeInTheDocument()
@@ -311,6 +320,7 @@ describe('CompliancePage — baseline', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     expect(await screen.findByText('Open tamper finding T-1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeDisabled()
@@ -328,6 +338,7 @@ describe('CompliancePage — baseline', () => {
     })
 
     const { unmount } = renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
     expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
       'Differences to explain (informational): 0',
     )
@@ -345,6 +356,7 @@ describe('CompliancePage — baseline', () => {
       discrepancyCount: null,
     })
     const second = renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
     expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
       'Differences to explain: Not available (import filed returns and map tax ledgers)',
     )
@@ -361,6 +373,7 @@ describe('CompliancePage — baseline', () => {
       discrepancyCount: 3,
     })
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
     expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
       'Differences to explain (informational): 3',
     )
@@ -379,6 +392,7 @@ describe('CompliancePage — baseline', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     expect(await screen.findByText('Baseline confirmed')).toBeInTheDocument()
     expect(
@@ -420,6 +434,7 @@ describe('CompliancePage — financial years', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
 
     await screen.findByText('TDS_PAYMENT 2024-07: not started')
     const itrOption = screen.getByRole('option', { name: 'ITR filed' }) as HTMLOptionElement
@@ -445,6 +460,7 @@ describe('CompliancePage — financial years', () => {
     mockYears([openYear])
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
 
     const select = await screen.findByLabelText('Close type FY 2024') as HTMLSelectElement
     expect(select.value).toBe('HANDLED_ELSEWHERE')
@@ -457,6 +473,7 @@ describe('CompliancePage — financial years', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
 
     const select = await screen.findByLabelText('Close type FY 2024')
     const user = userEvent.setup()
@@ -508,6 +525,7 @@ describe('CompliancePage — TDS ledger mapping', () => {
     mockPut.mockResolvedValue({ data: {} })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('TDS')
 
     expect(await screen.findByText('TDS ledgers')).toBeInTheDocument()
     expect(
