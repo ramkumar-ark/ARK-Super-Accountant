@@ -23,7 +23,9 @@ fallback at analysis time. An unmapped TDS payable ledger blocks TDS analysis an
 workflow advance for the organization until it is mapped; an unmapped TDS receivable
 ledger only warns. For TDS-applicable organizations an unmapped payable also refuses
 day-book uploads (422) until the mapping is saved. Candidates exclude GST-taxtype
-ledgers and EXPENSE, PURCHASE and GST-category ledgers. Suggestions are computed from the
+ledgers and EXPENSE, PURCHASE and GST-category ledgers, and also unflagged GST-looking
+ledgers (CGST/SGST/UTGST/IGST/GST or cess in the name, or a GST group segment, including
+GST TDS) unless Tally marks the ledger taxtype TDS (`TdsLedgerSuggester.looksLikeGst`). Suggestions are computed from the
 ledger name, its parent group and group chain, Tally tax type, and the nature-of-payment
 section code — nothing else — so the user can accept or correct them before a row is saved (who saved it and when are recorded).
 
