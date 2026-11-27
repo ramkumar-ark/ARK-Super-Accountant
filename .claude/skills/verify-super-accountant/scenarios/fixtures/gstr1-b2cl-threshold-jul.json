@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "gstin": "29AAVCS5633D1ZL",
+  "fp": "072024",
+  "b2cs": [
+    {
+      "sply_ty": "INTER",
+      "typ": "OE",
+      "pos": "27",
+      "txval": 150000,
+      "rt": 18,
+      "iamt": 27000,
+      "camt": 0,
+      "samt": 0,
+      "csamt": 0
+    }
+  ]
+}

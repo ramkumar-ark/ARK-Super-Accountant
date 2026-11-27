@@ -7,6 +7,7 @@ import com.arktech.superaccountant.statutory.models.StatutorySectionRule;
 import com.arktech.superaccountant.statutory.models.StatutoryRuleContext;
 import com.arktech.superaccountant.statutory.repository.StatutorySectionRepository;
 import com.arktech.superaccountant.statutory.repository.StatutorySectionRuleRepository;
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import com.arktech.superaccountant.tds.models.Tds194aRules;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
 import com.arktech.superaccountant.tds.repository.TdsSectionConfigRepository;
@@ -321,6 +322,39 @@ public class DataMigrationService {
                 "Finance Act 2025 s.56 and First Schedule Part II");
         created += seedSection("194T", "94T", "1067", "10.00", "10.00", "20000.00",
                 "Finance (No. 2) Act 2024 s.62");
+        return created;
+    }
+
+    /**
+     * Seeds the GST parameter pseudo-sections (statute CGST: B2CL_THRESHOLD, IFF_CAP,
+     * GST_RATE) and their dated rule rows from {@link GstStatutorySeed}. Idempotent per
+     * row — a row is identified by (section, context, effective_from) — so adding a dated
+     * row to the seed ships it on the next startup while existing rows are left untouched.
+     *
+     * @return number of rule rows created
+     */
+    @Transactional
+    public int seedGstParameters() {
+        int created = 0;
+        for (GstStatutorySeed.Row row : GstStatutorySeed.ROWS) {
+            StatutorySection section = statutorySectionRepository
+                    .findByStatuteAndCode(Statute.CGST, row.code())
+                    .orElseGet(() -> {
+                        StatutorySection s = new StatutorySection();
+                        s.setStatute(Statute.CGST);
+                        s.setCode(row.code());
+                        s.setDescription(row.description());
+                        s.setSortOrder(row.sortOrder());
+                        return statutorySectionRepository.save(s);
+                    });
+            boolean present = statutorySectionRuleRepository.findBySectionId(section.getId()).stream()
+                    .anyMatch(r -> r.getRuleContext().equals(row.context())
+                            && row.effectiveFrom().equals(r.getEffectiveFrom()));
+            if (!present) {
+                statutorySectionRuleRepository.save(GstStatutorySeed.toRule(row, section.getId()));
+                created++;
+            }
+        }
         return created;
     }
 

@@ -67,6 +67,10 @@ public class DataInitializer implements CommandLineRunner {
         if (newSections > 0) {
             System.out.println("Seeded " + newSections + " statutory sections (194D / 193 / 194T).");
         }
+        int gstRows = dataMigrationService.seedGstParameters();
+        if (gstRows > 0) {
+            System.out.println("Seeded " + gstRows + " GST parameter rule rows (B2CL threshold / IFF cap / GST rates).");
+        }
         int updatedDescriptions = dataMigrationService.updateStatutorySectionDescriptions();
         if (updatedDescriptions > 0) {
             System.out.println("Updated " + updatedDescriptions + " statutory section descriptions.");

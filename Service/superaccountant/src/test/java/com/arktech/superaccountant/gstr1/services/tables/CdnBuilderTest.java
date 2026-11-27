@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.gstr1.services.tables;
 
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
 import com.arktech.superaccountant.gstr1.services.VoucherView;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ class CdnBuilderTest extends TableTestSupport {
                 .cess(v("0.00"))
                 .build();
 
-        List<PreparedReturnRow> rows = new CdnBuilder().build(workflow(), List.of(note));
+        List<PreparedReturnRow> rows = new CdnBuilder(GstStatutorySeed::asParameters).build(workflow(), List.of(note));
 
         assertEquals(1, rows.size());
         PreparedReturnRow row = rows.get(0);
@@ -55,7 +56,7 @@ class CdnBuilderTest extends TableTestSupport {
                 .igst(v("900.00"))
                 .build();
 
-        List<PreparedReturnRow> rows = new CdnBuilder().build(workflow(), List.of(note));
+        List<PreparedReturnRow> rows = new CdnBuilder(GstStatutorySeed::asParameters).build(workflow(), List.of(note));
 
         assertEquals(1, rows.size());
         PreparedReturnRow row = rows.get(0);
@@ -77,7 +78,7 @@ class CdnBuilderTest extends TableTestSupport {
                 .igst(v("54000.00"))
                 .build();
 
-        List<PreparedReturnRow> rows = new CdnBuilder().build(workflow(), List.of(note));
+        List<PreparedReturnRow> rows = new CdnBuilder(GstStatutorySeed::asParameters).build(workflow(), List.of(note));
 
         assertEquals(1, rows.size());
         assertEquals("B2CL", rows.get(0).payload().get("type"));
@@ -96,7 +97,7 @@ class CdnBuilderTest extends TableTestSupport {
                 .partyGstin("29ABCDE1234F1Z5")
                 .build();
 
-        List<PreparedReturnRow> rows = new CdnBuilder().build(workflow(), List.of(cancelled, invoice));
+        List<PreparedReturnRow> rows = new CdnBuilder(GstStatutorySeed::asParameters).build(workflow(), List.of(cancelled, invoice));
 
         assertEquals(0, rows.size());
     }

@@ -8,6 +8,7 @@ import com.arktech.superaccountant.gstr1.models.Gstr1FillInScope;
 import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
 import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.gstr1.services.tables.TableTestSupport;
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.workflow.models.FilerProfile;
@@ -58,7 +59,7 @@ class Gstr1ValidatorTest extends TableTestSupport {
         when(fillInRepository.findByWorkflowIdAndScope(any(UUID.class), any(Gstr1FillInScope.class)))
                 .thenReturn(List.of());
         validator = new Gstr1Validator(organizationRepository, filerProfileRepository,
-                parsedVoucherRepository, fillInRepository);
+                parsedVoucherRepository, fillInRepository, GstStatutorySeed::asParameters);
     }
 
     private PreparedReturnRow row(String tableCode, String rowKey, String sourceVoucherKey,

@@ -13,6 +13,7 @@ import com.arktech.superaccountant.gstr1.services.ReportingClass;
 import com.arktech.superaccountant.gstr1.services.ReportingClassifier;
 import com.arktech.superaccountant.gstr1.services.VoucherView;
 import com.arktech.superaccountant.gstr1.services.VoucherViewBuilder;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
 import com.arktech.superaccountant.workflow.snapshot.AmendmentChangeKind;
@@ -92,6 +93,8 @@ public class AmendmentBuilder {
     @Autowired
     private AdvanceBuilder advanceBuilder;
 
+    private final GstParameterSource parameterSource;
+
     public AmendmentBuilder(AmendmentFollowUpRepository followUpRepository,
                             PreparedReturnRepository preparedReturnRepository,
                             PreparedReturnRowRepository rowRepository,
@@ -104,7 +107,9 @@ public class AmendmentBuilder {
                             B2csBuilder b2csBuilder,
                             ExportBuilder exportBuilder,
                             CdnBuilder cdnBuilder,
-                            AdvanceBuilder advanceBuilder) {
+                            AdvanceBuilder advanceBuilder,
+                            GstParameterSource parameterSource) {
+        this.parameterSource = parameterSource;
         this.followUpRepository = followUpRepository;
         this.preparedReturnRepository = preparedReturnRepository;
         this.rowRepository = rowRepository;
@@ -118,9 +123,6 @@ public class AmendmentBuilder {
         this.exportBuilder = exportBuilder;
         this.cdnBuilder = cdnBuilder;
         this.advanceBuilder = advanceBuilder;
-    }
-
-    public AmendmentBuilder() {
     }
 
     /**
@@ -139,7 +141,8 @@ public class AmendmentBuilder {
         }
         ReportingClassifier classifier = new ReportingClassifier(
                 (view, attribute) -> fillInService.resolve(
-                        current, view.getVoucherKey(), null, attribute));
+                        current, view.getVoucherKey(), null, attribute),
+                parameterSource.current());
         Set<String> usedKeys = new HashSet<>();
         for (PreparedReturnRow row : currentRows) {
             usedKeys.add(row.getRowKey());

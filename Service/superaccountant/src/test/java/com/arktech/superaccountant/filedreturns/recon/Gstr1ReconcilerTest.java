@@ -3,6 +3,7 @@ package com.arktech.superaccountant.filedreturns.recon;
 import com.arktech.superaccountant.filedreturns.FiledFormType;
 import com.arktech.superaccountant.filedreturns.FiledReturnLine;
 import com.arktech.superaccountant.filedreturns.FiledReturnSnapshot;
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -67,7 +68,8 @@ class Gstr1ReconcilerTest {
     }
 
     private List<FiledReturnDiscrepancy> reconcile(NetFiledPosition filed, BooksGst books) {
-        return Gstr1Reconciler.reconcile(ORG_ID, WORKFLOW_ID, filed, books, APRIL_START, APRIL_END);
+        return Gstr1Reconciler.reconcile(ORG_ID, WORKFLOW_ID, filed, books, APRIL_START, APRIL_END,
+                GstStatutorySeed.asParameters());
     }
 
     @Test
@@ -223,5 +225,32 @@ class Gstr1ReconcilerTest {
                 Map.of(), Map.of());
 
         assertThat(reconcile(filed, books)).isEmpty();
+    }
+
+    /** The shared B2CL lookup changes on 2024-08-01: the same Rs 1,77,000 invoice is B2CS before, B2CL from. */
+    @Test
+    void b2clThresholdBoundaryFollowsTheSharedLookup() {
+        LocalDate onJuly31 = LocalDate.of(2024, 7, 31);
+        LocalDate onAug1 = LocalDate.of(2024, 8, 1);
+        for (LocalDate date : List.of(onJuly31, onAug1)) {
+            BooksGst books = new BooksGst(List.of(booksDoc("INV-B", "INVB", "INVB", date, null,
+                    DocKind.INV, new HeadAmounts(new BigDecimal("150000"), new BigDecimal("27000"),
+                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                    Map.of(new BigDecimal("18"), new BigDecimal("150000")))), Map.of());
+            NetFiledPosition filedAsB2cl = new NetFiledPosition(
+                    List.of(filedDoc("B2CL", DocKind.INV, null, "INV-B", date,
+                            new HeadAmounts(new BigDecimal("150000"), new BigDecimal("27000"),
+                                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                            Map.of(new BigDecimal("18"), new BigDecimal("150000")))),
+                    Map.of(), Map.of());
+            List<FiledReturnDiscrepancy> findings = Gstr1Reconciler.reconcile(ORG_ID, WORKFLOW_ID,
+                    filedAsB2cl, books, date.withDayOfMonth(1), date.plusMonths(1).withDayOfMonth(1).minusDays(1),
+                    GstStatutorySeed.asParameters());
+            if (date.equals(onAug1)) {
+                assertThat(findings).isEmpty();
+            } else {
+                assertThat(findings).isNotEmpty(); // books side is B2CS at Rs 2,50,000, so filed B2CL does not match
+            }
+        }
     }
 }

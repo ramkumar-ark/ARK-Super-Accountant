@@ -1,7 +1,7 @@
 package com.arktech.superaccountant.gstr1.services.tables;
 
 import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
-import com.arktech.superaccountant.gstr1.services.Gstr1Rules;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
 import com.arktech.superaccountant.gstr1.services.VoucherView;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import org.springframework.stereotype.Component;
@@ -15,9 +15,16 @@ import java.util.Map;
 @Component
 public class CdnBuilder {
 
+    private final GstParameterSource parameterSource;
+
+    public CdnBuilder(GstParameterSource parameterSource) {
+        this.parameterSource = parameterSource;
+    }
+
     public List<PreparedReturnRow> build(Workflow workflow, List<VoucherView> sales) {
         List<PreparedReturnRow> rows = new ArrayList<>();
         YearMonth period = YearMonth.from(workflow.getPeriodStart());
+        BigDecimal b2clThreshold = parameterSource.current().b2clThreshold(period);
         for (VoucherView v : sales) {
             if (v.isCancelled() || !TableRows.isNote(v.getVoucherTypeName())) {
                 continue;
@@ -33,7 +40,7 @@ public class CdnBuilder {
                 String supplier = v.getSupplierStateCode();
                 boolean interStateLarge = pos != null && supplier != null && !pos.equals(supplier)
                         && TableRows.orZero(v.getTotalValue())
-                                .compareTo(Gstr1Rules.b2clThreshold(period)) > 0;
+                                .compareTo(b2clThreshold) > 0;
                 payload.put("type", interStateLarge ? "B2CL" : "B2CS");
                 payload.put("pos", pos);
             }

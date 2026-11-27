@@ -1,0 +1,64 @@
+{
+  "tallymessage": [
+    {
+      "date": "20240715",
+      "vouchertypename": "Sales",
+      "vouchernumber": "SALES-JUL",
+      "guid": "SYN-B2CL-JUL",
+      "partyledgername": "Synthetic Customer",
+      "placeofsupply": "27",
+      "allledgerentries": [
+        {
+          "ledgername": "Synthetic Customer",
+          "amount": 177000,
+          "ispartyledger": true
+        },
+        {
+          "ledgername": "Synthetic Sales Ledger",
+          "amount": -150000,
+          "ratedetails": [
+            {
+              "gstratedutyhead": "Integrated Tax",
+              "gstrateevaluationtype": "Rate",
+              "gstrate": "18"
+            }
+          ]
+        },
+        {
+          "ledgername": "Output IGST",
+          "amount": -27000
+        }
+      ]
+    },
+    {
+      "date": "20240815",
+      "vouchertypename": "Sales",
+      "vouchernumber": "SALES-AUG",
+      "guid": "SYN-B2CL-AUG",
+      "partyledgername": "Synthetic Customer",
+      "placeofsupply": "27",
+      "allledgerentries": [
+        {
+          "ledgername": "Synthetic Customer",
+          "amount": 177000,
+          "ispartyledger": true
+        },
+        {
+          "ledgername": "Synthetic Sales Ledger",
+          "amount": -150000,
+          "ratedetails": [
+            {
+              "gstratedutyhead": "Integrated Tax",
+              "gstrateevaluationtype": "Rate",
+              "gstrate": "18"
+            }
+          ]
+        },
+        {
+          "ledgername": "Output IGST",
+          "amount": -27000
+        }
+      ]
+    }
+  ]
+}
