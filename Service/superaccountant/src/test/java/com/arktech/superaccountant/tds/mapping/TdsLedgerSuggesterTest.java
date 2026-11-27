@@ -102,7 +102,6 @@ class TdsLedgerSuggesterTest {
     void dutiesAndTaxesLedgersWithoutTdsTokenAreNotTds() {
         assertEquals(NOT_TDS, suggest(snap("PF Payable", "duties & taxes", null, null)).role());
         assertEquals(NOT_TDS, suggest(snap("Professional Tax", "duties & taxes", null, null)).role());
-        assertEquals(NOT_TDS, suggest(snap("Output CGST", "duties & taxes", null, null)).role());
     }
 
     @Test
@@ -112,6 +111,29 @@ class TdsLedgerSuggesterTest {
         assertFalse(TdsLedgerSuggester.isCandidate(snapshot("TDS Contract Expense", "indirect expenses", LedgerCategory.EXPENSE, true, null)));
         assertFalse(TdsLedgerSuggester.isCandidate(snapshot("TDS Purchase", "purchase accounts", LedgerCategory.PURCHASE, true, null)));
         assertTrue(TdsLedgerSuggester.isCandidate(snapshot("TDS Payable - 194C A/c", "tds|duties & taxes", LedgerCategory.TDS, null, null)));
+    }
+
+    @Test
+    void unflaggedGstLedgersInDutiesAndTaxesAreNotCandidates() {
+        // Captain's real ledger names: no GST taxtype/category/flag on the snapshot.
+        for (String name : new String[] {"Cess", "CGST - RCM Liabililty A/c", "SGST - RCM Liability A/c",
+                "TDS - CGST Cash Balance A/c", "TDS - SGST Cash Balance A/c", "Output CGST", "Input IGST"}) {
+            assertFalse(TdsLedgerSuggester.isCandidate(snap(name, "duties & taxes", null, null)), name);
+            assertFalse(TdsLedgerSuggester.isCandidate(snap(name, "duties & taxes", "Others", null)), name);
+            assertFalse(TdsLedgerSuggester.isCandidate(snap(name, "tds|duties & taxes", null, null)), name);
+        }
+        assertFalse(TdsLedgerSuggester.isCandidate(snap("IGST Payable", "gst|duties & taxes", null, null)));
+        assertFalse(TdsLedgerSuggester.isCandidate(snap("Output Levy", "gst|duties & taxes", "Others", null)));
+    }
+
+    @Test
+    void genuineAndAmbiguousDutyLedgersStayCandidates() {
+        assertTrue(TdsLedgerSuggester.isCandidate(snap("PF Payable", "duties & taxes", null, null)));
+        assertTrue(TdsLedgerSuggester.isCandidate(snap("Professional Tax", "duties & taxes", "Others", null)));
+        assertTrue(TdsLedgerSuggester.isCandidate(snap("TDS Payable - 194C A/c", "tds|duties & taxes", "TDS", null)));
+        assertTrue(TdsLedgerSuggester.isCandidate(snap("Education Cess on TDS", "duties & taxes", null, null)));
+        assertTrue(TdsLedgerSuggester.isCandidate(snap("Withholding", "duties & taxes", "TDS", null)));
+        assertEquals(NOT_TDS, suggest(snap("PF Payable", "duties & taxes", null, null)).role());
     }
 
     private UploadLedgerSnapshot snap(String name, String chain, String taxType, String nature) {
