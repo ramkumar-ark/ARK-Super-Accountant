@@ -1,5 +1,6 @@
 import { useAuthStore } from "@/store/authStore"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
+import { Menu } from "lucide-react"
 import { OrganizationSelector } from "./OrganizationSelector"
 import { RoleBadge } from "./RoleBadge"
 
@@ -8,10 +9,16 @@ const PAGE_TITLES: Record<string, string> = {
     '/day-book': 'Day Book',
     '/masters': 'Masters',
     '/team': 'Team',
+    '/workflows': 'Workflows',
     '/organization/setup': 'Organization Setup',
+    '/settings/compliance': 'Compliance settings',
 }
 
-export function Header() {
+interface HeaderProps {
+    onMenuClick?: () => void
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
 
     const { user, logout } = useAuthStore()
     const navigate = useNavigate()
@@ -24,10 +31,21 @@ export function Header() {
     }
 
     return (
-        <header className="h-16 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex items-center justify-between px-6 shadow-[var(--shadow-sm)] flex-shrink-0" >
-            <span className="text-base font-semibold text-[var(--color-text-primary)]">
-                {pageTitle}
-            </span>
+        <header className="h-16 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex items-center justify-between px-4 sm:px-6 shadow-[var(--shadow-sm)] flex-shrink-0" >
+            <div className="flex items-center gap-3 min-w-0">
+                {onMenuClick && (
+                    <button
+                        onClick={onMenuClick}
+                        aria-label="Open navigation menu"
+                        className="lg:hidden p-2 -ml-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                    >
+                        <Menu size={22} />
+                    </button>
+                )}
+                <span className="text-base font-semibold text-[var(--color-text-primary)] truncate">
+                    {pageTitle}
+                </span>
+            </div>
             <div className="flex items-center gap-4">
                 {user && <OrganizationSelector />}
                 <RoleBadge role={user?.role} />
