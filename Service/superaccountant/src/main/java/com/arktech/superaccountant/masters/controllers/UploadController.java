@@ -726,7 +726,7 @@ public class UploadController {
             if (approving) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Approval takes no value; it applies what was proposed."));
             }
-            valueRule = FindingOverrideMasterService.bulkRuleForValue(bulkValue);
+            valueRule = findingOverrideMasterService.bulkRuleForValue(bulkValue);
             if (valueRule == null) {
                 return ResponseEntity.badRequest().body(Map.of("error",
                         "A batch cannot apply this value. Correct PAN findings individually. Bulk accepts a TDS section (or NOT_SUBJECT) for TDS findings, or NOT_APPLICABLE for GSTIN findings."));

@@ -135,7 +135,7 @@ class TdsDebtorTanFindingTest {
         snaps.put(TdsEngine.key(debtor.getLedgerName()), debtor);
         return new TdsAnalysisInput(TdsEngineFixtures.ORG, TdsEngineFixtures.WF, TdsEngineFixtures.JOB,
                 vouchers, snaps, mappingsByKey, debtorTans, TdsEngineFixtures.CONFIGS, TdsEngineFixtures.FY_START,
-                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30));
+                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 6, 30), TdsEngineFixtures.REFS);
     }
 
     private static Map<String, TdsLedgerMapping> receivableMappings() {

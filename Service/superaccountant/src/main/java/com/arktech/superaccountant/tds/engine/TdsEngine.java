@@ -14,7 +14,6 @@ import com.arktech.superaccountant.tds.models.TdsDeducteeType;
 import com.arktech.superaccountant.tds.models.TdsFinding;
 import com.arktech.superaccountant.tds.models.TdsFindingType;
 import com.arktech.superaccountant.tds.models.TdsSectionConfig;
-import com.arktech.superaccountant.tds.models.TdsSectionRefs;
 import com.arktech.superaccountant.workflow.snapshot.VoucherKeys;
 import org.springframework.stereotype.Component;
 
@@ -146,10 +145,10 @@ public class TdsEngine {
                             tdsSection,
                             null, e.getAmount().abs().setScale(2, RoundingMode.HALF_UP),
                             "TDS deducted under section "
-                                    + TdsSectionRefs.forDate(tdsSection, v.getVoucherDate())
+                                    + input.displayRef(tdsSection, v.getVoucherDate())
                                     + " but voucher expenses map to "
                                     + baseBySection.keySet().stream()
-                                            .map(code -> TdsSectionRefs.forDate(code, v.getVoucherDate()))
+                                            .map(code -> input.displayRef(code, v.getVoucherDate()))
                                             .toList(),
                             "Correct the TDS ledger or the expense ledger's section in Tally."));
                 }
@@ -353,7 +352,7 @@ public class TdsEngine {
                         FindingSeverity.HIGH, crossing.section(), expected,
                         new BigDecimal("0.00"),
                         "Aggregate payments of " + bases + " to '" + crossing.partyName() + "' under "
-                                + cfg.displayFor(crossing.voucher().getVoucherDate())
+                                + input.displayRef(cfg.getSectionCode(), crossing.voucher().getVoucherDate())
                                 + " crossed the annual threshold of "
                                 + cfg.getThresholdAnnual() + "; TDS was not deducted.",
                         "Deduct " + expected + " and record the TDS entry in Tally."));
@@ -381,7 +380,7 @@ public class TdsEngine {
                     findings.add(finding(input, f.voucher(), TdsFindingType.NOT_DEDUCTED,
                             FindingSeverity.HIGH, f.section(), expected, new BigDecimal("0.00"),
                             "No TDS deducted on liable payment of " + f.base() + " under "
-                                    + cfg.displayFor(f.voucher().getVoucherDate()) + ".",
+                                    + input.displayRef(cfg.getSectionCode(), f.voucher().getVoucherDate()) + ".",
                             "Deduct " + expected + " and record the TDS entry in Tally."));
                 }
             }
@@ -496,7 +495,7 @@ public class TdsEngine {
                                     "Advance of " + op.remaining() + " to '" + creditorName
                                             + "' outstanding at " + monthEnd
                                             + " — TDS deductible on payment under "
-                                            + cfg.displayFor(op.voucher().getVoucherDate()) + ".",
+                                            + input.displayRef(cfg.getSectionCode(), op.voucher().getVoucherDate()) + ".",
                                     "Deduct TDS on the advance or verify this is a bill settlement."));
                         }
                     }

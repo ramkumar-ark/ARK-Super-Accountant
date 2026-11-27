@@ -12,6 +12,7 @@ import com.arktech.superaccountant.tds.models.TdsSectionConfig;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,10 +64,7 @@ public class StatutorySectionService {
      */
     @Transactional
     public List<StatutorySectionOptionResponse> tdsSectionOptions() {
-        Map<UUID, List<StatutorySectionRule>> rulesBySectionId = new LinkedHashMap<>();
-        for (StatutorySectionRule rule : statutorySectionRuleRepository.findAll()) {
-            rulesBySectionId.computeIfAbsent(rule.getSectionId(), k -> new ArrayList<>()).add(rule);
-        }
+        Map<UUID, List<StatutorySectionRule>> rulesBySectionId = rulesBySectionId();
         List<StatutorySectionOptionResponse> options = new ArrayList<>();
         for (StatutorySection section
                 : statutorySectionRepository.findByStatuteOrderBySortOrderAscCodeAsc(Statute.INCOME_TAX)) {
@@ -82,6 +80,71 @@ public class StatutorySectionService {
                     section.getSortOrder()));
         }
         return options;
+    }
+
+    /**
+     * True when an active INCOME_TAX section row with this exact code is stored in
+     * statutory_sections (no 194I alias — the legacy pre-split code is not a stored
+     * section and masters must not carry it).
+     */
+    public boolean isActiveIncomeTaxSection(String code) {
+        return code != null && statutorySectionRepository.existsByStatuteAndCodeAndActiveTrue(
+                Statute.INCOME_TAX, code);
+    }
+
+    /**
+     * The s.393-era legal reference per active section code: the DEFAULT rule row
+     * covering the new-Act effective date (1 April 2026). Sections whose covering
+     * rule's reference is the code itself (e.g. 194M, which has no s.393 row) are
+     * omitted, and the legacy stored 194I alias resolves to its land/building half —
+     * mirroring the deleted TdsSectionRefs map.
+     */
+    public Map<String, String> newActRefsByCode() {
+        Map<UUID, List<StatutorySectionRule>> rulesBySectionId = rulesBySectionId();
+        Map<String, String> refs = new LinkedHashMap<>();
+        for (StatutorySection section
+                : statutorySectionRepository.findByStatuteOrderBySortOrderAscCodeAsc(Statute.INCOME_TAX)) {
+            if (!Boolean.TRUE.equals(section.getActive())) {
+                continue;
+            }
+            String ref = legalReference(rulesBySectionId.get(section.getId()), section);
+            if (ref != null && !ref.equals(section.getCode())) {
+                refs.put(section.getCode(), ref);
+            }
+        }
+        if (!refs.containsKey("194I") && refs.containsKey("194I_B")) {
+            refs.put("194I", refs.get("194I_B"));
+        }
+        return refs;
+    }
+
+    /**
+     * The reference to show for a known TDS date: the s.393 reference on/after 1 April
+     * 2026, otherwise the old section code. Null dates fall back to the code.
+     */
+    public static String displayRef(Map<String, String> newActRefsByCode, String code, LocalDate tdsDate) {
+        if (code == null) {
+            return null;
+        }
+        String ref = newActRefsByCode.get(code);
+        return ref != null && tdsDate != null && TdsSectionConfig.newActApplies(tdsDate) ? ref : code;
+    }
+
+    /** Old section first, then the s.393 reference, for places where no period is known. */
+    public static String displayWithRef(Map<String, String> newActRefsByCode, String code) {
+        if (code == null) {
+            return null;
+        }
+        String ref = newActRefsByCode.get(code);
+        return ref == null ? code : code + " / " + ref;
+    }
+
+    private Map<UUID, List<StatutorySectionRule>> rulesBySectionId() {
+        Map<UUID, List<StatutorySectionRule>> rulesBySectionId = new LinkedHashMap<>();
+        for (StatutorySectionRule rule : statutorySectionRuleRepository.findAll()) {
+            rulesBySectionId.computeIfAbsent(rule.getSectionId(), k -> new ArrayList<>()).add(rule);
+        }
+        return rulesBySectionId;
     }
 
     /**

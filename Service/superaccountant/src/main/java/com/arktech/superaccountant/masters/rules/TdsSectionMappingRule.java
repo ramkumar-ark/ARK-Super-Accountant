@@ -2,11 +2,13 @@ package com.arktech.superaccountant.masters.rules;
 
 import com.arktech.superaccountant.masters.classifier.ParsedLedger;
 import com.arktech.superaccountant.masters.models.*;
-import com.arktech.superaccountant.tds.models.TdsSectionRefs;
+import com.arktech.superaccountant.statutory.services.StatutorySectionService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Checks that expense ledgers (and purchase accounts, which are expense-like) and fixed asset ledgers have a
@@ -16,6 +18,9 @@ import java.util.List;
  */
 @Component("TDS_SECTION_MAPPING")
 public class TdsSectionMappingRule implements ValidationRule {
+
+    @Autowired
+    private StatutorySectionService statutorySectionService;
 
     @Override
     public String getRuleCode() {
@@ -29,6 +34,7 @@ public class TdsSectionMappingRule implements ValidationRule {
             return List.of();
         }
         List<ValidationFinding> findings = new ArrayList<>();
+        Map<String, String> refs = null;
 
         for (PreconfiguredMaster master : context.preconfiguredMasters()) {
             if (!inScope(master)) {
@@ -47,8 +53,11 @@ public class TdsSectionMappingRule implements ValidationRule {
                 f.setSeverity(severity);
                 f.setResolveStatus(ResolveStatus.OPEN);
                 f.setMessage("Ledger '" + master.getLedgerName() + "' has no TDS section assigned.");
-                f.setSuggestedFix("Assign a TDS section (e.g., " + TdsSectionRefs.both("194C")
-                        + " \u2013 Payments to contractors and sub-contractors, " + TdsSectionRefs.both("194J_A")
+                if (refs == null) {
+                    refs = statutorySectionService.newActRefsByCode();
+                }
+                f.setSuggestedFix("Assign a TDS section (e.g., " + StatutorySectionService.displayWithRef(refs, "194C")
+                        + " \u2013 Payments to contractors and sub-contractors, " + StatutorySectionService.displayWithRef(refs, "194J_A")
                         + " \u2013 Fees for technical services, royalty for films, call centre) or mark as 'NOT_SUBJECT' if not applicable to TDS.");
                 findings.add(f);
             }

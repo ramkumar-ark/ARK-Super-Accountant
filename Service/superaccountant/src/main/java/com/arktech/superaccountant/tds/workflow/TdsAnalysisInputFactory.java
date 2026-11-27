@@ -63,6 +63,9 @@ public class TdsAnalysisInputFactory {
     @org.springframework.beans.factory.annotation.Autowired
     private StatutorySectionRuleRepository statutorySectionRuleRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.arktech.superaccountant.statutory.services.StatutorySectionService statutorySectionService;
+
     public TdsAnalysisInput build(AnalysisContext ctx) {
         mappingGate.requireComplete(ctx.organizationId());
         Map<String, TdsLedgerMapping> mappingsByKey = mappingService.mappingsByKey(ctx.organizationId());
@@ -94,7 +97,7 @@ public class TdsAnalysisInputFactory {
         applyInterestPayerThreshold(org, configsBySection, ctx.periodStart());
         return new TdsAnalysisInput(ctx.organizationId(), ctx.workflowId(), ctx.uploadJobId(),
                 vouchers, snapshotsByName, mappingsByKey, debtorTansByName, configsBySection,
-                fyStart, ctx.periodStart(), ctx.periodEnd());
+                fyStart, ctx.periodStart(), ctx.periodEnd(), statutorySectionService.newActRefsByCode());
     }
 
     /**

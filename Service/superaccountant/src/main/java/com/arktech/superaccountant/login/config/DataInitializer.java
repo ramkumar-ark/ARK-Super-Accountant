@@ -83,73 +83,87 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
-    private record NewActValues(String rateCompany, String rateNonCompany, String perTxn, String annual) {}
+    /**
+     * Seed values for the legacy TDS section configs. The old- and new-Act (Income-tax Act 2025 s.393,
+     * effective 1 Apr 2026; see docs/tds-income-tax-act-2025-research.md) values are kept together so a
+     * fresh database seeds identically to one backfilled mid-history. 194M has no new-Act values: it has
+     * no Form 140 code post-2026 (Form 141), so it keeps old-Act values.
+     * Rate/threshold edits must go to statutory_section_rules, not this list.
+     */
+    private record SectionSeed(String code, String desc,
+                               String rateCompany, String rateNonCompany, String perTxn, String annual,
+                               String newRateCompany, String newRateNonCompany, String newPerTxn, String newAnnual) {}
 
-    // LEGACY seed: frozen and not re-synced into statutory_section_rules; slated for removal in PR2/PR3.
-    // Rate/threshold edits must go to statutory_section_rules, not this map.
-    // Income-tax Act 2025 s.393 values (effective 1 Apr 2026); see docs/tds-income-tax-act-2025-research.md.
-    // 194M is absent: it has no Form 140 code post-2026 (Form 141), so it keeps old-Act values.
-    // Display refs and picker natures live in statutory_sections/statutory_section_rules (served by GET /api/tds/sections); Form 140 codes in Rpu140FormatSpec.SECTION_CODES.
-    private static final Map<String, NewActValues> NEW_ACT_VALUES = Map.of(
-            "194A", new NewActValues("10.00", "10.00", null, "10000.00"),
-            "194C", new NewActValues("2.00", "1.00", "30000.00", "100000.00"),
-            "194H", new NewActValues("2.00", "2.00", null, "20000.00"),
-            "194I_A", new NewActValues("2.00", "2.00", null, "600000.00"),
-            "194I_B", new NewActValues("10.00", "10.00", null, "600000.00"),
-            "194J_A", new NewActValues("2.00", "2.00", null, "50000.00"),
-            "194J_B", new NewActValues("10.00", "10.00", null, "50000.00"),
-            "194J_C", new NewActValues("10.00", "10.00", null, "0.00"),
-            "194Q", new NewActValues("0.10", "0.10", null, "5000000.00"));
+    private static final List<SectionSeed> SECTION_SEEDS = List.of(
+            new SectionSeed("194A", "Interest other than securities", "10.00", "10.00", null, "10000.00",
+                    "10.00", "10.00", null, "10000.00"),
+            new SectionSeed("194C", "Payments to contractors", "2.00", "1.00", "30000.00", "100000.00",
+                    "2.00", "1.00", "30000.00", "100000.00"),
+            new SectionSeed("194H", "Commission or brokerage", "2.00", "2.00", null, "20000.00",
+                    "2.00", "2.00", null, "20000.00"),
+            new SectionSeed("194I_A", "Rent of plant, machinery or equipment", "2.00", "2.00", null, "240000.00",
+                    "2.00", "2.00", null, "600000.00"),
+            new SectionSeed("194I_B", "Rent of land, building, furniture or fittings", "10.00", "10.00", null, "240000.00",
+                    "10.00", "10.00", null, "600000.00"),
+            new SectionSeed("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00",
+                    "2.00", "2.00", null, "50000.00"),
+            new SectionSeed("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00",
+                    "10.00", "10.00", null, "50000.00"),
+            new SectionSeed("194J_C", "Remuneration, fees or commission to a director (not salary)", "10.00", "10.00", null, "0.00",
+                    "10.00", "10.00", null, "0.00"),
+            new SectionSeed("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00",
+                    null, null, null, null),
+            new SectionSeed("194Q", "Purchase of goods", "0.10", "0.10", null, "5000000.00",
+                    "0.10", "0.10", null, "5000000.00"));
 
     private void seedTdsSectionConfigs() {
         // Rates/thresholds per Income Tax Act as of FY 2026-27.
         // VERIFY against the current Finance Act before release — these change yearly.
-        seedSection("194A", "Interest other than securities", "10.00", "10.00", null, "10000.00");
-        seedSection("194C", "Payments to contractors", "2.00", "1.00", "30000.00", "100000.00");
-        seedSection("194H", "Commission or brokerage", "2.00", "2.00", null, "20000.00");
-        seedSection("194I_A", "Rent of plant, machinery or equipment", "2.00", "2.00", null, "240000.00");
-        seedSection("194I_B", "Rent of land, building, furniture or fittings", "10.00", "10.00", null, "240000.00");
-        seedSection("194J_A", "Fees for technical services", "2.00", "2.00", null, "30000.00");
-        seedSection("194J_B", "Fees for professional services", "10.00", "10.00", null, "30000.00");
-        seedSection("194J_C", "Remuneration, fees or commission to a director (not salary)", "10.00", "10.00", null, "0.00");
-        seedSection("194M", "Payments by individuals/HUF to contractors/professionals", "2.00", "2.00", null, "5000000.00");
-        seedSection("194Q", "Purchase of goods", "0.10", "0.10", null, "5000000.00");
+        for (SectionSeed seed : SECTION_SEEDS) {
+            seedSection(seed);
+        }
     }
 
-    private void seedSection(String code, String desc, String rateCompany, String rateNonCompany,
-                             String perTxn, String annual) {
-        if (tdsSectionConfigRepository.existsBySectionCode(code)) return;
+    private void seedSection(SectionSeed seed) {
+        if (tdsSectionConfigRepository.existsBySectionCode(seed.code())) return;
         TdsSectionConfig c = new TdsSectionConfig();
-        c.setSectionCode(code);
-        c.setDescription(desc);
-        c.setRateCompany(new java.math.BigDecimal(rateCompany));
-        c.setRateNonCompany(new java.math.BigDecimal(rateNonCompany));
-        c.setThresholdPerTransaction(perTxn != null ? new java.math.BigDecimal(perTxn) : null);
-        c.setThresholdAnnual(new java.math.BigDecimal(annual));
+        c.setSectionCode(seed.code());
+        c.setDescription(seed.desc());
+        c.setRateCompany(new java.math.BigDecimal(seed.rateCompany()));
+        c.setRateNonCompany(new java.math.BigDecimal(seed.rateNonCompany()));
+        c.setThresholdPerTransaction(seed.perTxn() != null ? new java.math.BigDecimal(seed.perTxn()) : null);
+        c.setThresholdAnnual(new java.math.BigDecimal(seed.annual()));
         c.setHigherRateIfNoPan(new java.math.BigDecimal("20.00"));
-        applyNewAct(c);
+        applyNewAct(c, seed);
         tdsSectionConfigRepository.save(c);
-        System.out.println("TDS section config seeded: " + code);
+        System.out.println("TDS section config seeded: " + seed.code());
     }
 
     /** Applies s.393 values to configs created before the new-act seeds existed. */
     private void backfillNewActSectionConfigs() {
         int updated = 0;
         for (TdsSectionConfig c : tdsSectionConfigRepository.findAll()) {
-            if (c.getNewActRateCompany() != null || !applyNewAct(c)) continue;
+            SectionSeed seed = seedByCode(c.getSectionCode());
+            if (c.getNewActRateCompany() != null || seed == null || !applyNewAct(c, seed)) continue;
             tdsSectionConfigRepository.save(c);
             updated++;
         }
         if (updated > 0) System.out.println("Backfilled " + updated + " TDS section configs with Income-tax Act 2025 (s.393) values.");
     }
 
-    private boolean applyNewAct(TdsSectionConfig c) {
-        NewActValues v = NEW_ACT_VALUES.get(c.getSectionCode());
-        if (v == null) return false;
-        c.setNewActRateCompany(new java.math.BigDecimal(v.rateCompany()));
-        c.setNewActRateNonCompany(new java.math.BigDecimal(v.rateNonCompany()));
-        c.setNewActThresholdPerTransaction(v.perTxn() != null ? new java.math.BigDecimal(v.perTxn()) : null);
-        c.setNewActThresholdAnnual(new java.math.BigDecimal(v.annual()));
+    private static SectionSeed seedByCode(String code) {
+        for (SectionSeed seed : SECTION_SEEDS) {
+            if (seed.code().equals(code)) return seed;
+        }
+        return null;
+    }
+
+    private boolean applyNewAct(TdsSectionConfig c, SectionSeed seed) {
+        if (seed.newRateCompany() == null) return false;
+        c.setNewActRateCompany(new java.math.BigDecimal(seed.newRateCompany()));
+        c.setNewActRateNonCompany(new java.math.BigDecimal(seed.newRateNonCompany()));
+        c.setNewActThresholdPerTransaction(seed.newPerTxn() != null ? new java.math.BigDecimal(seed.newPerTxn()) : null);
+        c.setNewActThresholdAnnual(new java.math.BigDecimal(seed.newAnnual()));
         return true;
     }
 

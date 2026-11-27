@@ -37,6 +37,8 @@ class FindingOverrideMasterServiceTest {
     UploadLedgerSnapshotRepository snapshotRepository;
     @Mock
     MasterEditLogRepository editLogRepository;
+    @Mock
+    com.arktech.superaccountant.statutory.services.StatutorySectionService statutorySectionService;
 
     @InjectMocks
     FindingOverrideMasterService service;
@@ -54,6 +56,13 @@ class FindingOverrideMasterServiceTest {
         master.setExpectedParentGroup("Indirect Expenses");
         master.setExpectedGstApplicable(true);
         master.setExpectedTdsApplicable(false);
+        // Seeded sections only: 194B/194D are not seeded, so they are rejected everywhere.
+        org.mockito.Mockito.lenient()
+                .when(statutorySectionService.isActiveIncomeTaxSection(any())).thenAnswer(inv -> {
+                    String code = inv.getArgument(0);
+                    return code != null && java.util.Set.of("194A", "194C", "194H", "194I_A", "194I_B",
+                            "194J_A", "194J_B", "194J_C", "194M", "194Q").contains(code);
+                });
     }
 
     private ValidationFinding finding(String ruleCode, MismatchType type, String ledger, String expected, String actual) {
@@ -430,11 +439,12 @@ class FindingOverrideMasterServiceTest {
     @Test
     void validate_tdsSection_acceptsOnlyTheListedCodes() {
         for (String ok : List.of("NOT_SUBJECT", "194C", "194J_A", "194J_B", "194J_C", "194H", "194I_A",
-                "194I_B", "194Q", "194A", "194B", "194D", "194M", "OTHER")) {
+                "194I_B", "194Q", "194A", "194M", "OTHER")) {
             ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
             assertThatCode(() -> service.validate(f, ok, orgId)).as(ok).doesNotThrowAnyException();
         }
-        for (String bad : List.of("194I", "194J", "194j_a", "194J(a)", "206AA", "Not subject to TDS", "194C ;")) {
+        for (String bad : List.of("194I", "194J", "194j_a", "194J(a)", "206AA", "Not subject to TDS", "194C ;",
+                "194B", "194D")) {
             ValidationFinding f = finding("TDS_SECTION_MAPPING", null, "Office Rent", null, null);
             assertThatThrownBy(() -> service.validate(f, bad, orgId)).as(bad)
                     .isInstanceOfSatisfying(FindingOverrideException.class,

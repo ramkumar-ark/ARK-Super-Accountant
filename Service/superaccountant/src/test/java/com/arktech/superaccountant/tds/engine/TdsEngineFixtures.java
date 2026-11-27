@@ -120,8 +120,13 @@ public final class TdsEngineFixtures {
                                   Map<String, TdsLedgerMapping> mappingsBy,
                                   LocalDate periodStart, LocalDate periodEnd) {
         return new TdsAnalysisInput(ORG, WF, JOB, vouchers, snaps, mappingsBy, Map.of(), CONFIGS,
-                FY_START, periodStart, periodEnd);
+                FY_START, periodStart, periodEnd, REFS);
     }
+
+    /** s.393 display refs for the sections the fixtures use, as the statutory tables seed them. */
+    public static final Map<String, String> REFS = Map.of(
+            "194C", "393(1) [Table: Sl. No. 6(i)]",
+            "194J_B", "393(1) [Table: Sl. No. 6(iii).D(b)]");
 
     public static TdsAnalysisInput inputQ1(List<ParsedVoucher> vouchers, Map<String, UploadLedgerSnapshot> snaps,
                                    Map<String, TdsLedgerMapping> mappingsBy) {
