@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import {
@@ -9,6 +10,13 @@ import {
   type TurnoverNature,
 } from '@/lib/tdsApplicabilityApi'
 import { apiErrorMessage } from '@/lib/apiError'
+import {
+  ALERT_ERROR_CLASS,
+  INPUT_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  PILL_WARNING_CLASS,
+  SECTION_CARD_CLASS,
+} from './sectionStyles'
 
 const BASIS_LABELS: Record<TdsApplicabilityYear['basis'], { on: string; off: string }> = {
   ENTITY_TYPE: { on: 'TDS applies (entity type)', off: 'Not a deductor (entity type)' },
@@ -41,7 +49,7 @@ export function TdsApplicabilitySection() {
   if (!data?.years) return <section />
 
   return (
-    <section>
+    <section className={SECTION_CARD_CLASS}>
       <h2 className="text-lg font-semibold mb-2">TDS applicability</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-3">
         {data.entityCode
@@ -106,14 +114,12 @@ function YearRow({
           {fyLabel(year.financialYear)} — {year.applicable ? labels.on : labels.off}
         </span>
         {year.needsAnswer && (
-          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
-            Needs answer
-          </span>
+          <span className={PILL_WARNING_CLASS}>Needs answer</span>
         )}
         {canEdit && !editing && (
           <button
             type="button"
-            className="text-xs px-2 py-0.5 rounded border border-[var(--color-border)]"
+            className="text-xs px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)]"
             onClick={onEdit}
           >
             {year.needsAnswer ? 'Answer' : 'Change'}
@@ -198,7 +204,7 @@ function AnswerForm({
               min={0}
               value={turnover}
               onChange={(e) => setTurnover(e.target.value)}
-              className="border rounded px-2 py-1 text-sm"
+              className={INPUT_CLASS}
               placeholder="₹"
             />
           </label>
@@ -207,7 +213,7 @@ function AnswerForm({
             <select
               value={nature}
               onChange={(e) => setNature(e.target.value as TurnoverNature)}
-              className="border rounded px-2 py-1 text-sm"
+              className={INPUT_CLASS}
             >
               <option value="BUSINESS">Business</option>
               <option value="PROFESSION">Profession</option>
@@ -216,14 +222,15 @@ function AnswerForm({
         </div>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <div role="alert" className={ALERT_ERROR_CLASS}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {error}
-        </p>
+        </div>
       )}
       <button
         type="submit"
         disabled={mutation.isPending}
-        className="px-3 py-1.5 text-sm rounded bg-[var(--color-primary)] text-white disabled:opacity-50 w-fit"
+        className={`${PRIMARY_BUTTON_CLASS} w-fit`}
       >
         Save answer
       </button>

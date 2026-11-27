@@ -1,10 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { z } from 'zod'
+import { AlertCircle, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import { apiErrorMessage } from '@/lib/apiError'
 import { getOrganization, updateDeductor, type DeductorDetails } from '@/lib/tdsApi'
+import {
+  ALERT_ERROR_CLASS,
+  ALERT_WARNING_CLASS,
+  INPUT_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECTION_CARD_CLASS,
+} from './sectionStyles'
 
 // Non-government deductor categories per e-TDS file format Annexure 4 (Form 26Q v5.8).
 // P was previously mislabelled "Individual / HUF" — that is Q; P is AOP.
@@ -102,20 +110,22 @@ function DeductorForm({
   }
 
   return (
-    <section>
+    <section className={SECTION_CARD_CLASS}>
       <h2 className="text-lg font-semibold mb-2">Deductor details</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-3">
         TAN and responsible person as reported in TDS returns (26Q).
       </p>
       {tanMissing && (
-        <p className="text-sm text-amber-700 mb-2">
+        <div className={`${ALERT_WARNING_CLASS} mb-3`}>
+          <AlertTriangle size={16} className="flex-shrink-0" />
           TAN missing — TDS returns cannot be finalized without it.
-        </p>
+        </div>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-600 mb-2">
+        <div role="alert" className={`${ALERT_ERROR_CLASS} mb-3`}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {error}
-        </p>
+        </div>
       )}
       <form
         aria-label="Deductor details"
@@ -129,7 +139,7 @@ function DeductorForm({
             value={tan}
             onChange={(e) => setTan(e.target.value.toUpperCase())}
             disabled={!canEdit}
-            className="border rounded px-2 py-1 text-sm"
+            className={INPUT_CLASS}
           />
         </label>
         <label className="text-sm flex flex-col gap-1">
@@ -139,7 +149,7 @@ function DeductorForm({
             value={deductorType}
             onChange={(e) => setDeductorType(e.target.value)}
             disabled={!canEdit}
-            className="border rounded px-2 py-1 text-sm"
+            className={INPUT_CLASS}
           >
             <option value="">Select</option>
             <option value="K">Company</option>
@@ -159,7 +169,7 @@ function DeductorForm({
             value={interestPayerType}
             onChange={(e) => setInterestPayerType(e.target.value)}
             disabled={!canEdit}
-            className="border rounded px-2 py-1 text-sm"
+            className={INPUT_CLASS}
           >
             {INTEREST_PAYER_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -179,7 +189,7 @@ function DeductorForm({
             value={responsiblePersonName}
             onChange={(e) => setResponsiblePersonName(e.target.value)}
             disabled={!canEdit}
-            className="border rounded px-2 py-1 text-sm"
+            className={INPUT_CLASS}
           />
         </label>
         <label className="text-sm flex flex-col gap-1">
@@ -189,14 +199,14 @@ function DeductorForm({
             value={responsiblePersonDesignation}
             onChange={(e) => setResponsiblePersonDesignation(e.target.value)}
             disabled={!canEdit}
-            className="border rounded px-2 py-1 text-sm"
+            className={INPUT_CLASS}
           />
         </label>
         {canEdit && (
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="px-3 py-1.5 text-sm rounded bg-[var(--color-primary)] text-white disabled:opacity-50 w-fit"
+            className={`${PRIMARY_BUTTON_CLASS} w-fit`}
           >
             Save
           </button>

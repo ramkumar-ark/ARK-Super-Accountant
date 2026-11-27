@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useTdsApplicability } from '@/hooks/useTdsApplicability'
 import { apiErrorMessage } from '@/lib/apiError'
@@ -12,6 +13,20 @@ import {
   type TdsLedgerMappingRow,
   type TdsLedgerRole,
 } from '@/lib/tdsLedgerMappingApi'
+import {
+  ALERT_ERROR_CLASS,
+  ALERT_ERROR_LIST_CLASS,
+  ALERT_WARNING_LIST_CLASS,
+  LOADING_CLASS,
+  PILL_SUCCESS_CLASS,
+  PILL_WARNING_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECTION_CARD_CLASS,
+  TABLE_CELL_CLASS,
+  TABLE_HEAD_CLASS,
+  TABLE_INPUT_CLASS,
+  TABLE_ROW_CLASS,
+} from './sectionStyles'
 
 const ROLES = Object.keys(TDS_LEDGER_ROLE_LABELS) as TdsLedgerRole[]
 
@@ -81,94 +96,117 @@ export function TdsLedgerMappingSection() {
     })
   }
 
-  if (isLoading) return <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
+  if (isLoading) {
+    return (
+      <div className={LOADING_CLASS}>
+        <Loader2 size={16} className="animate-spin" />
+        Loading…
+      </div>
+    )
+  }
   if (isError || !view)
     return (
-      <section>
-        <h2 className="text-lg font-semibold mb-2">TDS ledgers</h2>
-        <p role="alert" className="text-sm text-red-600">
+      <section className={SECTION_CARD_CLASS}>
+        <h2 className="text-lg font-semibold mb-3">TDS ledgers</h2>
+        <div role="alert" className={ALERT_ERROR_CLASS}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {apiErrorMessage(error, 'Could not load TDS-ledger mapping')}
-        </p>
+        </div>
       </section>
     )
 
   return (
-    <section>
-      <div className="flex items-center gap-3 mb-2">
+    <section className={SECTION_CARD_CLASS}>
+      <div className="flex items-center gap-3 mb-3">
         <h2 className="text-lg font-semibold">TDS ledgers</h2>
-        <span
-          className={
-            complete
-              ? 'text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800'
-              : 'text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800'
-          }
-        >
+        <span className={complete ? PILL_SUCCESS_CLASS : PILL_WARNING_CLASS}>
           {complete ? 'Complete' : 'Incomplete'}
         </span>
       </div>
       {anyTdsOn && blockers.length > 0 && (
-        <ul className="text-sm text-red-600 mb-2 list-disc list-inside">
-          {blockers.map((b) => (
-            <li key={b}>{b}</li>
-          ))}
-        </ul>
+        <div className={`${ALERT_ERROR_LIST_CLASS} mb-3`}>
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+          <ul className="list-disc list-inside">
+            {blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
       )}
       {anyTdsOn && (
         <div className="mb-6">
-          <h3 className="text-sm font-semibold mb-1">TDS payable ledgers</h3>
+          <h3 className="text-sm font-semibold mb-2 text-[var(--color-text-primary)]">TDS payable ledgers</h3>
+          {payableRows.length === 0 && (
+            <p className="text-sm text-[var(--color-text-muted)] py-2">
+              No TDS payable ledgers found in your books.
+            </p>
+          )}
+          {payableRows.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left">
+                  <th className={TABLE_HEAD_CLASS}>Ledger</th>
+                  <th className={TABLE_HEAD_CLASS}>Group</th>
+                  <th className={TABLE_HEAD_CLASS}>Role</th>
+                  <th className={TABLE_HEAD_CLASS}>Section</th>
+                  <th className={TABLE_HEAD_CLASS}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payableRows.map((r) => (
+                  <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+      <div>
+        <h3 className="text-sm font-semibold mb-2 text-[var(--color-text-primary)]">TDS receivable ledgers</h3>
+        {receivableWarnings.length > 0 && (
+          <div className={`${ALERT_WARNING_LIST_CLASS} mb-3`}>
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+            <ul className="list-disc list-inside">
+              {receivableWarnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {receivableRows.length === 0 && (
+          <p className="text-sm text-[var(--color-text-muted)] py-2">
+            No TDS receivable ledgers found in your books.
+          </p>
+        )}
+        {receivableRows.length > 0 && (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left border-b">
-                <th className="py-2">Ledger</th>
-                <th className="py-2">Group</th>
-                <th className="py-2">Role</th>
-                <th className="py-2">Section</th>
-                <th className="py-2">Status</th>
+              <tr className="text-left">
+                <th className={TABLE_HEAD_CLASS}>Ledger</th>
+                <th className={TABLE_HEAD_CLASS}>Group</th>
+                <th className={TABLE_HEAD_CLASS}>Role</th>
+                <th className={TABLE_HEAD_CLASS}>Section</th>
+                <th className={TABLE_HEAD_CLASS}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {payableRows.map((r) => (
+              {receivableRows.map((r) => (
                 <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} />
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-      <div>
-        <h3 className="text-sm font-semibold mb-1">TDS receivable ledgers</h3>
-        {receivableWarnings.length > 0 && (
-          <ul className="text-sm text-amber-600 mb-2 list-disc list-inside">
-            {receivableWarnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
         )}
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left border-b">
-              <th className="py-2">Ledger</th>
-              <th className="py-2">Group</th>
-              <th className="py-2">Role</th>
-              <th className="py-2">Section</th>
-              <th className="py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receivableRows.map((r) => (
-              <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} />
-            ))}
-          </tbody>
-        </table>
       </div>
       {mutation.isError && (
-        <p role="alert" className="text-sm text-red-600 mt-2">
+        <div role="alert" className={`${ALERT_ERROR_CLASS} mt-3`}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {apiErrorMessage(mutation.error, 'Could not save the TDS-ledger mapping')}
-        </p>
+        </div>
       )}
       {canEdit && (
         <button
           type="button"
-          className="mt-3 px-3 py-1.5 text-sm rounded bg-[var(--color-primary)] text-white disabled:opacity-50"
+          className={`mt-4 ${PRIMARY_BUTTON_CLASS}`}
           disabled={!canSave || mutation.isPending}
           onClick={() => mutation.mutate()}
         >
@@ -191,13 +229,13 @@ function LedgerRow({
   const { data: tdsSections } = useTdsSections()
   const sectionOptions = buildTdsSectionOptions(tdsSections).filter((o) => o.value !== 'NOT_SUBJECT')
   return (
-    <tr className="border-b">
-      <td className="py-2">{r.ledgerName}</td>
-      <td className="py-2">{r.parentGroup ?? '—'}</td>
-      <td className="py-2">
+    <tr className={TABLE_ROW_CLASS}>
+      <td className={TABLE_CELL_CLASS}>{r.ledgerName}</td>
+      <td className={TABLE_CELL_CLASS}>{r.parentGroup ?? '—'}</td>
+      <td className={TABLE_CELL_CLASS}>
         <select
           aria-label={`Role for ${r.ledgerName}`}
-          className="border rounded px-2 py-1 text-sm"
+          className={TABLE_INPUT_CLASS}
           disabled={!canEdit}
           value={r.role ?? ''}
           onChange={(e) => {
@@ -213,10 +251,10 @@ function LedgerRow({
           ))}
         </select>
       </td>
-      <td className="py-2">
+      <td className={TABLE_CELL_CLASS}>
         <select
           aria-label={`Section for ${r.ledgerName}`}
-          className="border rounded px-2 py-1 text-sm"
+          className={TABLE_INPUT_CLASS}
           disabled={!canEdit || r.role !== 'TDS_PAYABLE'}
           value={r.role === 'TDS_PAYABLE' ? (r.section ?? '') : ''}
           onChange={(e) =>
@@ -231,8 +269,14 @@ function LedgerRow({
           ))}
         </select>
       </td>
-      <td className="py-2">
-        {r.saved ? <>Saved by {r.savedBy ?? '—'}</> : r.edited ? 'Not saved' : 'Suggested, not saved'}
+      <td className={TABLE_CELL_CLASS}>
+        {r.saved ? (
+          <span className="text-[var(--color-text-secondary)]">Saved by {r.savedBy ?? '—'}</span>
+        ) : r.edited ? (
+          <span className="text-[var(--color-warning)]">Not saved</span>
+        ) : (
+          <span className="text-[var(--color-text-muted)]">Suggested, not saved</span>
+        )}
       </td>
     </tr>
   )
