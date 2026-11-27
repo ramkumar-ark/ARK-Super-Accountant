@@ -24,10 +24,15 @@ import {
   PILL_WARNING_CLASS,
   PRIMARY_BUTTON_CLASS,
   SECTION_CARD_CLASS,
-  TABLE_CELL_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
   TABLE_HEAD_CLASS,
   TABLE_INPUT_CLASS,
-  TABLE_ROW_CLASS,
 } from './sectionStyles'
 
 const ROLES = Object.keys(TDS_LEDGER_ROLE_LABELS) as TdsLedgerRole[]
@@ -145,8 +150,8 @@ export function TdsLedgerMappingSection() {
             </p>
           )}
           {payableRows.length > 0 && (
-            <table className="w-full text-sm">
-              <thead>
+            <table className={STACKED_TABLE_CLASS}>
+              <thead className={STACKED_THEAD_CLASS}>
                 <tr className="text-left">
                   <th className={TABLE_HEAD_CLASS}>Ledger</th>
                   <th className={TABLE_HEAD_CLASS}>Group</th>
@@ -155,7 +160,7 @@ export function TdsLedgerMappingSection() {
                   <th className={TABLE_HEAD_CLASS}>Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className={STACKED_BODY_CLASS}>
                 {payableRows.map((r) => (
                   <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} setDrafts={setDrafts} />
                 ))}
@@ -182,8 +187,8 @@ export function TdsLedgerMappingSection() {
           </p>
         )}
         {receivableRows.length > 0 && (
-          <table className="w-full text-sm">
-            <thead>
+          <table className={STACKED_TABLE_CLASS}>
+            <thead className={STACKED_THEAD_CLASS}>
               <tr className="text-left">
                 <th className={TABLE_HEAD_CLASS}>Ledger</th>
                 <th className={TABLE_HEAD_CLASS}>Group</th>
@@ -192,7 +197,7 @@ export function TdsLedgerMappingSection() {
                 <th className={TABLE_HEAD_CLASS}>Status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={STACKED_BODY_CLASS}>
               {receivableRows.map((r) => (
                 <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} setDrafts={setDrafts} />
               ))}
@@ -242,49 +247,64 @@ function LedgerRow({
   const { data: tdsSections } = useTdsSections()
   const sectionOptions = buildTdsSectionOptions(tdsSections).filter((o) => o.value !== 'NOT_SUBJECT')
   const suggestedRole = r.role !== null ? r.role : null
+  const selectedSectionLabel = sectionOptions.find((o) => o.value === r.section)?.label
   return (
-    <tr className={TABLE_ROW_CLASS}>
-      <td className={TABLE_CELL_CLASS}>{r.ledgerName}</td>
-      <td className={TABLE_CELL_CLASS}>{r.parentGroup ?? '—'}</td>
-      <td className={TABLE_CELL_CLASS}>
-        <select
-          aria-label={`Role for ${r.ledgerName}`}
-          className={TABLE_INPUT_CLASS}
-          disabled={!canEdit}
-          value={r.role ?? ''}
-          onChange={(e) => {
-            const nextRole = (e.target.value || null) as TdsLedgerRole | null
-            setDraft(r.ledgerName, { role: r.role, section: r.section }, { role: nextRole, section: null })
-          }}
-        >
-          <option value="">—</option>
-          {ROLES.map((roleOption) => (
-            <option key={roleOption} value={roleOption}>
-              {TDS_LEDGER_ROLE_LABELS[roleOption]}
-            </option>
-          ))}
-        </select>
+    <tr className={STACKED_ROW_CLASS}>
+      <td className={STACKED_CELL_CLASS}>
+        <span className={STACKED_LABEL_CLASS}>Ledger</span>
+        <span className={STACKED_VALUE_CLASS}>{r.ledgerName}</span>
       </td>
-      <td className={TABLE_CELL_CLASS}>
-        <select
-          aria-label={`Section for ${r.ledgerName}`}
-          className={TABLE_INPUT_CLASS}
-          disabled={!canEdit || r.role !== 'TDS_PAYABLE'}
-          value={r.role === 'TDS_PAYABLE' ? (r.section ?? '') : ''}
-          onChange={(e) =>
-            setDraft(r.ledgerName, { role: r.role, section: r.section }, { section: e.target.value || null })
-          }
-        >
-          <option value="">Combined / infer per voucher</option>
-          {sectionOptions.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+      <td className={STACKED_CELL_CLASS}>
+        <span className={STACKED_LABEL_CLASS}>Group</span>
+        <span className={STACKED_VALUE_CLASS}>{r.parentGroup ?? '—'}</span>
       </td>
-      <td className={TABLE_CELL_CLASS}>
-        <div className="flex items-center gap-2">
+      <td className={STACKED_CELL_CLASS}>
+        <span className={STACKED_LABEL_CLASS}>Role</span>
+        <span className={STACKED_VALUE_CLASS}>
+          <select
+            aria-label={`Role for ${r.ledgerName}`}
+            className={TABLE_INPUT_CLASS}
+            disabled={!canEdit}
+            value={r.role ?? ''}
+            onChange={(e) => {
+              const nextRole = (e.target.value || null) as TdsLedgerRole | null
+              setDraft(r.ledgerName, { role: r.role, section: r.section }, { role: nextRole, section: null })
+            }}
+          >
+            <option value="">—</option>
+            {ROLES.map((roleOption) => (
+              <option key={roleOption} value={roleOption}>
+                {TDS_LEDGER_ROLE_LABELS[roleOption]}
+              </option>
+            ))}
+          </select>
+        </span>
+      </td>
+      <td className={STACKED_CELL_CLASS}>
+        <span className={STACKED_LABEL_CLASS}>Section</span>
+        <span className={STACKED_VALUE_CLASS}>
+          <select
+            aria-label={`Section for ${r.ledgerName}`}
+            className={TABLE_INPUT_CLASS}
+            disabled={!canEdit || r.role !== 'TDS_PAYABLE'}
+            value={r.role === 'TDS_PAYABLE' ? (r.section ?? '') : ''}
+            title={selectedSectionLabel}
+            onChange={(e) =>
+              setDraft(r.ledgerName, { role: r.role, section: r.section }, { section: e.target.value || null })
+            }
+          >
+            <option value="">Combined / infer per voucher</option>
+            {sectionOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </span>
+      </td>
+      <td className={STACKED_CELL_CLASS}>
+        <span className={STACKED_LABEL_CLASS}>Status</span>
+        <div className={`${STACKED_VALUE_CLASS} gap-2`}>
           {r.edited && r.role === null ? (
             <span className="text-[var(--color-danger)]">Choose a role</span>
           ) : r.saved ? (

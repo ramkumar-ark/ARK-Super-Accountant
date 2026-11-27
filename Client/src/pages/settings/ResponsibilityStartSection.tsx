@@ -17,10 +17,15 @@ import {
   PRIMARY_BUTTON_CLASS,
   PILL_WARNING_CLASS,
   SECTION_CARD_CLASS,
-  TABLE_CELL_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
   TABLE_HEAD_CLASS,
   TABLE_INPUT_CLASS,
-  TABLE_ROW_CLASS,
 } from './sectionStyles'
 
 const ORDER: WorkflowType[] = [...WORKFLOW_TYPES]
@@ -91,8 +96,8 @@ export function ResponsibilityStartSection() {
           {error}
         </div>
       )}
-      <table className="w-full text-sm">
-        <thead>
+      <table className={STACKED_TABLE_CLASS}>
+        <thead className={STACKED_THEAD_CLASS}>
           <tr className="text-left">
             <th className={TABLE_HEAD_CLASS}>Return</th>
             <th className={TABLE_HEAD_CLASS}>First period</th>
@@ -100,7 +105,7 @@ export function ResponsibilityStartSection() {
             <th className={TABLE_HEAD_CLASS}></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className={STACKED_BODY_CLASS}>
           {ORDER.filter((type) => !TDS_TYPES.includes(type) || anyTdsOn).map((type) => {
             const row = byType.get(type)
             const date = row?.firstPeriodStart ?? ''
@@ -108,28 +113,37 @@ export function ResponsibilityStartSection() {
             const fy = isTds && date ? fyOfDate(date, fyStartMonth) : null
             const notApplicable = fy !== null && !isTdsOnFor(fy)
             return (
-              <tr key={type} className={TABLE_ROW_CLASS}>
-                <td className={TABLE_CELL_CLASS}>{WORKFLOW_TYPE_LABEL[type]}</td>
-                <td className={TABLE_CELL_CLASS}>
-                  {row?.firstPeriodStart ? (
-                    <span data-testid={`resp-${type}`}>{row.firstPeriodStart}</span>
-                  ) : (
-                    <span className="text-[var(--color-text-muted)]">Not set</span>
-                  )}
+              <tr key={type} className={STACKED_ROW_CLASS}>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Return</span>
+                  <span className={STACKED_VALUE_CLASS}>{WORKFLOW_TYPE_LABEL[type]}</span>
                 </td>
-                <td className={TABLE_CELL_CLASS}>
-                  {row && row.baselineRowCount > 0 && (
-                    <span>
-                      {row.baselineRowCount} baseline periods
-                    </span>
-                  )}
-                  {row?.locked && (
-                    <span className={`ml-2 ${PILL_WARNING_CLASS}`}>
-                      Locked
-                    </span>
-                  )}
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>First period</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    {row?.firstPeriodStart ? (
+                      <span data-testid={`resp-${type}`}>{row.firstPeriodStart}</span>
+                    ) : (
+                      <span className="text-[var(--color-text-muted)]">Not set</span>
+                    )}
+                  </span>
                 </td>
-                <td className={TABLE_CELL_CLASS}>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Baseline</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    {row && row.baselineRowCount > 0 && (
+                      <span>
+                        {row.baselineRowCount} baseline periods
+                      </span>
+                    )}
+                    {row?.locked && (
+                      <span className={`ml-2 ${PILL_WARNING_CLASS}`}>
+                        Locked
+                      </span>
+                    )}
+                  </span>
+                </td>
+                <td className="flex sm:table-cell items-center justify-end gap-3 px-2 py-2.5 align-middle min-w-0">
                   {canEdit && (
                     <RespEditControl
                       type={type}

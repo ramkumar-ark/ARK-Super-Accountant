@@ -14,9 +14,14 @@ import {
   LOADING_CLASS,
   PRIMARY_BUTTON_CLASS,
   SECTION_CARD_CLASS,
-  TABLE_CELL_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
   TABLE_HEAD_CLASS,
-  TABLE_ROW_CLASS,
 } from './sectionStyles'
 
 export function FilerProfileSection() {
@@ -67,8 +72,8 @@ export function FilerProfileSection() {
         </p>
       )}
       {profiles && profiles.length > 0 && (
-        <table className="w-full text-sm mb-4">
-          <thead>
+        <table className={`${STACKED_TABLE_CLASS} mb-4`}>
+          <thead className={STACKED_THEAD_CLASS}>
             <tr className="text-left">
               <th className={TABLE_HEAD_CLASS}>Effective from</th>
               <th className={TABLE_HEAD_CLASS}>Frequency</th>
@@ -77,14 +82,31 @@ export function FilerProfileSection() {
               <th className={TABLE_HEAD_CLASS}>HSN digits</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className={STACKED_BODY_CLASS}>
             {profiles.map((p) => (
-              <tr key={p.id} className={TABLE_ROW_CLASS}>
-                <td className={TABLE_CELL_CLASS}>{p.effectiveFrom}</td>
-                <td className={TABLE_CELL_CLASS}>{p.frequency === 'QRMP' ? 'QRMP (quarterly)' : 'Monthly'}</td>
-                <td className={TABLE_CELL_CLASS}>{p.iffOptIn ? 'Yes' : 'No'}</td>
-                <td className={TABLE_CELL_CLASS}>{p.einvoiceEnabled ? 'Yes' : 'No'}</td>
-                <td className={TABLE_CELL_CLASS}>HSN: {p.hsnDigits} digits</td>
+              <tr key={p.id} className={STACKED_ROW_CLASS}>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Effective from</span>
+                  <span className={STACKED_VALUE_CLASS}>{p.effectiveFrom}</span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Frequency</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    {p.frequency === 'QRMP' ? 'QRMP (quarterly)' : 'Monthly'}
+                  </span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>IFF</span>
+                  <span className={STACKED_VALUE_CLASS}>{p.iffOptIn ? 'Yes' : 'No'}</span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>E-invoice</span>
+                  <span className={STACKED_VALUE_CLASS}>{p.einvoiceEnabled ? 'Yes' : 'No'}</span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>HSN digits</span>
+                  <span className={STACKED_VALUE_CLASS}>HSN: {p.hsnDigits} digits</span>
+                </td>
               </tr>
             ))}
           </tbody>

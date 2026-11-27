@@ -11,9 +11,14 @@ import {
   LOADING_CLASS,
   PRIMARY_BUTTON_CLASS,
   SECTION_CARD_CLASS,
-  TABLE_CELL_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
   TABLE_HEAD_CLASS,
-  TABLE_ROW_CLASS,
 } from './sectionStyles'
 
 export function BaselineSection() {
@@ -56,8 +61,8 @@ export function BaselineSection() {
               Baseline {status.rangeStart} to {status.rangeEnd}
             </p>
           )}
-          <table className="w-full text-sm mt-2">
-            <thead>
+          <table className={`${STACKED_TABLE_CLASS} mt-2`}>
+            <thead className={STACKED_THEAD_CLASS}>
               <tr className="text-left">
                 <th className={TABLE_HEAD_CLASS}>Return</th>
                 <th className={TABLE_HEAD_CLASS}>Unconfirmed</th>
@@ -65,13 +70,27 @@ export function BaselineSection() {
                 <th className={TABLE_HEAD_CLASS}>Latest period end</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className={STACKED_BODY_CLASS}>
               {(status.types ?? []).map((t) => (
-                <tr key={t.type} className={TABLE_ROW_CLASS}>
-                  <td className={TABLE_CELL_CLASS}>{WORKFLOW_TYPE_LABEL[t.type as WorkflowType]}</td>
-                  <td className={TABLE_CELL_CLASS}>{t.unconfirmedRows}</td>
-                  <td className={TABLE_CELL_CLASS}>{t.confirmedRows}</td>
-                  <td className={TABLE_CELL_CLASS}>{t.latestEnd ?? '—'}</td>
+                <tr key={t.type} className={STACKED_ROW_CLASS}>
+                  <td className={STACKED_CELL_CLASS}>
+                    <span className={STACKED_LABEL_CLASS}>Return</span>
+                    <span className={STACKED_VALUE_CLASS}>
+                      {WORKFLOW_TYPE_LABEL[t.type as WorkflowType]}
+                    </span>
+                  </td>
+                  <td className={STACKED_CELL_CLASS}>
+                    <span className={STACKED_LABEL_CLASS}>Unconfirmed</span>
+                    <span className={STACKED_VALUE_CLASS}>{t.unconfirmedRows}</span>
+                  </td>
+                  <td className={STACKED_CELL_CLASS}>
+                    <span className={STACKED_LABEL_CLASS}>Confirmed</span>
+                    <span className={STACKED_VALUE_CLASS}>{t.confirmedRows}</span>
+                  </td>
+                  <td className={STACKED_CELL_CLASS}>
+                    <span className={STACKED_LABEL_CLASS}>Latest period end</span>
+                    <span className={STACKED_VALUE_CLASS}>{t.latestEnd ?? '—'}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
