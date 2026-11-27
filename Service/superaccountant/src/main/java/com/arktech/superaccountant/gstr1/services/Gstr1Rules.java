@@ -1,36 +1,16 @@
 package com.arktech.superaccountant.gstr1.services;
 
-import java.math.BigDecimal;
-import java.time.YearMonth;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * GSTR-1 reporting rule constants. B2CL threshold is keyed by period so future
- * threshold changes can be applied without touching the classifier logic.
+ * GSTR-1 reporting rule constants that are stable enumerations or formats. Dated statutory
+ * parameters (B2CL threshold, IFF cap, allowed GST rates) live in the statutory tables and
+ * are read through GstParameters.
  */
 public final class Gstr1Rules {
-
-    public static final BigDecimal DEFAULT_B2CL_THRESHOLD = new BigDecimal("250000.00");
-
-    private static final Map<YearMonth, BigDecimal> B2CL_THRESHOLDS = Map.of();
-
-    /** Valid GST tax rates (percent), including nil/exempt and compensation-cess-era rates. */
-    public static final Set<BigDecimal> ALLOWED_RATES = Set.of(
-            new BigDecimal("0"),
-            new BigDecimal("0.1"),
-            new BigDecimal("0.25"),
-            new BigDecimal("1"),
-            new BigDecimal("1.5"),
-            new BigDecimal("3"),
-            new BigDecimal("5"),
-            new BigDecimal("7.5"),
-            new BigDecimal("12"),
-            new BigDecimal("18"),
-            new BigDecimal("28"),
-            new BigDecimal("40"));
 
     /** State codes 01..38 (incl. 97 other territory). */
     public static final Set<String> STATE_CODES = Set.of(
@@ -117,17 +97,5 @@ public final class Gstr1Rules {
     }
 
     private Gstr1Rules() {
-    }
-
-    public static BigDecimal b2clThreshold(YearMonth period) {
-        return B2CL_THRESHOLDS.getOrDefault(period, DEFAULT_B2CL_THRESHOLD);
-    }
-
-    public static boolean isAllowedRate(BigDecimal rate) {
-        if (rate == null) {
-            return false;
-        }
-        // numeric equality regardless of scale: 18.0 must equal 18
-        return ALLOWED_RATES.stream().anyMatch(allowed -> allowed.compareTo(rate) == 0);
     }
 }

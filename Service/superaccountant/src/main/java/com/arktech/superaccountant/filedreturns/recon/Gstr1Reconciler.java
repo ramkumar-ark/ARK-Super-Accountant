@@ -5,6 +5,7 @@ import com.arktech.superaccountant.filedreturns.recon.NetFiledPosition.B2csKey;
 import com.arktech.superaccountant.gst.rules.GstRuleSupport;
 import com.arktech.superaccountant.masters.models.FindingSeverity;
 import com.arktech.superaccountant.review.EvidenceHash;
+import com.arktech.superaccountant.statutory.services.GstParameters;
 
 import java.math.BigDecimal;import java.time.LocalDate;
 import java.util.ArrayList;
@@ -17,16 +18,13 @@ import java.util.UUID;
 
 public final class Gstr1Reconciler {
 
-    private static final BigDecimal B2CL_THRESHOLD_CURRENT = new BigDecimal("100000");
-    private static final BigDecimal B2CL_THRESHOLD_BEFORE_AUG_2024 = new BigDecimal("250000");
-    private static final LocalDate B2CL_THRESHOLD_DATE = LocalDate.of(2024, 8, 1);
-
     private Gstr1Reconciler() {
     }
 
     public static List<FiledReturnDiscrepancy> reconcile(UUID organizationId, UUID workflowId,
                                                          NetFiledPosition filed, BooksGst books,
-                                                         LocalDate coverStart, LocalDate coverEnd) {
+                                                         LocalDate coverStart, LocalDate coverEnd,
+                                                         GstParameters parameters) {
         List<FiledReturnDiscrepancy> findings = new ArrayList<>();
         List<NetFiledPosition.FiledDocument> filedDocs = new ArrayList<>(filed.documents());
         List<BooksDocument> booksDocs = new ArrayList<>(books.salesDocuments());
@@ -39,8 +37,7 @@ public final class Gstr1Reconciler {
             }
             BigDecimal invoiceValue = invoiceValue(doc);
             boolean intra = isIntra(doc);
-            BigDecimal threshold = doc.date().isBefore(B2CL_THRESHOLD_DATE)
-                    ? B2CL_THRESHOLD_BEFORE_AUG_2024 : B2CL_THRESHOLD_CURRENT;
+            BigDecimal threshold = parameters.b2clThreshold(doc.date());
             if (intra || invoiceValue.compareTo(threshold) <= 0) {
                 addToBooksB2cs(booksB2cs, doc);
             } else {

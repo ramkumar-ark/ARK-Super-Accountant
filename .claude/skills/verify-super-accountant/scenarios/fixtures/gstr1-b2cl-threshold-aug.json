@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "gstin": "29AAVCS5633D1ZL",
+  "fp": "082024",
+  "b2cl": [
+    {
+      "pos": "27",
+      "inv": [
+        {
+          "inum": "SALES-AUG",
+          "idt": "15-08-2024",
+          "val": 177000,
+          "itms": [
+            {
+              "num": 1,
+              "itm_det": {
+                "rt": 18,
+                "txval": 150000,
+                "iamt": 27000,
+                "camt": 0,
+                "samt": 0,
+                "csamt": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -14,6 +14,8 @@ import com.arktech.superaccountant.gstr1.services.VoucherView;
 import com.arktech.superaccountant.gstr1.services.VoucherViewBuilder;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
 import com.arktech.superaccountant.masters.repository.UploadLedgerSnapshotRepository;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -58,6 +60,8 @@ class AmendmentBuilderTest extends TableTestSupport {
     private WorkflowRepository workflowRepository;
     private AmendmentBuilder builder;
 
+    private static final GstParameterSource SEED = GstStatutorySeed::asParameters;
+
     @BeforeEach
     void setUp() {
         followUpRepository = mock(AmendmentFollowUpRepository.class);
@@ -81,8 +85,8 @@ class AmendmentBuilderTest extends TableTestSupport {
 
         builder = new AmendmentBuilder(followUpRepository, preparedReturnRepository, rowRepository,
                 fillInRepository, workflowRepository, viewBuilder, fillInService,
-                new B2bBuilder(), new B2clBuilder(), new B2csBuilder(), new ExportBuilder(),
-                new CdnBuilder(), new AdvanceBuilder());
+                new B2bBuilder(), new B2clBuilder(SEED), new B2csBuilder(SEED), new ExportBuilder(),
+                new CdnBuilder(SEED), new AdvanceBuilder(), SEED);
     }
 
     /** S2: a changed invoice → B2BA row whose oinum/oidt come from the April frozen return row, not the day book. */

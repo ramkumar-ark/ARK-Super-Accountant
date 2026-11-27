@@ -14,6 +14,7 @@ import com.arktech.superaccountant.gstr1.services.tables.DocsIssuedBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.ExportBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.HsnBuilder;
 import com.arktech.superaccountant.gstr1.services.tables.NilExemptBuilder;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
 import com.arktech.superaccountant.workflow.repository.WorkflowRepository;
@@ -86,6 +87,9 @@ public class Gstr1PrepareService {
     private Gstr1FillInService fillInService;
 
     @Autowired
+    private GstParameterSource parameterSource;
+
+    @Autowired
     private B2bBuilder b2bBuilder;
     @Autowired
     private B2clBuilder b2clBuilder;
@@ -108,7 +112,7 @@ public class Gstr1PrepareService {
 
     private ReportingClassifier classifier(Workflow workflow) {
         return new ReportingClassifier((view, attribute) -> fillInService.resolve(
-                workflow, view.getVoucherKey(), null, attribute));
+                workflow, view.getVoucherKey(), null, attribute), parameterSource.current());
     }
 
     @Transactional

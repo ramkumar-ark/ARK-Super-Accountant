@@ -14,6 +14,7 @@ import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingGate;
 import com.arktech.superaccountant.gst.mapping.TaxLedgerMappingService;
 import com.arktech.superaccountant.masters.models.UploadJobStatus;
 import com.arktech.superaccountant.review.FindingLifecycleService;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowStage;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -61,6 +62,9 @@ public class FiledReturnReconService {
 
     @Autowired
     private FiledReturnLineRepository lineRepository;
+
+    @Autowired
+    private GstParameterSource gstParameterSource;
 
     @Autowired
     private FiledReturnDiscrepancyRepository discrepancyRepository;
@@ -206,7 +210,7 @@ public class FiledReturnReconService {
         }
         NetFiledPosition filed = NetFiledPosition.build(withLines, row.getPeriodStart(), row.getPeriodEnd());
         return Gstr1Reconciler.reconcile(organizationId, row.getId(), filed, books,
-                row.getPeriodStart(), row.getPeriodEnd());
+                row.getPeriodStart(), row.getPeriodEnd(), gstParameterSource.current());
     }
 
     private DayBookUploadJob booksUpload(Workflow row) {

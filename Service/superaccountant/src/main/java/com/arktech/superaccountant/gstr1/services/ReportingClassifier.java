@@ -8,11 +8,12 @@ import java.util.Optional;
 import java.util.Set;
 
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute;
+import com.arktech.superaccountant.statutory.services.GstParameters;
 
 /**
  * Decides which GSTR-1 table a captured voucher belongs to.
  *
- * <p>Rule precedence (spec §7, B2CL threshold fixed at 2,50,000):
+ * <p>Rule precedence (spec §7; B2CL threshold read from the statutory tables):
  * <ol>
  *   <li>cancelled voucher → NOT_REPORTED</li>
  *   <li>advance payment / adjustment vouchers → ADVANCE / ADV_ADJ</li>
@@ -20,7 +21,7 @@ import com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute;
  *   <li>credit/debit note: GSTIN → CDNR, none → CDNUR</li>
  *   <li>counterparty GSTIN → B2B</li>
  *   <li>export/SEZ via fill-in or captured supply nature / foreign consignee → EXP</li>
- *   <li>unregistered + inter-state + value &gt; 2,50,000 → B2CL</li>
+ *   <li>unregistered + inter-state + value &gt; the B2CL threshold for the period → B2CL</li>
  *   <li>any other unregistered supply → B2CS</li>
  * </ol>
  */
@@ -41,8 +42,11 @@ public class ReportingClassifier {
 
     private final FillInResolver fillInResolver;
 
-    public ReportingClassifier(FillInResolver fillInResolver) {
+    private final GstParameters parameters;
+
+    public ReportingClassifier(FillInResolver fillInResolver, GstParameters parameters) {
         this.fillInResolver = Objects.requireNonNull(fillInResolver);
+        this.parameters = Objects.requireNonNull(parameters);
     }
 
     public record Result(ReportingClass category, String reason) {
@@ -97,7 +101,7 @@ public class ReportingClassifier {
         String supplierCode = lower(v.getSupplierStateCode());
         boolean interState = !posCode.equals(supplierCode);
         BigDecimal value = v.getTotalValue() == null ? BigDecimal.ZERO : v.getTotalValue();
-        if (interState && value.compareTo(Gstr1Rules.b2clThreshold(period)) > 0) {
+        if (interState && value.compareTo(parameters.b2clThreshold(period)) > 0) {
             return Result.of(ReportingClass.B2CL);
         }
         return Result.of(ReportingClass.B2CS);

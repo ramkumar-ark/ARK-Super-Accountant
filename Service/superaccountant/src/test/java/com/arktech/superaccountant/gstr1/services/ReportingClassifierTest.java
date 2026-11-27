@@ -1,6 +1,7 @@
 package com.arktech.superaccountant.gstr1.services;
 
 import com.arktech.superaccountant.gstr1.models.Gstr1FillInAttribute;
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -18,7 +19,8 @@ class ReportingClassifierTest {
     private ReportingClassifier classifier(
             Map<String, Optional<String>> fillIns) {
         return new ReportingClassifier((v, attribute) ->
-                fillIns.getOrDefault(attribute.name(), Optional.empty()));
+                fillIns.getOrDefault(attribute.name(), Optional.empty()),
+                GstStatutorySeed.asParameters());
     }
 
     private ReportingClassifier classifier() {
@@ -35,15 +37,22 @@ class ReportingClassifierTest {
     @Test
     void exactlyThresholdGoesToB2cs() {
         VoucherView v = voucher()
-                .totalValue(new BigDecimal("250000.00"))
+                .totalValue(new BigDecimal("100000.00"))
                 .build();
         assertEquals(ReportingClass.B2CS, classifier().classify(v, PERIOD).category());
     }
 
     @Test
+    void invoiceOf150000IsB2csInJuly2024ButB2clFromAugust2024() {
+        VoucherView v = voucher().totalValue(new BigDecimal("150000.00")).build();
+        assertEquals(ReportingClass.B2CS, classifier().classify(v, YearMonth.of(2024, 7)).category());
+        assertEquals(ReportingClass.B2CL, classifier().classify(v, YearMonth.of(2024, 8)).category());
+    }
+
+    @Test
     void justAboveThresholdInterStateGoesToB2cl() {
         VoucherView v = voucher()
-                .totalValue(new BigDecimal("250000.01"))
+                .totalValue(new BigDecimal("100000.01"))
                 .build();
         assertEquals(ReportingClass.B2CL, classifier().classify(v, PERIOD).category());
     }

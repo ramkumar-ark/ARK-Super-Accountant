@@ -1,7 +1,7 @@
 package com.arktech.superaccountant.gstr1.services.tables;
 
 import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
-import com.arktech.superaccountant.gstr1.services.Gstr1Rules;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
 import com.arktech.superaccountant.gstr1.services.VoucherView;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import org.springframework.stereotype.Component;
@@ -15,6 +15,12 @@ import java.util.Map;
 
 @Component
 public class B2csBuilder {
+
+    private final GstParameterSource parameterSource;
+
+    public B2csBuilder(GstParameterSource parameterSource) {
+        this.parameterSource = parameterSource;
+    }
 
     private static final class Bucket {
         BigDecimal taxable = BigDecimal.ZERO;
@@ -30,6 +36,7 @@ public class B2csBuilder {
     public List<PreparedReturnRow> build(Workflow workflow, List<VoucherView> sales) {
         Map<String, Bucket> buckets = new HashMap<>();
         YearMonth period = YearMonth.from(workflow.getPeriodStart());
+        BigDecimal b2clThreshold = parameterSource.current().b2clThreshold(period);
         for (VoucherView v : sales) {
             if (v.isCancelled() || TableRows.isNote(v.getVoucherTypeName())
                     || TableRows.hasGstin(v) || isExportCandidate(v) || isNilRate(v)) {
@@ -42,7 +49,7 @@ public class B2csBuilder {
                 continue;
             }
             boolean interState = !pos.equals(supplier);
-            if (interState && value.compareTo(Gstr1Rules.b2clThreshold(period)) > 0) {
+            if (interState && value.compareTo(b2clThreshold) > 0) {
                 continue;
             }
             BigDecimal rate = v.getRate() == null ? BigDecimal.ZERO : v.getRate();

@@ -1,5 +1,6 @@
 package com.arktech.superaccountant.gstr1.services.tables;
 
+import com.arktech.superaccountant.statutory.services.GstStatutorySeed;
 import com.arktech.superaccountant.gstr1.models.PreparedReturnRow;
 import com.arktech.superaccountant.gstr1.services.VoucherView;
 import org.junit.jupiter.api.Test;
@@ -53,7 +54,7 @@ class B2csBuilderTest extends TableTestSupport {
                 .cess(v("0.00"))
                 .build();
 
-        List<PreparedReturnRow> rows = new B2csBuilder().build(workflow(),
+        List<PreparedReturnRow> rows = new B2csBuilder(GstStatutorySeed::asParameters).build(workflow(),
                 List.of(karnataka18, karnataka18Again, tn5));
 
         assertEquals(2, rows.size());
@@ -100,7 +101,7 @@ class B2csBuilderTest extends TableTestSupport {
                 .rate(v("0"))
                 .build();
 
-        List<PreparedReturnRow> rows = new B2csBuilder().build(workflow(),
+        List<PreparedReturnRow> rows = new B2csBuilder(GstStatutorySeed::asParameters).build(workflow(),
                 List.of(registered, cancelled, note, export, nil));
 
         assertEquals(0, rows.size());

@@ -10,6 +10,8 @@ import com.arktech.superaccountant.gstr1.repository.Gstr1FillInRepository;
 import com.arktech.superaccountant.gstr1.services.Gstr1Rules;
 import com.arktech.superaccountant.masters.models.Organization;
 import com.arktech.superaccountant.masters.repository.OrganizationRepository;
+import com.arktech.superaccountant.statutory.services.GstParameterSource;
+import com.arktech.superaccountant.statutory.services.GstParameters;
 import com.arktech.superaccountant.workflow.models.FilerProfile;
 import com.arktech.superaccountant.workflow.models.Workflow;
 import com.arktech.superaccountant.workflow.models.WorkflowType;
@@ -43,7 +45,6 @@ public class Gstr1Validator {
 
     private static final String RETURN_KIND = "GSTR1";
     private static final BigDecimal TAX_TOLERANCE = BigDecimal.ONE;
-    private static final BigDecimal IFF_CAP = new BigDecimal("5000000");
     private static final String INVOICE_NO_PATTERN = "^[A-Z0-9/-]{1,16}$";
     private static final String GSTIN_PATTERN = "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$";
     private static final String GSTIN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -57,11 +58,14 @@ public class Gstr1Validator {
     private final FilerProfileRepository filerProfileRepository;
     private final ParsedVoucherRepository parsedVoucherRepository;
     private final Gstr1FillInRepository fillInRepository;
+    private final GstParameterSource parameterSource;
 
     public Gstr1Validator(OrganizationRepository organizationRepository,
                           FilerProfileRepository filerProfileRepository,
                           ParsedVoucherRepository parsedVoucherRepository,
-                          Gstr1FillInRepository fillInRepository) {
+                          Gstr1FillInRepository fillInRepository,
+                          GstParameterSource parameterSource) {
+        this.parameterSource = parameterSource;
         this.organizationRepository = organizationRepository;
         this.filerProfileRepository = filerProfileRepository;
         this.parsedVoucherRepository = parsedVoucherRepository;
@@ -70,6 +74,7 @@ public class Gstr1Validator {
 
     public List<ValidationResult> validate(Workflow workflow, List<PreparedReturnRow> rows) {
         List<ValidationResult> results = new ArrayList<>();
+        GstParameters parameters = parameterSource.current();
         String ownGstin = ownGstin(workflow.getOrganizationId());
         FilerProfile profile = profileFor(workflow);
         int hsnDigits = profile != null && profile.getHsnDigits() != null ? profile.getHsnDigits() : 4;
@@ -103,7 +108,7 @@ public class Gstr1Validator {
                 checkHsn(results, row, payload, hsnDigits);
             }
             checkPos(results, row, payload, table);
-            checkRate(results, row, payload);
+            checkRate(results, row, payload, parameters, periodStart);
             checkTaxArithmetic(results, row, payload);
             checkInvoiceNumber(results, row, payload, invoiceNos);
             checkDate(results, row, payload, periodStart, periodEnd);
@@ -144,7 +149,7 @@ public class Gstr1Validator {
                     "E-invoicing is enabled for this filer, so B2B rows that are e-invoice reportable"
                             + " may be excluded from this build; confirm they are covered by IRN invoices"));
         }
-        if (workflow.getType() == WorkflowType.IFF && aggregate.compareTo(IFF_CAP) > 0) {
+        if (workflow.getType() == WorkflowType.IFF && aggregate.compareTo(parameters.iffCap(periodStart)) > 0) {
             results.add(new ValidationResult("IFF_CAP", ValidationResult.Severity.WARNING,
                     null, null,
                     "Aggregate value for the month exceeds the ₹50 lakh IFF cap (see T22);"
@@ -214,12 +219,13 @@ public class Gstr1Validator {
     }
 
     private void checkRate(List<ValidationResult> results, PreparedReturnRow row,
-                           Map<String, Object> payload) {
+                           Map<String, Object> payload, GstParameters parameters,
+                           LocalDate periodStart) {
         BigDecimal rate = number(payload, "rate");
         if (rate == null) {
             return;
         }
-        if (!Gstr1Rules.isAllowedRate(rate)) {
+        if (!parameters.isAllowedRate(rate, periodStart)) {
             results.add(new ValidationResult("RATE_INVALID", ValidationResult.Severity.ERROR,
                     row.getTableCode(), row.getRowKey(),
                     "Tax rate " + rate.toPlainString() + "% is not an allowed GST rate"));
