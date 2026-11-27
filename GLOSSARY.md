@@ -158,6 +158,22 @@ mapped with the receivable role. It carries no section. An unmapped one only war
 never blocks analysis.
 _Avoid_: TDS asset ledger, TDS credit ledger
 
+## Statutory section
+
+A global (not per-organization) TDS section such as 194C, identified by its stable code,
+with its description, Form 26Q / Form 140 codes and a flag for payee-split rates. Rates,
+thresholds and the legal reference for a period live on dated rule rows beside it, so a
+Finance Act change is a data change. Ledger mappings point at the stable code; the reference
+shown (194C or 393(1) ...) comes from the rule row covering the period.
+_Avoid_: section config (the legacy per-section config columns are frozen)
+
+## Payee-split rate
+
+A section whose rate depends on the payee's status. The individual/HUF rate applies only when
+the payee's PAN 4th character is P or H; every other payee (company, firm, LLP, AOP, trust)
+gets the other rate. 194C is 1% / 2%.
+_Avoid_: company/non-company rate (a firm is "non-company" but pays the higher rate)
+
 ## GST tax-ledger mapping
 
 A per-organization record saying what a GST-categorized ledger in the books is: its

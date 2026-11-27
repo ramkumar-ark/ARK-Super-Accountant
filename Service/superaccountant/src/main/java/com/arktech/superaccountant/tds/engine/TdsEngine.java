@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -76,6 +77,7 @@ public class TdsEngine {
     private void runPerVoucherPass(TdsAnalysisInput input, List<VoucherFact> facts,
                                    List<TdsFinding> findings, List<TdsDeducteeEntry> entries) {
         Set<String> panFindingKeys = new HashSet<>();
+        Set<String> unconfiguredSections = new HashSet<>();
         Set<String> debtorKeys = debtorKeys(input);
         Set<String> receivableKeys = receivableLedgerKeys(input);
         for (ParsedVoucher v : input.vouchers()) {
@@ -179,6 +181,17 @@ public class TdsEngine {
                 BigDecimal base = baseEntry.getValue();
                 TdsSectionConfig cfg = input.configsBySection().get(section);
                 if (cfg == null) {
+                    // A mapped section with no active statutory row cannot be analysed; say so
+                    // once per section instead of silently skipping the voucher.
+                    if (isInPeriod(v.getVoucherDate(), input) && unconfiguredSections.add(section)) {
+                        findings.add(finding(input, v, TdsFindingType.SECTION_NOT_CONFIGURED,
+                                FindingSeverity.MEDIUM, section, null, null,
+                                "Section '" + section + "' has no active statutory configuration, "
+                                        + "so TDS on voucher " + v.getVoucherNumber()
+                                        + " and other payments under it was not analysed.",
+                                "Map the ledger to a configured TDS section, or ask your administrator "
+                                        + "to configure section '" + section + "'."));
+                    }
                     continue;
                 }
                 UploadLedgerSnapshot partySnapshot = input.snapshotsByName().get(partyKey);
@@ -191,7 +204,7 @@ public class TdsEngine {
                         .divide(HUNDRED, 2, RoundingMode.HALF_UP);
                 BigDecimal deducted = tdsBySection.getOrDefault(section, BigDecimal.ZERO)
                         .setScale(2, RoundingMode.HALF_UP);
-                facts.add(new VoucherFact(v, partyName, partyKey, section, base, deducted, rate));
+                facts.add(new VoucherFact(v, partyName, partyKey, section, base, deducted, rate, panValid));
                 if (isInPeriod(v.getVoucherDate(), input)) {
                     if (panMissing) {
                         String dedupKey = partyKey + "|" + section + "|" + TdsFindingType.PAN_MISSING;
@@ -212,30 +225,8 @@ public class TdsEngine {
                                     "Add a valid PAN in the PAN tab, or deduct at " + rate + "%."));
                         }
                     }
-                    if (deducted.signum() != 0) {
-                        BigDecimal diff = expected.subtract(deducted);
-                        if (!panValid) {
-                            if (diff.abs().compareTo(TOLERANCE) > 0) {
-                                findings.add(finding(input, v, TdsFindingType.HIGHER_RATE_NOT_APPLIED,
-                                        FindingSeverity.HIGH, section, expected, deducted,
-                                        "PAN missing/invalid: expected " + rate + "% (" + expected
-                                                + "), deducted " + deducted + ".",
-                                        "Deduct at the " + rate + "% higher rate or fix the PAN."));
-                            }
-                        } else if (diff.abs().compareTo(TOLERANCE) > 0) {
-                            if (diff.signum() > 0) {
-                                findings.add(finding(input, v, TdsFindingType.SHORT_DEDUCTED,
-                                        FindingSeverity.HIGH, section, expected, deducted,
-                                        "Expected TDS " + expected + " at " + rate + "%, deducted "
-                                                + deducted + ".",
-                                        "Deduct the shortfall of " + diff + " and revise the entry in Tally."));
-                            } else {
-                                findings.add(finding(input, v, TdsFindingType.EXCESS_DEDUCTED,
-                                        FindingSeverity.MEDIUM, section, expected, deducted,
-                                        "Deducted " + deducted + " exceeds expected " + expected + ".",
-                                        "Verify the rate applied; excess can be adjusted in later payments."));
-                            }
-                        }
+                    if (deducted.signum() != 0 && !cfg.isThresholdExcessOnly()) {
+                        compareDeduction(input, v, section, panValid, rate, expected, deducted, findings);
                     }
                     if (deducted.signum() > 0) {
                         entries.add(deducteeEntry(input, v, partyName, trimmedPan, panValid, section,
@@ -243,6 +234,38 @@ public class TdsEngine {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Compares the TDS actually deducted on one voucher with the expected amount and emits the
+     * rate findings. Sections taxed on the excess over a threshold are compared in the
+     * threshold pass instead, once the running aggregate is known.
+     */
+    private void compareDeduction(TdsAnalysisInput input, ParsedVoucher v, String section, boolean panValid,
+                                  BigDecimal rate, BigDecimal expected, BigDecimal deducted,
+                                  List<TdsFinding> findings) {
+        BigDecimal diff = expected.subtract(deducted);
+        if (diff.abs().compareTo(TOLERANCE) <= 0) {
+            return;
+        }
+        if (!panValid) {
+            findings.add(finding(input, v, TdsFindingType.HIGHER_RATE_NOT_APPLIED,
+                    FindingSeverity.HIGH, section, expected, deducted,
+                    "PAN missing/invalid: expected " + rate + "% (" + expected
+                            + "), deducted " + deducted + ".",
+                    "Deduct at the " + rate + "% higher rate or fix the PAN."));
+        } else if (diff.signum() > 0) {
+            findings.add(finding(input, v, TdsFindingType.SHORT_DEDUCTED,
+                    FindingSeverity.HIGH, section, expected, deducted,
+                    "Expected TDS " + expected + " at " + rate + "%, deducted "
+                            + deducted + ".",
+                    "Deduct the shortfall of " + diff + " and revise the entry in Tally."));
+        } else {
+            findings.add(finding(input, v, TdsFindingType.EXCESS_DEDUCTED,
+                    FindingSeverity.MEDIUM, section, expected, deducted,
+                    "Deducted " + deducted + " exceeds expected " + expected + ".",
+                    "Verify the rate applied; excess can be adjusted in later payments."));
         }
     }
 
@@ -307,7 +330,13 @@ public class TdsEngine {
                                   List<RetroFlag> retroFlags) {
         Map<String, List<VoucherFact>> groups = new LinkedHashMap<>();
         for (VoucherFact fact : facts) {
-            groups.computeIfAbsent(fact.partyKey() + "|" + fact.section(), k -> new ArrayList<>()).add(fact);
+            TdsSectionConfig factCfg = input.configsBySection().get(fact.section());
+            String groupKey = fact.partyKey() + "|" + fact.section();
+            if (factCfg != null && factCfg.getThresholdMonthly() != null) {
+                // Monthly thresholds (rent) restart every calendar month, per payee.
+                groupKey += "|" + YearMonth.from(fact.voucher().getVoucherDate());
+            }
+            groups.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(fact);
         }
         for (List<VoucherFact> group : groups.values()) {
             group.sort(Comparator
@@ -319,6 +348,13 @@ public class TdsEngine {
             if (cfg == null) {
                 continue;
             }
+            if (cfg.isThresholdExcessOnly()) {
+                runExcessOnlyGroup(group, cfg, input, findings);
+                continue;
+            }
+            boolean monthly = cfg.getThresholdMonthly() != null;
+            BigDecimal threshold = monthly ? cfg.getThresholdMonthly() : orZero(cfg.getThresholdAnnual());
+            String thresholdKind = monthly ? "monthly" : "annual";
             BigDecimal aggregate = BigDecimal.ZERO;
             VoucherFact crossing = null;
             List<VoucherFact> priorUndeducted = new ArrayList<>();
@@ -326,7 +362,7 @@ public class TdsEngine {
             for (VoucherFact f : group) {
                 aggregate = aggregate.add(f.base());
                 if (crossing == null) {
-                    if (aggregate.compareTo(cfg.getThresholdAnnual()) > 0) {
+                    if (aggregate.compareTo(threshold) > 0) {
                         crossing = f;
                     } else if (f.deducted().signum() == 0) {
                         priorUndeducted.add(f);
@@ -353,8 +389,8 @@ public class TdsEngine {
                         new BigDecimal("0.00"),
                         "Aggregate payments of " + bases + " to '" + crossing.partyName() + "' under "
                                 + input.displayRef(cfg.getSectionCode(), crossing.voucher().getVoucherDate())
-                                + " crossed the annual threshold of "
-                                + cfg.getThresholdAnnual() + "; TDS was not deducted.",
+                                + " crossed the " + thresholdKind + " threshold of "
+                                + threshold + "; TDS was not deducted.",
                         "Deduct " + expected + " and record the TDS entry in Tally."));
                 findings.get(findings.size() - 1)
                         .setRelatedVoucherIds(relatedIds.isEmpty() ? "[]" : "[" + String.join(",", relatedIds) + "]");
@@ -385,6 +421,49 @@ public class TdsEngine {
                 }
             }
         }
+    }
+
+    /**
+     * Sections taxed only on the part of the aggregate above the threshold (194Q: 0.1% of the
+     * purchases above Rs 50 lakh, not of the whole purchase). Walks one payee's facts in date
+     * order, derives each voucher's taxable portion from the running aggregate and compares the
+     * TDS deducted with it. Payments up to the threshold carry no liability.
+     */
+    private void runExcessOnlyGroup(List<VoucherFact> group, TdsSectionConfig cfg, TdsAnalysisInput input,
+                                    List<TdsFinding> findings) {
+        BigDecimal threshold = orZero(cfg.getThresholdAnnual());
+        BigDecimal aggregate = BigDecimal.ZERO;
+        for (VoucherFact f : group) {
+            BigDecimal before = aggregate;
+            aggregate = aggregate.add(f.base());
+            BigDecimal taxable = aggregate.subtract(threshold.max(before)).max(BigDecimal.ZERO).min(f.base());
+            if (!isInPeriod(f.voucher().getVoucherDate(), input)) {
+                continue;
+            }
+            BigDecimal expected = taxable.multiply(f.rate()).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+            if (f.deducted().signum() != 0) {
+                compareDeduction(input, f.voucher(), f.section(), f.panValid(), f.rate(), expected,
+                        f.deducted(), findings);
+            } else if (expected.signum() > 0) {
+                boolean crossing = before.compareTo(threshold) <= 0;
+                String ref = input.displayRef(cfg.getSectionCode(), f.voucher().getVoucherDate());
+                findings.add(finding(input, f.voucher(),
+                        crossing ? TdsFindingType.THRESHOLD_CROSSED : TdsFindingType.NOT_DEDUCTED,
+                        FindingSeverity.HIGH, f.section(), expected, new BigDecimal("0.00"),
+                        crossing
+                                ? "Aggregate payments of " + aggregate + " to '" + f.partyName() + "' under "
+                                        + ref + " crossed the threshold of " + threshold
+                                        + "; TDS applies to the excess of " + taxable + ", not to the "
+                                        + "whole payment, and was not deducted."
+                                : "No TDS deducted on liable payment of " + taxable + " (above the "
+                                        + "threshold) under " + ref + ".",
+                        "Deduct " + expected + " and record the TDS entry in Tally."));
+            }
+        }
+    }
+
+    private static BigDecimal orZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private void runAdvancePass(TdsAnalysisInput input, List<VoucherFact> facts, List<TdsFinding> findings) {
@@ -568,14 +647,18 @@ public class TdsEngine {
                 && amount.compareTo(cfg.getThresholdPerTransaction()) > 0) {
             return true;
         }
+        boolean monthly = cfg.getThresholdMonthly() != null;
+        YearMonth month = YearMonth.from(asOf);
         BigDecimal aggregate = BigDecimal.ZERO;
         for (VoucherFact f : facts) {
             if (partyKey != null && partyKey.equals(f.partyKey()) && section.equals(f.section())
-                    && f.voucher().getVoucherDate() != null && !f.voucher().getVoucherDate().isAfter(asOf)) {
+                    && f.voucher().getVoucherDate() != null && !f.voucher().getVoucherDate().isAfter(asOf)
+                    && (!monthly || month.equals(YearMonth.from(f.voucher().getVoucherDate())))) {
                 aggregate = aggregate.add(f.base());
             }
         }
-        return aggregate.add(amount).compareTo(cfg.getThresholdAnnual()) > 0;
+        BigDecimal threshold = monthly ? cfg.getThresholdMonthly() : orZero(cfg.getThresholdAnnual());
+        return aggregate.add(amount).compareTo(threshold) > 0;
     }
 
     private BigDecimal rateFor(String partyKey, TdsSectionConfig cfg, TdsAnalysisInput in) {
@@ -585,8 +668,22 @@ public class TdsEngine {
         if (!panValid) {
             return cfg.getHigherRateIfNoPan();
         }
+        if (cfg.isPayeeSplit()) {
+            // Payee-split sections (194C): only an individual or HUF (PAN 4th character P or H)
+            // gets the lower rate; firms, LLPs, AOPs, trusts and companies get the other rate.
+            return isIndividualOrHuf(pan.trim()) ? cfg.getRateNonCompany() : cfg.getRateCompany();
+        }
         return deducteeTypeFromPan(pan.trim()) == TdsDeducteeType.COMPANY
                 ? cfg.getRateCompany() : cfg.getRateNonCompany();
+    }
+
+    /** PAN 4th character P (individual) or H (HUF). */
+    static boolean isIndividualOrHuf(String validPan) {
+        if (validPan == null || validPan.length() < 4) {
+            return false;
+        }
+        char status = Character.toUpperCase(validPan.charAt(3));
+        return status == 'P' || status == 'H';
     }
 
     private TdsFinding finding(TdsAnalysisInput in, ParsedVoucher v, TdsFindingType t, FindingSeverity s,
@@ -664,6 +761,6 @@ public class TdsEngine {
     }
 
     private record VoucherFact(ParsedVoucher voucher, String partyName, String partyKey, String section,
-                               BigDecimal base, BigDecimal deducted, BigDecimal rate) {
+                               BigDecimal base, BigDecimal deducted, BigDecimal rate, boolean panValid) {
     }
 }

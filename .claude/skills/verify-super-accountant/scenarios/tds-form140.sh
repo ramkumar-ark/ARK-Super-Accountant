@@ -3,7 +3,9 @@
 # deductee entries -> challans -> map -> gate -> finalize -> GET /tds/export.
 # Quarters used (one periodKey each, never reused): 2025-Q1 old Act, 2026-Q1 new
 # Act (194C individual/non-individual + 194J_B), 2026-Q2 new Act with 194M,
-# 2026-Q3 new Act with a payee that has no PAN (gate must block).
+# 2026-Q3 new Act with a payee that has no PAN (gate must block). The 2026-Q1 and
+# 2025-Q1 quarters also carry a 194T (partner remuneration, seeded from the
+# statutory tables) voucher: Form 140 code 1067 / 26Q code 94T.
 
 TDS_TAN="CHEA12345B"
 
@@ -36,7 +38,7 @@ tds_setup() {
   req "masters-latest" GET "/api/v1/uploads?page=0&size=1"
   local job; job=$(echo "$RESP" | jq -r '.content[0].id')
   local pair name sec sid
-  for pair in "TDS Contract Expense=194C" "TDS Contract Expense 194M=194M" "TDS Professional Expense=194J_B"; do
+  for pair in "TDS Contract Expense=194C" "TDS Contract Expense 194M=194M" "TDS Professional Expense=194J_B" "TDS Partner Remuneration=194T"; do
     name=${pair%%=*}; sec=${pair#*=}
     sid=$(vsa_psql "select id from upload_ledger_snapshots where upload_job_id='$job' and ledger_name='$name'" | head -1)
     [ -n "$sid" ] || vsa_fail "no snapshot for $name"
@@ -119,14 +121,15 @@ run_scenario() {
   tds_daybook 2026 4 "$dd/tds-2026-q1.json" \
     "TDS Contract Expense:TDS Payee Individual:500000:5000" \
     "TDS Contract Expense:TDS Payee Company:500000:10000" \
-    "TDS Professional Expense:TDS Payee Company:200000:20000"
+    "TDS Professional Expense:TDS Payee Company:200000:20000" \
+    "TDS Partner Remuneration:TDS Payee Individual:100000:10000"
   # Payment months first: each payment upload becomes the latest upload for its
   # period, so the quarter's own upload must be the last one bound.
-  cid=$(tds_pay_months 2026 1 35000)
+  cid=$(tds_pay_months 2026 1 45000)
   qid=$(tds_quarter 2026 1 "$dd/tds-2026-q1.json")
   as_accountant
   req "entries-q1" GET "/api/v1/workflows/$qid/tds/entries"
-  expect_json 'length == 3'
+  expect_json 'length == 4 and ([.[] | select(.section == "194T")] | length == 1)'
   tds_map_gate_finalize "$qid" "$cid"
   tds_export "$qid"
   expect_status 200
@@ -135,9 +138,10 @@ run_scenario() {
   expect_contains '^1023^'
   expect_contains '^1024^'
   expect_contains '^1027^'
+  expect_contains '^1067^'   # 194T
   expect_header "140_${TDS_TAN}_FY2026_Q1.txt"
   VSA_STEP="no-old-act-codes"
-  if echo "$RESP" | grep -qE '\^(94C|4JB)\^'; then ok=false; else ok=true; fi
+  if echo "$RESP" | grep -qE '\^(94C|4JB|94T)\^'; then ok=false; else ok=true; fi
   vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" GET "$VSA_PATH" "$STATUS" "body has no 26Q section codes" "$ok"
   as_operator
   req "export-operator-forbidden" GET "/api/v1/workflows/$qid/tds/export"
@@ -179,8 +183,9 @@ run_scenario() {
   vsa_psql "update organizations set books_start_date='2025-04-01' where id='$org'" >/dev/null
   tds_daybook 2025 4 "$dd/tds-2025-q1.json" \
     "TDS Contract Expense:TDS Payee Individual:500000:5000" \
-    "TDS Professional Expense:TDS Payee Company:200000:20000"
-  cid=$(tds_pay_months 2025 1 25000)
+    "TDS Professional Expense:TDS Payee Company:200000:20000" \
+    "TDS Partner Remuneration:TDS Payee Individual:100000:10000"
+  cid=$(tds_pay_months 2025 1 35000)
   qid=$(tds_quarter 2025 1 "$dd/tds-2025-q1.json")
   tds_map_gate_finalize "$qid" "$cid"
   tds_export "$qid"
@@ -188,9 +193,10 @@ run_scenario() {
   expect_contains '^26Q^'
   expect_contains '^94C^'
   expect_contains '^4JB^'
+  expect_contains '^94T^'   # 194T
   expect_header "26Q_${TDS_TAN}_FY2025_Q1.txt"
   VSA_STEP="no-form140"
-  if echo "$RESP" | grep -qE '\^140\^|\^(1023|1024|1027)\^'; then ok=false; else ok=true; fi
+  if echo "$RESP" | grep -qE '\^140\^|\^(1023|1024|1027|1067)\^'; then ok=false; else ok=true; fi
   vsa_log_step "$VSA_SCENARIO" "$VSA_STEP" GET "$VSA_PATH" "$STATUS" "old-Act body has no Form 140 markers" "$ok"
   vsa_psql "update organizations set books_start_date=NULL where id='$org'" >/dev/null
   trap - EXIT

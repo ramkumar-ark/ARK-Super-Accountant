@@ -221,7 +221,7 @@ class BulkTypedOverrideIT {
         bulk(accountantJwt, "{\"ruleCode\":\"GSTIN_PRESENCE\",\"value\":\"29ABCDE1234F1Z5\"}").andExpect(status().isBadRequest());
         bulk(accountantJwt, "{\"allMatching\":true,\"value\":\"194Z\"}").andExpect(status().isBadRequest());
         // unseeded sections are rejected everywhere, not just absent from the picker
-        bulk(accountantJwt, "{\"allMatching\":true,\"value\":\"194D\"}").andExpect(status().isBadRequest());
+        bulk(accountantJwt, "{\"allMatching\":true,\"value\":\"192A\"}").andExpect(status().isBadRequest());
         bulk(accountantJwt, "{\"allMatching\":true,\"value\":\"194B\"}").andExpect(status().isBadRequest());
         bulk(accountantJwt, "{\"ruleCode\":\"GSTIN_PRESENCE\",\"value\":\"194C\"}").andExpect(status().isBadRequest());
         bulk(accountantJwt, "{\"action\":\"APPROVE\",\"ruleCode\":\"TDS_SECTION_MAPPING\",\"value\":\"194C\"}").andExpect(status().isBadRequest());

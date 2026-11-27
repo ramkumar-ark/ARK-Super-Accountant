@@ -52,4 +52,19 @@ public record RpuHeader(
                 false, false,
                 regularStatementFiledEarlier);
     }
+
+    /**
+     * Last day of the return's quarter (30 Jun, 30 Sep, 31 Dec, 31 Mar). A nil challan carries no
+     * real deposit date, so both the 26Q and Form 140 exports report this date instead.
+     * Null for a quarter outside 1-4.
+     */
+    public LocalDate quarterEndDate() {
+        return switch (quarter) {
+            case 1 -> LocalDate.of(financialYearStart, 6, 30);
+            case 2 -> LocalDate.of(financialYearStart, 9, 30);
+            case 3 -> LocalDate.of(financialYearStart, 12, 31);
+            case 4 -> LocalDate.of(financialYearStart + 1, 3, 31);
+            default -> null;
+        };
+    }
 }

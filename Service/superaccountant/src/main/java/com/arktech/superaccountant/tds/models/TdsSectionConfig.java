@@ -90,6 +90,29 @@ public class TdsSectionConfig {
     @ToString.Exclude
     private List<StatutorySectionRule> datedRules;
 
+    /**
+     * Engine-only (never persisted): per-calendar-month threshold per payee, from the covering
+     * rule row. When set it replaces the annual aggregate test (rent, s.393(1) Table Sl. No. 2(ii)).
+     */
+    @Transient
+    private BigDecimal thresholdMonthly;
+
+    /**
+     * Engine-only: tax applies only to the part of the aggregate above {@link #thresholdAnnual}
+     * (s.194Q). False means the whole payment is taxed once the threshold is crossed.
+     */
+    @Transient
+    private boolean thresholdExcessOnly;
+
+    /**
+     * Engine-only: the section's rate pair is split by payee status. {@link #rateNonCompany} is
+     * then the individual/HUF rate (PAN 4th character P or H) and {@link #rateCompany} is the
+     * rate for every other payee (company, firm, LLP, AOP, trust, ...), e.g. 194C at 1% / 2%.
+     * Copied from {@code StatutorySection.rpu140PayeeSplit} by the caller.
+     */
+    @Transient
+    private boolean payeeSplit;
+
     public static boolean newActApplies(LocalDate tdsDate) {
         return !tdsDate.isBefore(NEW_ACT_EFFECTIVE_DATE);
     }
@@ -122,6 +145,8 @@ public class TdsSectionConfig {
         copy.setThresholdPerTransaction(rule.getThresholdPerTransaction());
         copy.setThresholdAnnual(rule.getThresholdAnnual());
         copy.setHigherRateIfNoPan(rule.getHigherRateIfNoPan());
+        copy.setThresholdMonthly(rule.getThresholdMonthly());
+        copy.setThresholdExcessOnly(Boolean.TRUE.equals(rule.getThresholdExcessOnly()));
         return copy;
     }
 

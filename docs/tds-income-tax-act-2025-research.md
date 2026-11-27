@@ -102,11 +102,32 @@ Date-driven on the **earlier of payment or credit date** of the transaction:
 
 ## Open points (implemented conservatively, reported here)
 
-1. Rent threshold granularity: the new Act tests ₹50,000 **per month** per landlord, which our
-   annual-threshold engine cannot express exactly; implemented as per-transaction check against
-   the monthly figure using the voucher month, keeping the annual catch-up off for rent.
+1. Rent threshold granularity: the Act tests ₹50,000 **per month or part of a month** per landlord
+   (Finance Act 2025 s.64 for 194-I from 1 Apr 2025; s.393 Table Sl. No. 2(ii) from 1 Apr 2026).
+   Implemented as `statutory_section_rules.threshold_monthly`: the engine groups a payee's rent by the
+   voucher's calendar month and the annual aggregate is not used. The earlier ₹6,00,000 annual figure
+   in the first research pass was not the enacted wording. Periods before 1 Apr 2025 keep ₹2,40,000 annual.
 2. 194M: no Form 140 code exists post-1 Apr 2026 (moves to Form 141 Schedule C, which this app
    does not generate). The RPU generator emits an explicit validation error rather than a wrong
    file; flagged to the captain rather than inventing a Form 141 generator.
 3. The Protean workbook's own title says "Version 1.1" while the download page says 1.2 — the
    spec content used here is the downloaded 22072026 file; no behavioural difference observed.
+
+## Statutory-config PR4 (194D / 193 / 194T, rent, 194Q, payee split)
+
+- **Seeded sections** (`DataMigrationService.seedFinanceAct2025Sections`): 194D (2%, 10% domestic company,
+  ₹20,000 — FA 2025 s.61), 193 (10%, ₹10,000 — FA 2025 s.56), 194T (10%, ₹20,000 — Finance (No. 2) Act 2024
+  s.62, payer must be a firm). Rows start 1 Apr 2025, the date their values are verified for; earlier
+  periods fall back to the earliest row. 26Q codes `94D`/`193`/`94T` (v7.8) and Form 140 codes
+  `1005`/`1019`/`1067`. 194B (`94B` / `1058`) is verified but deliberately not seeded.
+- **Finance Act 2025 corrections** (`applyFinanceAct2025RuleCorrections`): 194H ₹15,000 → ₹20,000 (s.63) and
+  194J ₹30,000 → ₹50,000 (s.65) from 1 Apr 2025; 194-I per-month test from 1 Apr 2025 (s.64).
+- **194Q** deducts only on the part of the aggregate above ₹50 lakh in every period
+  (`threshold_excess_only`); no-PAN rate 5% under the 2025 Act. The old-regime no-PAN rate was not
+  re-verified and stays at the seeded 20%.
+- **Payee-split sections (194C)**: individual/HUF (PAN 4th character P or H) 1%, every other payee 2%.
+  Previously only a company PAN got 2%, so firms, LLPs, AOPs and trusts were under-deducted at 1%.
+- **194M** keeps the explicit "Form 141 not supported" export error; its 2025 Act rule row carries
+  the reference `393(1) [Table: Sl. No. 6(ii)]`.
+- A mapped section with no active statutory row raises `SECTION_NOT_CONFIGURED` once per section
+  instead of being skipped silently.

@@ -139,13 +139,7 @@ public class Rpu140Generator {
         if (!challan.isNilChallan()) {
             return null;
         }
-        return switch (header.quarter()) {
-            case 1 -> LocalDate.of(header.financialYearStart(), 6, 30);
-            case 2 -> LocalDate.of(header.financialYearStart(), 9, 30);
-            case 3 -> LocalDate.of(header.financialYearStart(), 12, 31);
-            case 4 -> LocalDate.of(header.financialYearStart() + 1, 3, 31);
-            default -> null;
-        };
+        return header.quarterEndDate();
     }
 
     private static BigDecimal nz(BigDecimal value) {

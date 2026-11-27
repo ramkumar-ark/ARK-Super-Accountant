@@ -10,5 +10,7 @@ public enum TdsFindingType {
     PAN_MISSING,
     PAN_INVALID,
     HIGHER_RATE_NOT_APPLIED,
-    DEBTOR_TDS_RECEIVABLE_MISSING_TAN
+    DEBTOR_TDS_RECEIVABLE_MISSING_TAN,
+    /** A voucher maps to a TDS section with no active statutory configuration, so it was not analysed. */
+    SECTION_NOT_CONFIGURED
 }

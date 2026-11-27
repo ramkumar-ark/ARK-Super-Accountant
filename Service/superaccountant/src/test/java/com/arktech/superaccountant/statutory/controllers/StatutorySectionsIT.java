@@ -64,7 +64,7 @@ class StatutorySectionsIT {
 
         MvcResult result = mockMvc.perform(get("/api/tds/sections").with(user(principal)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(10))
+                .andExpect(jsonPath("$.length()").value(13))
                 .andExpect(jsonPath("$[?(@.code == '194C')].description").value(
                         org.hamcrest.Matchers.hasItem("Payments to contractors and sub-contractors")))
                 .andExpect(jsonPath("$[?(@.code == '194C')].legalReference").value(
@@ -74,12 +74,17 @@ class StatutorySectionsIT {
                 .andExpect(jsonPath("$[?(@.code == '194C')].rpu140Code").value(
                         org.hamcrest.Matchers.hasItem("1024")))
                 .andExpect(jsonPath("$[?(@.code == '194M')].legalReference").value(
-                        org.hamcrest.Matchers.hasItem("194M")))
+                        org.hamcrest.Matchers.hasItem("393(1) [Table: Sl. No. 6(ii)]")))
+                .andExpect(jsonPath("$[?(@.code == '194T')].rpu26qCode").value(
+                        org.hamcrest.Matchers.hasItem("94T")))
+                .andExpect(jsonPath("$[?(@.code == '194D')].rpu140Code").value(
+                        org.hamcrest.Matchers.hasItem("1005")))
+                .andExpect(jsonPath("$[?(@.code == '193')].legalReference").value(
+                        org.hamcrest.Matchers.hasItem("393(1) [Table: Sl. No. 5(i)]")))
                 .andReturn();
 
         String body = result.getResponse().getContentAsString();
         assertFalse(body.contains("\"194B\""));
-        assertFalse(body.contains("\"194D\""));
     }
 
     @Test

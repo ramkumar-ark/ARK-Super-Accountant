@@ -311,6 +311,13 @@
         "guid": "SYN-L-TDS-EXP-J",
         "parent": "Indirect Expenses"
       }
+    },
+    {
+      "ledger": {
+        "name": "TDS Partner Remuneration",
+        "guid": "SYN-L-TDS-EXP-T",
+        "parent": "Indirect Expenses"
+      }
     }
   ]
 }
