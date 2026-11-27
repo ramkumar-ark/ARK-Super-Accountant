@@ -15,7 +15,6 @@ import {
   type StatutoryRule,
   type StatutorySectionView,
 } from '@/lib/statutoryAdminApi'
-import { api } from '@/lib/api'
 import {
   ALERT_ERROR_CLASS,
   ALERT_WARNING_CLASS,
@@ -146,7 +145,7 @@ export function StatutoryConfigPage() {
       setError(null)
       invalidateStatutoryCaches(qc)
     },
-    onError: (err) => setError(apiErrorMessage(err)),
+    onError: (err) => setError(apiErrorMessage(err, "The change could not be saved.")),
   })
   const setSectionActive = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
@@ -155,7 +154,7 @@ export function StatutoryConfigPage() {
       setError(null)
       invalidateStatutoryCaches(qc)
     },
-    onError: (err) => setError(apiErrorMessage(err)),
+    onError: (err) => setError(apiErrorMessage(err, "The change could not be saved.")),
   })
   const deleteSection = useMutation({
     mutationFn: (id: string) => deleteStatutorySection(id),
@@ -163,7 +162,7 @@ export function StatutoryConfigPage() {
       setError(null)
       invalidateStatutoryCaches(qc)
     },
-    onError: (err) => setError(apiErrorMessage(err)),
+    onError: (err) => setError(apiErrorMessage(err, "The change could not be saved.")),
   })
 
   const { tds, gst } = useMemo(() => {
