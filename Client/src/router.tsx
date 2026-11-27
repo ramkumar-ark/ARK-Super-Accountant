@@ -16,6 +16,7 @@ import { WorkflowListPage } from '@/pages/workflows/WorkflowListPage'
 import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
 import { TeamPage } from '@/pages/TeamPage'
 import { CompliancePage } from '@/pages/settings/CompliancePage'
+import { StatutoryConfigPage } from '@/pages/settings/StatutoryConfigPage'
 import { BaselinePeriodsPage } from '@/pages/settings/BaselinePeriodsPage'
 import { useAuthStore } from '@/store/authStore'
 import { validateSession } from '@/lib/session'
@@ -159,6 +160,15 @@ const complianceRoute = createRoute({
   component: CompliancePage,
 })
 
+const statutoryRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/statutory',
+  beforeLoad: async () => {
+    await requireSession()
+  },
+  component: StatutoryConfigPage,
+})
+
 const baselinePeriodsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/baseline-periods',
@@ -183,6 +193,7 @@ const routeTree = rootRoute.addChildren([
   workflowDetailRoute,
   teamRoute,
   complianceRoute,
+  statutoryRoute,
   baselinePeriodsRoute,
 ])
 
