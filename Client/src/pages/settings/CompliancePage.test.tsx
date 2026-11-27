@@ -7,6 +7,7 @@ import { CompliancePage } from './CompliancePage'
 const MAPPING_VIEW = {
   complete: true,
   mastersJobId: null,
+  gstApplicable: true,
   blockers: [],
   ledgers: [
     {
@@ -90,6 +91,12 @@ function renderPage(role: string) {
   )
 }
 
+async function openTab(name: string) {
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('tab', { name }))
+  return user
+}
+
 describe('CompliancePage — responsibility start', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -139,6 +146,7 @@ describe('CompliancePage — responsibility start', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     await waitFor(() => {
       expect(screen.getByTestId('resp-TDS_PAYMENT')).toHaveTextContent('2025-07-01')
@@ -175,7 +183,7 @@ describe('CompliancePage — responsibility start', () => {
 
     renderPage('ROLE_ACCOUNTANT')
 
-    const user = userEvent.setup()
+    const user = await openTab('Periods & baseline')
     const dateInput = await screen.findByLabelText('GSTR-1 responsibility start date')
     await user.type(dateInput, '2025-06-01')
     const respSection = screen.getByText('Responsibility start').closest('section') as HTMLElement
@@ -198,9 +206,10 @@ describe('CompliancePage — responsibility start', () => {
 
     renderPage('ROLE_OPERATOR')
 
+    expect(screen.queryByRole('button', { name: 'Add profile' })).not.toBeInTheDocument()
+    await openTab('Periods & baseline')
     await screen.findByText('Responsibility start')
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Add profile' })).not.toBeInTheDocument()
   })
 
   it('lists filer profile rows and adds one', async () => {
@@ -288,6 +297,7 @@ describe('CompliancePage — baseline', () => {
     mockPost.mockResolvedValue({ data: { confirmed: true } })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     await screen.findByText('Baseline 2025-04-01 to 2025-06-30')
     expect(screen.getByText('Imported filed data: not available')).toBeInTheDocument()
@@ -311,6 +321,7 @@ describe('CompliancePage — baseline', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     expect(await screen.findByText('Open tamper finding T-1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirm baseline' })).toBeDisabled()
@@ -328,6 +339,7 @@ describe('CompliancePage — baseline', () => {
     })
 
     const { unmount } = renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
     expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
       'Differences to explain (informational): 0',
     )
@@ -345,6 +357,7 @@ describe('CompliancePage — baseline', () => {
       discrepancyCount: null,
     })
     const second = renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
     expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
       'Differences to explain: Not available (import filed returns and map tax ledgers)',
     )
@@ -361,6 +374,7 @@ describe('CompliancePage — baseline', () => {
       discrepancyCount: 3,
     })
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
     expect(await screen.findByTestId('discrepancy-count')).toHaveTextContent(
       'Differences to explain (informational): 3',
     )
@@ -379,6 +393,7 @@ describe('CompliancePage — baseline', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Periods & baseline')
 
     expect(await screen.findByText('Baseline confirmed')).toBeInTheDocument()
     expect(
@@ -420,13 +435,15 @@ describe('CompliancePage — financial years', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
 
+    const user = userEvent.setup()
+    await user.click(await screen.findByText('Show open periods (1)'))
     await screen.findByText('TDS_PAYMENT 2024-07: not started')
     const itrOption = screen.getByRole('option', { name: 'ITR filed' }) as HTMLOptionElement
     expect(itrOption.disabled).toBe(true)
     expect(screen.getByText('Every period must be filed')).toBeInTheDocument()
 
-    const user = userEvent.setup()
     await user.type(screen.getByLabelText('Note'), 'Prior CA')
     await user.click(screen.getByRole('button', { name: 'Close year' }))
 
@@ -441,10 +458,38 @@ describe('CompliancePage — financial years', () => {
     )
   })
 
+  it('shows per-return summary with collapsible open periods', async () => {
+    mockYears([
+      {
+        ...openYear,
+        openItems: [
+          'GSTR1 2024-04: not started',
+          'GSTR1 2024-05: STARTED',
+          'TDS_PAYMENT 2024-07: not started',
+        ],
+      },
+    ])
+
+    renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
+
+    expect(await screen.findByText('2 open periods · 1 started')).toBeInTheDocument()
+    expect(screen.getByText('1 open period')).toBeInTheDocument()
+    expect(screen.getByText('1 open')).toBeInTheDocument()
+    expect(screen.queryByText('GSTR1 2024-04: not started')).not.toBeInTheDocument()
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByText('Show open periods (3)'))
+    expect(await screen.findByText('GSTR1 2024-04: not started')).toBeInTheDocument()
+    expect(screen.getByText('GSTR1 2024-05: STARTED')).toBeInTheDocument()
+    expect(screen.getByText('TDS_PAYMENT 2024-07: not started')).toBeInTheDocument()
+  })
+
   it('close type defaults to handled elsewhere', async () => {
     mockYears([openYear])
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
 
     const select = await screen.findByLabelText('Close type FY 2024') as HTMLSelectElement
     expect(select.value).toBe('HANDLED_ELSEWHERE')
@@ -457,6 +502,7 @@ describe('CompliancePage — financial years', () => {
     })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('Financial years')
 
     const select = await screen.findByLabelText('Close type FY 2024')
     const user = userEvent.setup()
@@ -508,6 +554,7 @@ describe('CompliancePage — TDS ledger mapping', () => {
     mockPut.mockResolvedValue({ data: {} })
 
     renderPage('ROLE_ACCOUNTANT')
+    await openTab('TDS')
 
     expect(await screen.findByText('TDS ledgers')).toBeInTheDocument()
     expect(
@@ -518,11 +565,75 @@ describe('CompliancePage — TDS ledger mapping', () => {
 
     const user = userEvent.setup()
     const tdsSection = screen.getByText('TDS ledgers').closest('section') as HTMLElement
+    const saveButton = await within(tdsSection).findByRole('button', { name: 'Save' })
+    expect(saveButton).toBeDisabled()
+    await user.click(
+      await within(tdsSection).findByRole('button', {
+        name: 'Use suggested for TDS Payable - Contractors',
+      }),
+    )
     await user.click(within(tdsSection).getByRole('button', { name: 'Save' }))
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalledWith('/v1/tds/ledger-mapping', {
         items: [{ ledgerName: 'TDS Payable - Contractors', role: 'TDS_PAYABLE', section: '194C' }],
       })
     })
+  })
+})
+
+describe('CompliancePage — tab badges', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('surfaces needs-answer, incomplete and open-year counts on tabs', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/v1/organizations/org-abc/tds-applicability') {
+        return Promise.resolve({
+          data: {
+            years: [
+              {
+                financialYear: 2025,
+                applicable: true,
+                basis: 'DECLARED',
+                needsAnswer: true,
+                priorYearTurnover: null,
+                turnoverNature: null,
+              },
+            ],
+          },
+        })
+      }
+      if (url === '/v1/compliance/financial-years') {
+        return Promise.resolve({
+          data: [
+            {
+              financialYear: 2024,
+              start: '2024-04-01',
+              end: '2025-03-31',
+              closed: false,
+              closeType: null,
+              itrAckNo: null,
+              itrAckDate: null,
+              note: null,
+              closable: false,
+              openItems: [],
+              blockers: [],
+            },
+          ],
+        })
+      }
+      return Promise.resolve({ data: fallbackData(url) })
+    })
+
+    renderPage('ROLE_ACCOUNTANT')
+
+    await screen.findByRole('tab', { name: 'TDS' })
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'TDS' }).textContent).toContain('2')
+      expect(screen.getByRole('tab', { name: 'Ledger mapping' }).textContent).toContain('✓')
+      expect(screen.getByRole('tab', { name: 'Financial years' }).textContent).toContain('1')
+    })
+    expect(screen.getByRole('tab', { name: 'GST' }).textContent).toBe('GST')
   })
 })

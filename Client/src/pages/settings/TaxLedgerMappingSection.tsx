@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
 import {
@@ -7,9 +8,29 @@ import {
   saveTaxLedgerMapping,
   TAX_LEDGER_MAPPING_QUERY_KEY,
   TAX_LEDGER_ROLE_LABELS,
-  type TaxLedgerRole,
   type GstHead,
+  type TaxLedgerMappingItem,
+  type TaxLedgerRole,
 } from '@/lib/taxMappingApi'
+import {
+  ALERT_ERROR_CLASS,
+  ALERT_ERROR_LIST_CLASS,
+  GHOST_BUTTON_CLASS,
+  LOADING_CLASS,
+  PILL_SUCCESS_CLASS,
+  PILL_WARNING_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECTION_CARD_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
+  TABLE_HEAD_CLASS,
+  TABLE_INPUT_CLASS,
+} from './sectionStyles'
 
 const ROLES = Object.keys(TAX_LEDGER_ROLE_LABELS) as TaxLedgerRole[]
 const HEADS: GstHead[] = ['IGST', 'CGST', 'SGST', 'CESS']
@@ -41,23 +62,23 @@ export function TaxLedgerMappingSection() {
     return { ...r, role, head, edited }
   })
 
-  const everyRowHasRole = rows.every((r) => r.role !== null)
-  const everyNonNotTaxHasHead = rows.every(
-    (r) => r.role === 'NOT_TAX' || r.head !== null,
+  // Dirty-state save: only rows the user touched are sent. A dirty row is
+  // client-valid when it has a role and, unless it is NOT_TAX, a head.
+  // Invalid dirty rows stay on screen with a per-row error and are skipped.
+  const dirtyRows = rows.filter((r) => r.edited)
+  const validDirtyRows = dirtyRows.filter(
+    (r) => r.role !== null && (r.role === 'NOT_TAX' || r.head !== null),
   )
-  const canSave = canEdit && everyRowHasRole && everyNonNotTaxHasHead
+  const canSave = canEdit && validDirtyRows.length > 0
 
   const mutation = useMutation({
-    mutationFn: () =>
-      saveTaxLedgerMapping(
-        rows.map((r) => ({
-          ledgerName: r.ledgerName,
-          role: r.role as TaxLedgerRole,
-          head: r.role === 'NOT_TAX' ? null : r.head,
-        })),
-      ),
-    onSuccess: () => {
-      setDrafts({})
+    mutationFn: (items: TaxLedgerMappingItem[]) => saveTaxLedgerMapping(items),
+    onSuccess: (_data, items) => {
+      setDrafts((prev) => {
+        const next = { ...prev }
+        for (const item of items) delete next[item.ledgerName]
+        return next
+      })
       queryClient.invalidateQueries({ queryKey: TAX_LEDGER_MAPPING_QUERY_KEY })
       queryClient.invalidateQueries({ queryKey: ['baseline-status'] })
     },
@@ -70,106 +91,151 @@ export function TaxLedgerMappingSection() {
     })
   }
 
-  if (isLoading) return <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
+  if (isLoading) {
+    return (
+      <div className={LOADING_CLASS}>
+        <Loader2 size={16} className="animate-spin" />
+        Loading…
+      </div>
+    )
+  }
   if (isError || !view)
     return (
-      <section>
-        <h2 className="text-lg font-semibold mb-2">Tax ledgers</h2>
-        <p role="alert" className="text-sm text-red-600">
+      <section className={SECTION_CARD_CLASS}>
+        <h2 className="text-lg font-semibold mb-3">Tax ledgers</h2>
+        <div role="alert" className={ALERT_ERROR_CLASS}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {apiErrorMessage(error, 'Could not load tax-ledger mapping')}
-        </p>
+        </div>
       </section>
     )
 
   return (
-    <section>
-      <div className="flex items-center gap-3 mb-2">
+    <section className={SECTION_CARD_CLASS}>
+      <div className="flex items-center gap-3 mb-3">
         <h2 className="text-lg font-semibold">Tax ledgers</h2>
-        <span
-          className={
-            complete
-              ? 'text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800'
-              : 'text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800'
-          }
-        >
+        <span className={complete ? PILL_SUCCESS_CLASS : PILL_WARNING_CLASS}>
           {complete ? 'Complete' : 'Incomplete'}
         </span>
       </div>
       {blockers.length > 0 && (
-        <ul className="text-sm text-red-600 mb-2 list-disc list-inside">
-          {blockers.map((b) => (
-            <li key={b}>{b}</li>
-          ))}
-        </ul>
+        <div className={`${ALERT_ERROR_LIST_CLASS} mb-3`}>
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+          <ul className="list-disc list-inside">
+            {blockers.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
       )}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left border-b">
-            <th className="py-2">Ledger</th>
-            <th className="py-2">Group</th>
-            <th className="py-2">Role</th>
-            <th className="py-2">Head</th>
-            <th className="py-2">Status</th>
+      <table className={STACKED_TABLE_CLASS}>
+        <thead className={STACKED_THEAD_CLASS}>
+          <tr className="text-left">
+            <th className={TABLE_HEAD_CLASS}>Ledger</th>
+            <th className={TABLE_HEAD_CLASS}>Group</th>
+            <th className={TABLE_HEAD_CLASS}>Role</th>
+            <th className={TABLE_HEAD_CLASS}>Head</th>
+            <th className={TABLE_HEAD_CLASS}>Status</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className={STACKED_BODY_CLASS}>
           {rows.map((r) => {
             const missingHead = r.role !== null && r.role !== 'NOT_TAX' && r.head === null
+            const suggestedRole =
+              r.role !== null && (r.role === 'NOT_TAX' || r.head !== null) ? r.role : null
             return (
-              <tr key={r.ledgerName} className="border-b">
-                <td className="py-2">{r.ledgerName}</td>
-                <td className="py-2">{r.parentGroup ?? '—'}</td>
-                <td className="py-2">
-                  <select
-                    aria-label={`Role for ${r.ledgerName}`}
-                    className="border rounded px-2 py-1 text-sm"
-                    disabled={!canEdit}
-                    value={r.role ?? ''}
-                    onChange={(e) => {
-                      const nextRole = (e.target.value || null) as TaxLedgerRole | null
-                      setDraft(r.ledgerName, { role: r.role, head: r.head }, { role: nextRole, head: null })
-                    }}
-                  >
-                    <option value="">—</option>
-                    {ROLES.map((roleOption) => (
-                      <option key={roleOption} value={roleOption}>
-                        {TAX_LEDGER_ROLE_LABELS[roleOption]}
-                      </option>
-                    ))}
-                  </select>
+              <tr key={r.ledgerName} className={STACKED_ROW_CLASS}>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Ledger</span>
+                  <span className={STACKED_VALUE_CLASS}>{r.ledgerName}</span>
                 </td>
-                <td className="py-2">
-                  <select
-                    aria-label={`Head for ${r.ledgerName}`}
-                    className="border rounded px-2 py-1 text-sm"
-                    disabled={!canEdit || r.role === 'NOT_TAX'}
-                    value={r.role === 'NOT_TAX' ? '' : (r.head ?? '')}
-                    onChange={(e) =>
-                      setDraft(
-                        r.ledgerName,
-                        { role: r.role, head: r.head },
-                        { head: (e.target.value || null) as GstHead | null },
-                      )
-                    }
-                  >
-                    <option value="">—</option>
-                    {HEADS.map((h) => (
-                      <option key={h} value={h}>
-                        {h}
-                      </option>
-                    ))}
-                  </select>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Group</span>
+                  <span className={STACKED_VALUE_CLASS}>{r.parentGroup ?? '—'}</span>
                 </td>
-                <td className="py-2">
-                  {missingHead ? (
-                    <span className="text-red-600">Choose a head</span>
-                  ) : r.saved ? (
-                    <>Saved by {r.savedBy ?? '—'}</>
-                  ) : r.edited ? (
-                    'Not saved'
-                  ) : (
-                    'Suggested, not saved'
-                  )}
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Role</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    <select
+                      aria-label={`Role for ${r.ledgerName}`}
+                      className={TABLE_INPUT_CLASS}
+                      disabled={!canEdit}
+                      value={r.role ?? ''}
+                      onChange={(e) => {
+                        const nextRole = (e.target.value || null) as TaxLedgerRole | null
+                        setDraft(r.ledgerName, { role: r.role, head: r.head }, { role: nextRole, head: null })
+                      }}
+                    >
+                      <option value="">—</option>
+                      {ROLES.map((roleOption) => (
+                        <option key={roleOption} value={roleOption}>
+                          {TAX_LEDGER_ROLE_LABELS[roleOption]}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Head</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    <select
+                      aria-label={`Head for ${r.ledgerName}`}
+                      className={TABLE_INPUT_CLASS}
+                      disabled={!canEdit || r.role === 'NOT_TAX'}
+                      value={r.role === 'NOT_TAX' ? '' : (r.head ?? '')}
+                      onChange={(e) =>
+                        setDraft(
+                          r.ledgerName,
+                          { role: r.role, head: r.head },
+                          { head: (e.target.value || null) as GstHead | null },
+                        )
+                      }
+                    >
+                      <option value="">—</option>
+                      {HEADS.map((h) => (
+                        <option key={h} value={h}>
+                          {h}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Status</span>
+                  <div className={`${STACKED_VALUE_CLASS} gap-2`}>
+                    {r.edited && r.role === null ? (
+                      <span className="text-[var(--color-danger)]">Choose a role</span>
+                    ) : missingHead ? (
+                      <span className="text-[var(--color-danger)]">Choose a head</span>
+                    ) : r.saved ? (
+                      <span className="text-[var(--color-text-secondary)]">
+                        Saved by {r.savedBy ?? '—'}
+                      </span>
+                    ) : r.edited ? (
+                      <span className="text-[var(--color-warning)]">Not saved</span>
+                    ) : (
+                      <span className="text-[var(--color-text-muted)]">Suggested, not saved</span>
+                    )}
+                    {canEdit && !r.saved && !r.edited && suggestedRole && (
+                      <button
+                        type="button"
+                        aria-label={`Use suggested for ${r.ledgerName}`}
+                        className={GHOST_BUTTON_CLASS}
+                        onClick={() => {
+                          if (!suggestedRole) return
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [r.ledgerName]: {
+                              role: suggestedRole,
+                              head: suggestedRole === 'NOT_TAX' ? null : r.head,
+                            },
+                          }))
+                        }}
+                      >
+                        Use suggested
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             )
@@ -177,16 +243,25 @@ export function TaxLedgerMappingSection() {
         </tbody>
       </table>
       {mutation.isError && (
-        <p role="alert" className="text-sm text-red-600 mt-2">
+        <div role="alert" className={`${ALERT_ERROR_CLASS} mt-3`}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {apiErrorMessage(mutation.error, 'Could not save the tax-ledger mapping')}
-        </p>
+        </div>
       )}
       {canEdit && (
         <button
           type="button"
-          className="mt-3 px-3 py-1.5 text-sm rounded bg-[var(--color-primary)] text-white disabled:opacity-50"
+          className={`mt-4 ${PRIMARY_BUTTON_CLASS}`}
           disabled={!canSave || mutation.isPending}
-          onClick={() => mutation.mutate()}
+          onClick={() =>
+            mutation.mutate(
+              validDirtyRows.map((r) => ({
+                ledgerName: r.ledgerName,
+                role: r.role as TaxLedgerRole,
+                head: r.role === 'NOT_TAX' ? null : r.head,
+              })),
+            )
+          }
         >
           Save
         </button>

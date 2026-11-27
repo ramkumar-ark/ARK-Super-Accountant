@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
 import { getOrganization } from '@/lib/tdsApi'
@@ -10,6 +11,22 @@ import {
   type ResponsibilityStart,
 } from '@/lib/complianceApi'
 import { WORKFLOW_TYPE_LABEL, WORKFLOW_TYPES, type WorkflowType } from '@/lib/workflowApi'
+import {
+  ALERT_ERROR_CLASS,
+  LOADING_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  PILL_WARNING_CLASS,
+  SECTION_CARD_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
+  TABLE_HEAD_CLASS,
+  TABLE_INPUT_CLASS,
+} from './sectionStyles'
 
 const ORDER: WorkflowType[] = [...WORKFLOW_TYPES]
 
@@ -57,30 +74,38 @@ export function ResponsibilityStartSection() {
     (rows ?? []).map((r) => [r.type, r]),
   )
 
-  if (isLoading) return <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>
+  if (isLoading) {
+    return (
+      <div className={LOADING_CLASS}>
+        <Loader2 size={16} className="animate-spin" />
+        Loading…
+      </div>
+    )
+  }
 
   return (
-    <section>
+    <section className={SECTION_CARD_CLASS}>
       <h2 className="text-lg font-semibold mb-2">Responsibility start</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-3">
         First period your firm prepares for each return. Earlier periods in open years become
         baseline.
       </p>
       {error && (
-        <p role="alert" className="text-sm text-red-600 mb-2">
+        <div role="alert" className={`${ALERT_ERROR_CLASS} mb-3`}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {error}
-        </p>
+        </div>
       )}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left border-b">
-            <th className="py-2">Return</th>
-            <th className="py-2">First period</th>
-            <th className="py-2">Baseline</th>
-            <th className="py-2"></th>
+      <table className={STACKED_TABLE_CLASS}>
+        <thead className={STACKED_THEAD_CLASS}>
+          <tr className="text-left">
+            <th className={TABLE_HEAD_CLASS}>Return</th>
+            <th className={TABLE_HEAD_CLASS}>First period</th>
+            <th className={TABLE_HEAD_CLASS}>Baseline</th>
+            <th className={TABLE_HEAD_CLASS}></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className={STACKED_BODY_CLASS}>
           {ORDER.filter((type) => !TDS_TYPES.includes(type) || anyTdsOn).map((type) => {
             const row = byType.get(type)
             const date = row?.firstPeriodStart ?? ''
@@ -88,28 +113,37 @@ export function ResponsibilityStartSection() {
             const fy = isTds && date ? fyOfDate(date, fyStartMonth) : null
             const notApplicable = fy !== null && !isTdsOnFor(fy)
             return (
-              <tr key={type} className="border-b">
-                <td className="py-2">{WORKFLOW_TYPE_LABEL[type]}</td>
-                <td className="py-2">
-                  {row?.firstPeriodStart ? (
-                    <span data-testid={`resp-${type}`}>{row.firstPeriodStart}</span>
-                  ) : (
-                    <span className="text-[var(--color-text-muted)]">Not set</span>
-                  )}
+              <tr key={type} className={STACKED_ROW_CLASS}>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Return</span>
+                  <span className={STACKED_VALUE_CLASS}>{WORKFLOW_TYPE_LABEL[type]}</span>
                 </td>
-                <td className="py-2">
-                  {row && row.baselineRowCount > 0 && (
-                    <span>
-                      {row.baselineRowCount} baseline periods
-                    </span>
-                  )}
-                  {row?.locked && (
-                    <span className="ml-2 px-1.5 py-0.5 text-xs rounded bg-amber-100 text-amber-800">
-                      Locked
-                    </span>
-                  )}
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>First period</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    {row?.firstPeriodStart ? (
+                      <span data-testid={`resp-${type}`}>{row.firstPeriodStart}</span>
+                    ) : (
+                      <span className="text-[var(--color-text-muted)]">Not set</span>
+                    )}
+                  </span>
                 </td>
-                <td className="py-2">
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Baseline</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    {row && row.baselineRowCount > 0 && (
+                      <span>
+                        {row.baselineRowCount} baseline periods
+                      </span>
+                    )}
+                    {row?.locked && (
+                      <span className={`ml-2 ${PILL_WARNING_CLASS}`}>
+                        Locked
+                      </span>
+                    )}
+                  </span>
+                </td>
+                <td className="flex sm:table-cell items-center justify-end gap-3 px-2 py-2.5 align-middle min-w-0">
                   {canEdit && (
                     <RespEditControl
                       type={type}
@@ -152,13 +186,13 @@ function RespEditControl({
         disabled={disabled}
         title={title}
         onChange={(e) => setDate(e.target.value)}
-        className="border rounded px-2 py-1 text-sm"
+        className={TABLE_INPUT_CLASS}
       />
       <button
         type="button"
         disabled={disabled || !date || date === initialDate}
         onClick={() => onSave(date)}
-        className="px-3 py-1 text-sm rounded bg-[var(--color-primary)] text-white disabled:opacity-50"
+        className={PRIMARY_BUTTON_CLASS}
       >
         Save
       </button>

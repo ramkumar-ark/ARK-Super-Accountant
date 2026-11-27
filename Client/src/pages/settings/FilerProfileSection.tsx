@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { apiErrorMessage } from '@/lib/apiError'
 import {
@@ -7,6 +8,21 @@ import {
   putFilerProfile,
   type FilerProfileInput,
 } from '@/lib/complianceApi'
+import {
+  ALERT_ERROR_CLASS,
+  INPUT_CLASS,
+  LOADING_CLASS,
+  PRIMARY_BUTTON_CLASS,
+  SECTION_CARD_CLASS,
+  STACKED_BODY_CLASS,
+  STACKED_CELL_CLASS,
+  STACKED_LABEL_CLASS,
+  STACKED_ROW_CLASS,
+  STACKED_TABLE_CLASS,
+  STACKED_THEAD_CLASS,
+  STACKED_VALUE_CLASS,
+  TABLE_HEAD_CLASS,
+} from './sectionStyles'
 
 export function FilerProfileSection() {
   const { user } = useAuthStore()
@@ -14,7 +30,7 @@ export function FilerProfileSection() {
   const canEdit = user?.role === 'ROLE_ACCOUNTANT'
   const [error, setError] = useState<string | null>(null)
 
-  const { data: profiles } = useQuery({
+  const { data: profiles, isLoading } = useQuery({
     queryKey: ['filer-profiles'],
     queryFn: getFilerProfiles,
   })
@@ -29,36 +45,68 @@ export function FilerProfileSection() {
     onError: (err) => setError(apiErrorMessage(err, 'Could not save filer profile')),
   })
 
+  if (isLoading) {
+    return (
+      <div className={LOADING_CLASS}>
+        <Loader2 size={16} className="animate-spin" />
+        Loading…
+      </div>
+    )
+  }
+
   return (
-    <section>
+    <section className={SECTION_CARD_CLASS}>
       <h2 className="text-lg font-semibold mb-2">Filer profile</h2>
       <p className="text-sm text-[var(--color-text-muted)] mb-3">
         GST filing frequency over time. Each row applies from its effective date.
       </p>
       {error && (
-        <p role="alert" className="text-sm text-red-600 mb-2">
+        <div role="alert" className={`${ALERT_ERROR_CLASS} mb-3`}>
+          <AlertCircle size={16} className="flex-shrink-0" />
           {error}
+        </div>
+      )}
+      {profiles && profiles.length === 0 && (
+        <p className="text-sm text-[var(--color-text-muted)] mb-4">
+          No filer profiles yet — add the first one below.
         </p>
       )}
       {profiles && profiles.length > 0 && (
-        <table className="w-full text-sm mb-4">
-          <thead>
-            <tr className="text-left border-b">
-              <th className="py-2">Effective from</th>
-              <th className="py-2">Frequency</th>
-              <th className="py-2">IFF</th>
-              <th className="py-2">E-invoice</th>
-              <th className="py-2">HSN digits</th>
+        <table className={`${STACKED_TABLE_CLASS} mb-4`}>
+          <thead className={STACKED_THEAD_CLASS}>
+            <tr className="text-left">
+              <th className={TABLE_HEAD_CLASS}>Effective from</th>
+              <th className={TABLE_HEAD_CLASS}>Frequency</th>
+              <th className={TABLE_HEAD_CLASS}>IFF</th>
+              <th className={TABLE_HEAD_CLASS}>E-invoice</th>
+              <th className={TABLE_HEAD_CLASS}>HSN digits</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className={STACKED_BODY_CLASS}>
             {profiles.map((p) => (
-              <tr key={p.id} className="border-b">
-                <td className="py-2">{p.effectiveFrom}</td>
-                <td className="py-2">{p.frequency === 'QRMP' ? 'QRMP (quarterly)' : 'Monthly'}</td>
-                <td className="py-2">{p.iffOptIn ? 'Yes' : 'No'}</td>
-                <td className="py-2">{p.einvoiceEnabled ? 'Yes' : 'No'}</td>
-                <td className="py-2">HSN: {p.hsnDigits} digits</td>
+              <tr key={p.id} className={STACKED_ROW_CLASS}>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Effective from</span>
+                  <span className={STACKED_VALUE_CLASS}>{p.effectiveFrom}</span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>Frequency</span>
+                  <span className={STACKED_VALUE_CLASS}>
+                    {p.frequency === 'QRMP' ? 'QRMP (quarterly)' : 'Monthly'}
+                  </span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>IFF</span>
+                  <span className={STACKED_VALUE_CLASS}>{p.iffOptIn ? 'Yes' : 'No'}</span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>E-invoice</span>
+                  <span className={STACKED_VALUE_CLASS}>{p.einvoiceEnabled ? 'Yes' : 'No'}</span>
+                </td>
+                <td className={STACKED_CELL_CLASS}>
+                  <span className={STACKED_LABEL_CLASS}>HSN digits</span>
+                  <span className={STACKED_VALUE_CLASS}>HSN: {p.hsnDigits} digits</span>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -90,7 +138,7 @@ function AddProfileForm({ onSubmit }: { onSubmit: (b: FilerProfileInput) => void
           aria-label="Frequency"
           value={frequency}
           onChange={(e) => setFrequency(e.target.value as 'MONTHLY' | 'QRMP')}
-          className="border rounded px-2 py-1 text-sm"
+          className={INPUT_CLASS}
         >
           <option value="MONTHLY">Monthly</option>
           <option value="QRMP">QRMP (quarterly)</option>
@@ -118,7 +166,7 @@ function AddProfileForm({ onSubmit }: { onSubmit: (b: FilerProfileInput) => void
           aria-label="HSN digits"
           value={hsnDigits}
           onChange={(e) => setHsnDigits(Number(e.target.value))}
-          className="border rounded px-2 py-1 text-sm"
+          className={INPUT_CLASS}
         >
           <option value={4}>4 digits</option>
           <option value={6}>6 digits</option>
@@ -131,13 +179,13 @@ function AddProfileForm({ onSubmit }: { onSubmit: (b: FilerProfileInput) => void
           aria-label="Effective from"
           value={effectiveFrom}
           onChange={(e) => setEffectiveFrom(e.target.value)}
-          className="border rounded px-2 py-1 text-sm"
+          className={INPUT_CLASS}
         />
       </label>
       <button
         type="submit"
         disabled={!effectiveFrom}
-        className="px-3 py-1.5 text-sm rounded bg-[var(--color-primary)] text-white disabled:opacity-50"
+        className={PRIMARY_BUTTON_CLASS}
       >
         Add profile
       </button>
