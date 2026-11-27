@@ -95,25 +95,24 @@ describe('TaxLedgerMappingSection', () => {
     expect(mockPut).not.toHaveBeenCalled()
   })
 
-  it('taxRoleWithoutHeadBlocksSave', async () => {
+  it('invalidDirtyRowBlocksItsOwnSaveButNotOtherDirtyRows', async () => {
     renderSection('ROLE_ACCOUNTANT')
 
     const user = userEvent.setup()
     const saveButton = await screen.findByRole('button', { name: 'Save' })
     expect(saveButton).toBeDisabled()
 
-    const cessRole = screen.getByLabelText('Role for Compensation Cess')
-    await user.selectOptions(cessRole, 'INPUT')
-    await user.selectOptions(screen.getByLabelText('Head for Compensation Cess'), 'CESS')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
-
     await user.selectOptions(screen.getByLabelText('Role for Output CGST'), 'OUTPUT')
     await user.selectOptions(screen.getByLabelText('Head for Output CGST'), '')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(screen.getByText('Choose a head')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Role for Compensation Cess'), 'INPUT')
+    await user.selectOptions(screen.getByLabelText('Head for Compensation Cess'), 'CESS')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
-  it('accountantSavesAllRows', async () => {
+  it('accountantSavesOnlyDirtyRows', async () => {
     renderSection('ROLE_ACCOUNTANT')
 
     const user = userEvent.setup()
@@ -125,10 +124,30 @@ describe('TaxLedgerMappingSection', () => {
       expect(mockPut).toHaveBeenCalled()
     })
     expect(mockPut).toHaveBeenCalledWith('/v1/gst/tax-ledger-mapping', {
-      items: [
-        { ledgerName: 'Output CGST', role: 'OUTPUT', head: 'CGST' },
-        { ledgerName: 'Compensation Cess', role: 'INPUT', head: 'CESS' },
-      ],
+      items: [{ ledgerName: 'Compensation Cess', role: 'INPUT', head: 'CESS' }],
+    })
+  })
+
+  it('useSuggestedAcceptsSuggestion', async () => {
+    renderSection('ROLE_ACCOUNTANT')
+
+    const user = userEvent.setup()
+    expect(
+      await screen.findByRole('button', { name: 'Use suggested for Output CGST' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Use suggested for Compensation Cess' }),
+    ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Use suggested for Output CGST' }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalled()
+    })
+    expect(mockPut).toHaveBeenCalledWith('/v1/gst/tax-ledger-mapping', {
+      items: [{ ledgerName: 'Output CGST', role: 'OUTPUT', head: 'CGST' }],
     })
   })
 
@@ -204,6 +223,7 @@ describe('TaxLedgerMappingSection', () => {
       'NOT_TAX',
     )
     expect(screen.getByLabelText('Head for Compensation Cess')).toBeDisabled()
+
     const roleSelect = screen.getByLabelText('Role for Output CGST')
     await user.selectOptions(roleSelect, 'CASH_BALANCE')
     expect(
@@ -213,8 +233,21 @@ describe('TaxLedgerMappingSection', () => {
     const headSelect = screen.getByLabelText('Head for Output CGST')
     expect(headSelect).toBeEnabled()
     expect(screen.getByText('Choose a head')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    // The valid NOT_TAX draft on Compensation Cess is enough to save;
+    // the invalid Output CGST draft is skipped, not blocking.
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     await user.selectOptions(headSelect, 'IGST')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('cashBalanceRoleWithoutHeadKeepsSaveDisabledUntilHeadChosen', async () => {
+    renderSection('ROLE_ACCOUNTANT')
+
+    const user = userEvent.setup()
+    await user.selectOptions(await screen.findByLabelText('Role for Output CGST'), 'CASH_BALANCE')
+    expect(screen.getByText('Choose a head')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await user.selectOptions(screen.getByLabelText('Head for Output CGST'), 'IGST')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
@@ -223,6 +256,9 @@ describe('TaxLedgerMappingSection', () => {
 
     expect(await screen.findAllByText('Suggested, not saved')).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Use suggested for Output CGST' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByLabelText('Role for Output CGST')).toBeDisabled()
     expect(screen.getByLabelText('Head for Output CGST')).toBeDisabled()
   })

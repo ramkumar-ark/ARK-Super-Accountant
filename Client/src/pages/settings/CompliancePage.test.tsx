@@ -565,6 +565,13 @@ describe('CompliancePage — TDS ledger mapping', () => {
 
     const user = userEvent.setup()
     const tdsSection = screen.getByText('TDS ledgers').closest('section') as HTMLElement
+    const saveButton = await within(tdsSection).findByRole('button', { name: 'Save' })
+    expect(saveButton).toBeDisabled()
+    await user.click(
+      await within(tdsSection).findByRole('button', {
+        name: 'Use suggested for TDS Payable - Contractors',
+      }),
+    )
     await user.click(within(tdsSection).getByRole('button', { name: 'Save' }))
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalledWith('/v1/tds/ledger-mapping', {

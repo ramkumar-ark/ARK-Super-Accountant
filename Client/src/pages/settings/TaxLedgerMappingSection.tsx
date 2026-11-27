@@ -8,12 +8,14 @@ import {
   saveTaxLedgerMapping,
   TAX_LEDGER_MAPPING_QUERY_KEY,
   TAX_LEDGER_ROLE_LABELS,
-  type TaxLedgerRole,
   type GstHead,
+  type TaxLedgerMappingItem,
+  type TaxLedgerRole,
 } from '@/lib/taxMappingApi'
 import {
   ALERT_ERROR_CLASS,
   ALERT_ERROR_LIST_CLASS,
+  GHOST_BUTTON_CLASS,
   LOADING_CLASS,
   PILL_SUCCESS_CLASS,
   PILL_WARNING_CLASS,
@@ -55,23 +57,23 @@ export function TaxLedgerMappingSection() {
     return { ...r, role, head, edited }
   })
 
-  const everyRowHasRole = rows.every((r) => r.role !== null)
-  const everyNonNotTaxHasHead = rows.every(
-    (r) => r.role === 'NOT_TAX' || r.head !== null,
+  // Dirty-state save: only rows the user touched are sent. A dirty row is
+  // client-valid when it has a role and, unless it is NOT_TAX, a head.
+  // Invalid dirty rows stay on screen with a per-row error and are skipped.
+  const dirtyRows = rows.filter((r) => r.edited)
+  const validDirtyRows = dirtyRows.filter(
+    (r) => r.role !== null && (r.role === 'NOT_TAX' || r.head !== null),
   )
-  const canSave = canEdit && everyRowHasRole && everyNonNotTaxHasHead
+  const canSave = canEdit && validDirtyRows.length > 0
 
   const mutation = useMutation({
-    mutationFn: () =>
-      saveTaxLedgerMapping(
-        rows.map((r) => ({
-          ledgerName: r.ledgerName,
-          role: r.role as TaxLedgerRole,
-          head: r.role === 'NOT_TAX' ? null : r.head,
-        })),
-      ),
-    onSuccess: () => {
-      setDrafts({})
+    mutationFn: (items: TaxLedgerMappingItem[]) => saveTaxLedgerMapping(items),
+    onSuccess: (_data, items) => {
+      setDrafts((prev) => {
+        const next = { ...prev }
+        for (const item of items) delete next[item.ledgerName]
+        return next
+      })
       queryClient.invalidateQueries({ queryKey: TAX_LEDGER_MAPPING_QUERY_KEY })
       queryClient.invalidateQueries({ queryKey: ['baseline-status'] })
     },
@@ -134,6 +136,8 @@ export function TaxLedgerMappingSection() {
         <tbody>
           {rows.map((r) => {
             const missingHead = r.role !== null && r.role !== 'NOT_TAX' && r.head === null
+            const suggestedRole =
+              r.role !== null && (r.role === 'NOT_TAX' || r.head !== null) ? r.role : null
             return (
               <tr key={r.ledgerName} className={TABLE_ROW_CLASS}>
                 <td className={TABLE_CELL_CLASS}>{r.ledgerName}</td>
@@ -180,17 +184,40 @@ export function TaxLedgerMappingSection() {
                   </select>
                 </td>
                 <td className={TABLE_CELL_CLASS}>
-                  {missingHead ? (
-                    <span className="text-[var(--color-danger)]">Choose a head</span>
-                  ) : r.saved ? (
-                    <span className="text-[var(--color-text-secondary)]">
-                      Saved by {r.savedBy ?? '—'}
-                    </span>
-                  ) : r.edited ? (
-                    <span className="text-[var(--color-warning)]">Not saved</span>
-                  ) : (
-                    <span className="text-[var(--color-text-muted)]">Suggested, not saved</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {r.edited && r.role === null ? (
+                      <span className="text-[var(--color-danger)]">Choose a role</span>
+                    ) : missingHead ? (
+                      <span className="text-[var(--color-danger)]">Choose a head</span>
+                    ) : r.saved ? (
+                      <span className="text-[var(--color-text-secondary)]">
+                        Saved by {r.savedBy ?? '—'}
+                      </span>
+                    ) : r.edited ? (
+                      <span className="text-[var(--color-warning)]">Not saved</span>
+                    ) : (
+                      <span className="text-[var(--color-text-muted)]">Suggested, not saved</span>
+                    )}
+                    {canEdit && !r.saved && !r.edited && suggestedRole && (
+                      <button
+                        type="button"
+                        aria-label={`Use suggested for ${r.ledgerName}`}
+                        className={GHOST_BUTTON_CLASS}
+                        onClick={() => {
+                          if (!suggestedRole) return
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [r.ledgerName]: {
+                              role: suggestedRole,
+                              head: suggestedRole === 'NOT_TAX' ? null : r.head,
+                            },
+                          }))
+                        }}
+                      >
+                        Use suggested
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             )
@@ -208,7 +235,15 @@ export function TaxLedgerMappingSection() {
           type="button"
           className={`mt-4 ${PRIMARY_BUTTON_CLASS}`}
           disabled={!canSave || mutation.isPending}
-          onClick={() => mutation.mutate()}
+          onClick={() =>
+            mutation.mutate(
+              validDirtyRows.map((r) => ({
+                ledgerName: r.ledgerName,
+                role: r.role as TaxLedgerRole,
+                head: r.role === 'NOT_TAX' ? null : r.head,
+              })),
+            )
+          }
         >
           Save
         </button>

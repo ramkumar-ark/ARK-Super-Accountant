@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useTdsApplicability } from '@/hooks/useTdsApplicability'
@@ -10,6 +10,7 @@ import {
   getTdsLedgerMapping,
   saveTdsLedgerMapping,
   TDS_LEDGER_ROLE_LABELS,
+  type TdsLedgerMappingItem,
   type TdsLedgerMappingRow,
   type TdsLedgerRole,
 } from '@/lib/tdsLedgerMappingApi'
@@ -17,6 +18,7 @@ import {
   ALERT_ERROR_CLASS,
   ALERT_ERROR_LIST_CLASS,
   ALERT_WARNING_LIST_CLASS,
+  GHOST_BUTTON_CLASS,
   LOADING_CLASS,
   PILL_SUCCESS_CLASS,
   PILL_WARNING_CLASS,
@@ -70,21 +72,22 @@ export function TdsLedgerMappingSection() {
   // Section is optional for TDS payable (null = combined / infer per voucher),
   // so only a role is required; payable rows hidden for non-deductors are neither
   // required nor saved.
+  // Dirty-state save: only rows the user touched are sent. A dirty row is
+  // client-valid once it has a role; invalid dirty rows stay on screen with a
+  // per-row error and are skipped.
   const savableRows = anyTdsOn ? rows : receivableRows
-  const everyRowHasRole = savableRows.every((r) => r.role !== null)
-  const canSave = canEdit && savableRows.length > 0 && everyRowHasRole
+  const dirtyRows = savableRows.filter((r) => r.edited)
+  const validDirtyRows = dirtyRows.filter((r) => r.role !== null)
+  const canSave = canEdit && validDirtyRows.length > 0
 
   const mutation = useMutation({
-    mutationFn: () =>
-      saveTdsLedgerMapping(
-        savableRows.map((r) => ({
-          ledgerName: r.ledgerName,
-          role: r.role as TdsLedgerRole,
-          section: r.role === 'TDS_PAYABLE' ? r.section : null,
-        })),
-      ),
-    onSuccess: () => {
-      setDrafts({})
+    mutationFn: (items: TdsLedgerMappingItem[]) => saveTdsLedgerMapping(items),
+    onSuccess: (_data, items) => {
+      setDrafts((prev) => {
+        const next = { ...prev }
+        for (const item of items) delete next[item.ledgerName]
+        return next
+      })
       queryClient.invalidateQueries({ queryKey: TDS_LEDGER_MAPPING_QUERY_KEY })
     },
   })
@@ -154,7 +157,7 @@ export function TdsLedgerMappingSection() {
               </thead>
               <tbody>
                 {payableRows.map((r) => (
-                  <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} />
+                  <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} setDrafts={setDrafts} />
                 ))}
               </tbody>
             </table>
@@ -191,7 +194,7 @@ export function TdsLedgerMappingSection() {
             </thead>
             <tbody>
               {receivableRows.map((r) => (
-                <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} />
+                <LedgerRow key={r.ledgerName} r={r} canEdit={canEdit} setDraft={setDraft} setDrafts={setDrafts} />
               ))}
             </tbody>
           </table>
@@ -208,7 +211,15 @@ export function TdsLedgerMappingSection() {
           type="button"
           className={`mt-4 ${PRIMARY_BUTTON_CLASS}`}
           disabled={!canSave || mutation.isPending}
-          onClick={() => mutation.mutate()}
+          onClick={() =>
+            mutation.mutate(
+              validDirtyRows.map((r) => ({
+                ledgerName: r.ledgerName,
+                role: r.role as TdsLedgerRole,
+                section: r.role === 'TDS_PAYABLE' ? r.section : null,
+              })),
+            )
+          }
         >
           Save
         </button>
@@ -221,13 +232,16 @@ function LedgerRow({
   r,
   canEdit,
   setDraft,
+  setDrafts,
 }: {
   r: Row
   canEdit: boolean
   setDraft: (ledgerName: string, base: Draft, patch: Partial<Draft>) => void
+  setDrafts: Dispatch<SetStateAction<Record<string, Draft>>>
 }) {
   const { data: tdsSections } = useTdsSections()
   const sectionOptions = buildTdsSectionOptions(tdsSections).filter((o) => o.value !== 'NOT_SUBJECT')
+  const suggestedRole = r.role !== null ? r.role : null
   return (
     <tr className={TABLE_ROW_CLASS}>
       <td className={TABLE_CELL_CLASS}>{r.ledgerName}</td>
@@ -270,13 +284,36 @@ function LedgerRow({
         </select>
       </td>
       <td className={TABLE_CELL_CLASS}>
-        {r.saved ? (
-          <span className="text-[var(--color-text-secondary)]">Saved by {r.savedBy ?? '—'}</span>
-        ) : r.edited ? (
-          <span className="text-[var(--color-warning)]">Not saved</span>
-        ) : (
-          <span className="text-[var(--color-text-muted)]">Suggested, not saved</span>
-        )}
+        <div className="flex items-center gap-2">
+          {r.edited && r.role === null ? (
+            <span className="text-[var(--color-danger)]">Choose a role</span>
+          ) : r.saved ? (
+            <span className="text-[var(--color-text-secondary)]">Saved by {r.savedBy ?? '—'}</span>
+          ) : r.edited ? (
+            <span className="text-[var(--color-warning)]">Not saved</span>
+          ) : (
+            <span className="text-[var(--color-text-muted)]">Suggested, not saved</span>
+          )}
+          {canEdit && !r.saved && !r.edited && suggestedRole && (
+            <button
+              type="button"
+              aria-label={`Use suggested for ${r.ledgerName}`}
+              className={GHOST_BUTTON_CLASS}
+              onClick={() => {
+                if (!suggestedRole) return
+                setDrafts((prev) => ({
+                  ...prev,
+                  [r.ledgerName]: {
+                    role: suggestedRole,
+                    section: suggestedRole === 'TDS_PAYABLE' ? r.section : null,
+                  },
+                }))
+              }}
+            >
+              Use suggested
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   )

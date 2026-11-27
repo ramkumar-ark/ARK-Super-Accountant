@@ -31,6 +31,9 @@ export const TABLE_INPUT_CLASS =
 export const PRIMARY_BUTTON_CLASS =
   'px-3 py-1.5 text-sm rounded-[var(--radius-md)] bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50'
 
+export const GHOST_BUTTON_CLASS =
+  'text-xs px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)]'
+
 export const PILL_SUCCESS_CLASS =
   'px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-success-bg)] text-[var(--color-success)]'
 

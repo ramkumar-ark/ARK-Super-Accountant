@@ -146,7 +146,10 @@ describe('TdsLedgerMappingSection', () => {
     renderSection('ROLE_ACCOUNTANT', false)
 
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Save' }))
+    await user.click(
+      await screen.findByRole('button', { name: 'Use suggested for TDS Receivable - Customers' }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(mockPut).toHaveBeenCalled()
@@ -156,7 +159,7 @@ describe('TdsLedgerMappingSection', () => {
     })
   })
 
-  it('accountantSavesAllRows', async () => {
+  it('accountantSavesOnlyDirtyRows', async () => {
     renderSection('ROLE_ACCOUNTANT')
 
     const user = userEvent.setup()
@@ -167,11 +170,7 @@ describe('TdsLedgerMappingSection', () => {
       expect(mockPut).toHaveBeenCalled()
     })
     expect(mockPut).toHaveBeenCalledWith('/v1/tds/ledger-mapping', {
-      items: [
-        { ledgerName: 'TDS Payable - Contractors', role: 'TDS_PAYABLE', section: '194C' },
-        { ledgerName: 'TDS Payable - Unknown', role: 'NOT_TDS', section: null },
-        { ledgerName: 'TDS Receivable - Customers', role: 'TDS_RECEIVABLE', section: null },
-      ],
+      items: [{ ledgerName: 'TDS Payable - Unknown', role: 'NOT_TDS', section: null }],
     })
   })
 
@@ -201,7 +200,6 @@ describe('TdsLedgerMappingSection', () => {
       items: [
         { ledgerName: 'TDS Payable - Contractors', role: 'TDS_PAYABLE', section: null },
         { ledgerName: 'TDS Payable - Unknown', role: 'NOT_TDS', section: null },
-        { ledgerName: 'TDS Receivable - Customers', role: 'TDS_RECEIVABLE', section: null },
       ],
     })
   })
@@ -211,6 +209,9 @@ describe('TdsLedgerMappingSection', () => {
 
     expect(await screen.findAllByText('Suggested, not saved')).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Use suggested for TDS Payable - Contractors' }),
+    ).not.toBeInTheDocument()
     expect(screen.getByLabelText('Role for TDS Payable - Contractors')).toBeDisabled()
     expect(screen.getByLabelText('Section for TDS Payable - Contractors')).toBeDisabled()
     expect(screen.getByLabelText('Role for TDS Receivable - Customers')).toBeDisabled()
