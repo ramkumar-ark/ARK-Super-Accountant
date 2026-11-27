@@ -8,17 +8,46 @@ run_scenario() {
 
   # ---------- prepare side: books from Apr 2024, GSTR-1 first period Apr 2024 ----------
   as_owner
-  local prepare_org; prepare_org=$(state_get org_id)
+  # A dedicated prepare org: the bootstrap org already carries GSTR1 workflows
+  # from earlier scenarios, which lock its responsibility start.
+  req "prepare-org-create" POST /api/organizations \
+    '{"name":"Verify B2CL Prepare","gstin":"29AAVCS5633E1ZM","pan":"AAVCS5633E","registeredAddress":"Test Street 1","financialYearStart":4}'
+  expect_status 201 || vsa_fail "prepare org create failed: $RESP"
+  local prepare_org; prepare_org=$(echo "$RESP" | jq -r .id)
+  state_set b2cl_prepare_org "$prepare_org"
+
+  VSA_JWT="$(state_get owner_token)"
+  vsa_org_accountant "$prepare_org" b2clprepare
   vsa_psql "update organizations set books_start_date='2024-04-01' where id='$prepare_org'"
-  as_accountant
+
+  req "prepare-masters-upload" POST /api/v1/uploads "" "$fixtures/masters.json"
+  expect_status "200|201" || vsa_fail "prepare masters upload failed: $RESP"
+
+  local items='[' first=1 r role label h
+  for r in OUTPUT:Output INPUT:Input CASH_BALANCE:Cash LIABILITY_BALANCE:Liability CREDIT_BALANCE:"Credit Balance" GST_TDS:"GST TDS"; do
+    role=${r%%:*}; label=${r#*:}
+    for h in CGST SGST IGST; do
+      [ $first = 1 ] && first=0 || items="$items,"
+      items="$items{\"ledgerName\":\"$label $h\",\"role\":\"$role\",\"head\":\"$h\"}"
+    done
+  done
+  items="$items]"
+  req "prepare-tax-ledger-mapping" PUT /api/v1/gst/tax-ledger-mapping "{\"items\":$items}"
+  expect_status "200|201" || vsa_fail "prepare tax ledger mapping failed: $RESP"
+  save_tds_mapping_from_view
+
+  req "prepare-responsibility-start" PUT /api/v1/compliance/responsibility-start \
+    '{"type":"GSTR1","firstPeriodStart":"2024-04-01"}'
+  expect_status "200|201" || vsa_fail "prepare responsibility-start failed: $RESP"
   req "prepare-responsibility-start" PUT /api/v1/compliance/responsibility-start \
     '{"type":"GSTR1","firstPeriodStart":"2024-04-01"}'
   expect_status "200|201" || vsa_fail "prepare responsibility-start failed: $RESP"
 
+  VSA_WF_JWT="$(state_get acct_token_b2clprepare)"
   local jul; jul=$(fresh_workflow GSTR1 2024-07 "$fixtures/daybook-b2cl-threshold-jul.json")
   local aug; aug=$(fresh_workflow GSTR1 2024-08 "$fixtures/daybook-b2cl-threshold-aug.json")
 
-  as_accountant
+  VSA_JWT="$(state_get acct_token_b2clprepare)"
   req "prepare-tables-jul" GET "/api/v1/workflows/$jul/gstr1/tables"
   expect_status 200 || vsa_fail "July tables failed: $RESP"
   expect_json '[.tables[].tableCode] | index("B2CS") != null' \
