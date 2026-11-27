@@ -148,7 +148,7 @@ The ledger where deducted TDS accumulates before it is deposited, mapped with th
 payable role. It may cover one section code, or be combined (no section), in which case
 the section is worked out from each voucher at analysis time. An unmapped one blocks
 TDS analysis and workflow advance, and refuses day-book uploads for TDS-applicable
-organizations. GST-taxtype and EXPENSE/PURCHASE/GST-category ledgers are never candidates.
+organizations. Candidate rules: ADR 0009.
 _Avoid_: TDS liability ledger, TDS out ledger
 
 ## TDS receivable ledger
