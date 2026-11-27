@@ -40,3 +40,4 @@ How a user reaches each feature, how an agent drives it over HTTP, and what obse
 
 - Re-check file:line anchors whenever a PR touches a controller or GSTR-1 UI.
 - Scenario files live in `scenarios/`; fixtures in `scenarios/fixtures/` (synthetic, committed — never from Downloads).
+| Statutory admin (app administrator) | /settings/statutory | `GET /api/statutory/sections` (any authenticated user, `canEdit` flag), writes (rules/deactivate/activate/delete, `POST /api/statutory/sections`) refused for every company role, audit list admin-only; grant via SQL `update users set app_admin = true` | 403 per role per endpoint; 201 + `superseded.effectiveTo=2027-03-31`; 400 overlap/bad-FY; 409 seeded delete; audit RULE_ADDED | `statutory-admin` |
