@@ -150,8 +150,7 @@ class StatutoryAdminIT {
         String sectionId = seededSectionId("194C");
         mockMvc.perform(post("/api/statutory/sections/" + sectionId + "/rules").with(user(admin))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"rateCompany\":2,\"rateNonCompany\":2,\"effectiveFrom\":\"2040-04-01\","
-                                + "\"legalReference\":\"s.194C\",\"sourceCitation\":\"test\"}"))
+                        .content(ruleJson(LocalDate.of(2040, 4, 1))))
                 .andExpect(status().is2xxSuccessful());
         mockMvc.perform(get("/api/statutory/sections").with(user(principal("reader2", ERole.ROLE_OPERATOR))))
                 .andExpect(status().isOk())
@@ -159,7 +158,7 @@ class StatutoryAdminIT {
         mockMvc.perform(get("/api/statutory/sections").with(user(admin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sections[?(@.code == '194C')].rules[*].createdBy",
-                        org.hamcrest.Matchers.hasItem("actorvis")));
+                        org.hamcrest.Matchers.hasItem(admin.getUsername())));
     }
 
     @Test
