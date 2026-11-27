@@ -165,6 +165,8 @@ with its description, Form 26Q / Form 140 codes and a flag for payee-split rates
 thresholds and the legal reference for a period live on dated rule rows beside it, so a
 Finance Act change is a data change. Ledger mappings point at the stable code; the reference
 shown (194C or 393(1) ...) comes from the rule row covering the period.
+GST parameters (B2CL threshold, IFF cap, GST rates) are stored the same way, as pseudo-sections
+under statute CGST with dated rule rows, and read through `GstParameters`.
 _Avoid_: section config (the legacy per-section config columns are frozen)
 
 ## Payee-split rate
